@@ -60,8 +60,24 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
   @override
-  List<GeneratedColumn> get $columns => [id, monto, tipo, fecha, descripcion];
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    monto,
+    tipo,
+    fecha,
+    descripcion,
+    medio,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -108,6 +124,12 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
         ),
       );
     }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
     return context;
   }
 
@@ -137,6 +159,10 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
         DriftSqlType.string,
         data['${effectivePrefix}descripcion'],
       ),
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
     );
   }
 
@@ -152,12 +178,14 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
   final String tipo;
   final DateTime fecha;
   final String? descripcion;
+  final String? medio;
   const Ingreso({
     required this.id,
     required this.monto,
     required this.tipo,
     required this.fecha,
     this.descripcion,
+    this.medio,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -168,6 +196,9 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
     map['fecha'] = Variable<DateTime>(fecha);
     if (!nullToAbsent || descripcion != null) {
       map['descripcion'] = Variable<String>(descripcion);
+    }
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
     }
     return map;
   }
@@ -181,6 +212,9 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       descripcion: descripcion == null && nullToAbsent
           ? const Value.absent()
           : Value(descripcion),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
     );
   }
 
@@ -195,6 +229,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       tipo: serializer.fromJson<String>(json['tipo']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       descripcion: serializer.fromJson<String?>(json['descripcion']),
+      medio: serializer.fromJson<String?>(json['medio']),
     );
   }
   @override
@@ -206,6 +241,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       'tipo': serializer.toJson<String>(tipo),
       'fecha': serializer.toJson<DateTime>(fecha),
       'descripcion': serializer.toJson<String?>(descripcion),
+      'medio': serializer.toJson<String?>(medio),
     };
   }
 
@@ -215,12 +251,14 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
     String? tipo,
     DateTime? fecha,
     Value<String?> descripcion = const Value.absent(),
+    Value<String?> medio = const Value.absent(),
   }) => Ingreso(
     id: id ?? this.id,
     monto: monto ?? this.monto,
     tipo: tipo ?? this.tipo,
     fecha: fecha ?? this.fecha,
     descripcion: descripcion.present ? descripcion.value : this.descripcion,
+    medio: medio.present ? medio.value : this.medio,
   );
   Ingreso copyWithCompanion(IngresosCompanion data) {
     return Ingreso(
@@ -231,6 +269,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       descripcion: data.descripcion.present
           ? data.descripcion.value
           : this.descripcion,
+      medio: data.medio.present ? data.medio.value : this.medio,
     );
   }
 
@@ -241,13 +280,14 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
           ..write('monto: $monto, ')
           ..write('tipo: $tipo, ')
           ..write('fecha: $fecha, ')
-          ..write('descripcion: $descripcion')
+          ..write('descripcion: $descripcion, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, monto, tipo, fecha, descripcion);
+  int get hashCode => Object.hash(id, monto, tipo, fecha, descripcion, medio);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -256,7 +296,8 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
           other.monto == this.monto &&
           other.tipo == this.tipo &&
           other.fecha == this.fecha &&
-          other.descripcion == this.descripcion);
+          other.descripcion == this.descripcion &&
+          other.medio == this.medio);
 }
 
 class IngresosCompanion extends UpdateCompanion<Ingreso> {
@@ -265,12 +306,14 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
   final Value<String> tipo;
   final Value<DateTime> fecha;
   final Value<String?> descripcion;
+  final Value<String?> medio;
   const IngresosCompanion({
     this.id = const Value.absent(),
     this.monto = const Value.absent(),
     this.tipo = const Value.absent(),
     this.fecha = const Value.absent(),
     this.descripcion = const Value.absent(),
+    this.medio = const Value.absent(),
   });
   IngresosCompanion.insert({
     this.id = const Value.absent(),
@@ -278,6 +321,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     this.tipo = const Value.absent(),
     required DateTime fecha,
     this.descripcion = const Value.absent(),
+    this.medio = const Value.absent(),
   }) : monto = Value(monto),
        fecha = Value(fecha);
   static Insertable<Ingreso> custom({
@@ -286,6 +330,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     Expression<String>? tipo,
     Expression<DateTime>? fecha,
     Expression<String>? descripcion,
+    Expression<String>? medio,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -293,6 +338,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
       if (tipo != null) 'tipo': tipo,
       if (fecha != null) 'fecha': fecha,
       if (descripcion != null) 'descripcion': descripcion,
+      if (medio != null) 'medio': medio,
     });
   }
 
@@ -302,6 +348,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     Value<String>? tipo,
     Value<DateTime>? fecha,
     Value<String?>? descripcion,
+    Value<String?>? medio,
   }) {
     return IngresosCompanion(
       id: id ?? this.id,
@@ -309,6 +356,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
       tipo: tipo ?? this.tipo,
       fecha: fecha ?? this.fecha,
       descripcion: descripcion ?? this.descripcion,
+      medio: medio ?? this.medio,
     );
   }
 
@@ -330,6 +378,9 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     if (descripcion.present) {
       map['descripcion'] = Variable<String>(descripcion.value);
     }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
     return map;
   }
 
@@ -340,7 +391,8 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
           ..write('monto: $monto, ')
           ..write('tipo: $tipo, ')
           ..write('fecha: $fecha, ')
-          ..write('descripcion: $descripcion')
+          ..write('descripcion: $descripcion, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
@@ -411,6 +463,15 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -419,6 +480,7 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
     categoria,
     fecha,
     nota,
+    medio,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -473,6 +535,12 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
         nota.isAcceptableOrUnknown(data['nota']!, _notaMeta),
       );
     }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
     return context;
   }
 
@@ -506,6 +574,10 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
         DriftSqlType.string,
         data['${effectivePrefix}nota'],
       ),
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
     );
   }
 
@@ -522,6 +594,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
   final String categoria;
   final DateTime fecha;
   final String? nota;
+  final String? medio;
   const Gasto({
     required this.id,
     required this.nombre,
@@ -529,6 +602,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     required this.categoria,
     required this.fecha,
     this.nota,
+    this.medio,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -541,6 +615,9 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     if (!nullToAbsent || nota != null) {
       map['nota'] = Variable<String>(nota);
     }
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
+    }
     return map;
   }
 
@@ -552,6 +629,9 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       categoria: Value(categoria),
       fecha: Value(fecha),
       nota: nota == null && nullToAbsent ? const Value.absent() : Value(nota),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
     );
   }
 
@@ -567,6 +647,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       categoria: serializer.fromJson<String>(json['categoria']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       nota: serializer.fromJson<String?>(json['nota']),
+      medio: serializer.fromJson<String?>(json['medio']),
     );
   }
   @override
@@ -579,6 +660,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       'categoria': serializer.toJson<String>(categoria),
       'fecha': serializer.toJson<DateTime>(fecha),
       'nota': serializer.toJson<String?>(nota),
+      'medio': serializer.toJson<String?>(medio),
     };
   }
 
@@ -589,6 +671,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     String? categoria,
     DateTime? fecha,
     Value<String?> nota = const Value.absent(),
+    Value<String?> medio = const Value.absent(),
   }) => Gasto(
     id: id ?? this.id,
     nombre: nombre ?? this.nombre,
@@ -596,6 +679,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     categoria: categoria ?? this.categoria,
     fecha: fecha ?? this.fecha,
     nota: nota.present ? nota.value : this.nota,
+    medio: medio.present ? medio.value : this.medio,
   );
   Gasto copyWithCompanion(GastosCompanion data) {
     return Gasto(
@@ -605,6 +689,7 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       categoria: data.categoria.present ? data.categoria.value : this.categoria,
       fecha: data.fecha.present ? data.fecha.value : this.fecha,
       nota: data.nota.present ? data.nota.value : this.nota,
+      medio: data.medio.present ? data.medio.value : this.medio,
     );
   }
 
@@ -616,13 +701,15 @@ class Gasto extends DataClass implements Insertable<Gasto> {
           ..write('monto: $monto, ')
           ..write('categoria: $categoria, ')
           ..write('fecha: $fecha, ')
-          ..write('nota: $nota')
+          ..write('nota: $nota, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, nombre, monto, categoria, fecha, nota);
+  int get hashCode =>
+      Object.hash(id, nombre, monto, categoria, fecha, nota, medio);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -632,7 +719,8 @@ class Gasto extends DataClass implements Insertable<Gasto> {
           other.monto == this.monto &&
           other.categoria == this.categoria &&
           other.fecha == this.fecha &&
-          other.nota == this.nota);
+          other.nota == this.nota &&
+          other.medio == this.medio);
 }
 
 class GastosCompanion extends UpdateCompanion<Gasto> {
@@ -642,6 +730,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
   final Value<String> categoria;
   final Value<DateTime> fecha;
   final Value<String?> nota;
+  final Value<String?> medio;
   const GastosCompanion({
     this.id = const Value.absent(),
     this.nombre = const Value.absent(),
@@ -649,6 +738,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     this.categoria = const Value.absent(),
     this.fecha = const Value.absent(),
     this.nota = const Value.absent(),
+    this.medio = const Value.absent(),
   });
   GastosCompanion.insert({
     this.id = const Value.absent(),
@@ -657,6 +747,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     required String categoria,
     required DateTime fecha,
     this.nota = const Value.absent(),
+    this.medio = const Value.absent(),
   }) : nombre = Value(nombre),
        monto = Value(monto),
        categoria = Value(categoria),
@@ -668,6 +759,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     Expression<String>? categoria,
     Expression<DateTime>? fecha,
     Expression<String>? nota,
+    Expression<String>? medio,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -676,6 +768,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
       if (categoria != null) 'categoria': categoria,
       if (fecha != null) 'fecha': fecha,
       if (nota != null) 'nota': nota,
+      if (medio != null) 'medio': medio,
     });
   }
 
@@ -686,6 +779,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     Value<String>? categoria,
     Value<DateTime>? fecha,
     Value<String?>? nota,
+    Value<String?>? medio,
   }) {
     return GastosCompanion(
       id: id ?? this.id,
@@ -694,6 +788,7 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
       categoria: categoria ?? this.categoria,
       fecha: fecha ?? this.fecha,
       nota: nota ?? this.nota,
+      medio: medio ?? this.medio,
     );
   }
 
@@ -718,6 +813,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     if (nota.present) {
       map['nota'] = Variable<String>(nota.value);
     }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
     return map;
   }
 
@@ -729,7 +827,8 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
           ..write('monto: $monto, ')
           ..write('categoria: $categoria, ')
           ..write('fecha: $fecha, ')
-          ..write('nota: $nota')
+          ..write('nota: $nota, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
@@ -1443,6 +1542,15 @@ class $PagosDeudaTable extends PagosDeuda
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1450,6 +1558,7 @@ class $PagosDeudaTable extends PagosDeuda
     monto,
     fecha,
     operationId,
+    medio,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1499,6 +1608,12 @@ class $PagosDeudaTable extends PagosDeuda
         ),
       );
     }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
     return context;
   }
 
@@ -1528,6 +1643,10 @@ class $PagosDeudaTable extends PagosDeuda
         DriftSqlType.string,
         data['${effectivePrefix}operation_id'],
       ),
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
     );
   }
 
@@ -1543,12 +1662,14 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
   final double monto;
   final DateTime fecha;
   final String? operationId;
+  final String? medio;
   const PagosDeudaData({
     required this.id,
     required this.deudaId,
     required this.monto,
     required this.fecha,
     this.operationId,
+    this.medio,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1559,6 +1680,9 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
     map['fecha'] = Variable<DateTime>(fecha);
     if (!nullToAbsent || operationId != null) {
       map['operation_id'] = Variable<String>(operationId);
+    }
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
     }
     return map;
   }
@@ -1572,6 +1696,9 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
       operationId: operationId == null && nullToAbsent
           ? const Value.absent()
           : Value(operationId),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
     );
   }
 
@@ -1586,6 +1713,7 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
       monto: serializer.fromJson<double>(json['monto']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       operationId: serializer.fromJson<String?>(json['operationId']),
+      medio: serializer.fromJson<String?>(json['medio']),
     );
   }
   @override
@@ -1597,6 +1725,7 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
       'monto': serializer.toJson<double>(monto),
       'fecha': serializer.toJson<DateTime>(fecha),
       'operationId': serializer.toJson<String?>(operationId),
+      'medio': serializer.toJson<String?>(medio),
     };
   }
 
@@ -1606,12 +1735,14 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
     double? monto,
     DateTime? fecha,
     Value<String?> operationId = const Value.absent(),
+    Value<String?> medio = const Value.absent(),
   }) => PagosDeudaData(
     id: id ?? this.id,
     deudaId: deudaId ?? this.deudaId,
     monto: monto ?? this.monto,
     fecha: fecha ?? this.fecha,
     operationId: operationId.present ? operationId.value : this.operationId,
+    medio: medio.present ? medio.value : this.medio,
   );
   PagosDeudaData copyWithCompanion(PagosDeudaCompanion data) {
     return PagosDeudaData(
@@ -1622,6 +1753,7 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
       operationId: data.operationId.present
           ? data.operationId.value
           : this.operationId,
+      medio: data.medio.present ? data.medio.value : this.medio,
     );
   }
 
@@ -1632,13 +1764,15 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
           ..write('deudaId: $deudaId, ')
           ..write('monto: $monto, ')
           ..write('fecha: $fecha, ')
-          ..write('operationId: $operationId')
+          ..write('operationId: $operationId, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, deudaId, monto, fecha, operationId);
+  int get hashCode =>
+      Object.hash(id, deudaId, monto, fecha, operationId, medio);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1647,7 +1781,8 @@ class PagosDeudaData extends DataClass implements Insertable<PagosDeudaData> {
           other.deudaId == this.deudaId &&
           other.monto == this.monto &&
           other.fecha == this.fecha &&
-          other.operationId == this.operationId);
+          other.operationId == this.operationId &&
+          other.medio == this.medio);
 }
 
 class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
@@ -1656,12 +1791,14 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
   final Value<double> monto;
   final Value<DateTime> fecha;
   final Value<String?> operationId;
+  final Value<String?> medio;
   const PagosDeudaCompanion({
     this.id = const Value.absent(),
     this.deudaId = const Value.absent(),
     this.monto = const Value.absent(),
     this.fecha = const Value.absent(),
     this.operationId = const Value.absent(),
+    this.medio = const Value.absent(),
   });
   PagosDeudaCompanion.insert({
     this.id = const Value.absent(),
@@ -1669,6 +1806,7 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
     required double monto,
     required DateTime fecha,
     this.operationId = const Value.absent(),
+    this.medio = const Value.absent(),
   }) : deudaId = Value(deudaId),
        monto = Value(monto),
        fecha = Value(fecha);
@@ -1678,6 +1816,7 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
     Expression<double>? monto,
     Expression<DateTime>? fecha,
     Expression<String>? operationId,
+    Expression<String>? medio,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1685,6 +1824,7 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
       if (monto != null) 'monto': monto,
       if (fecha != null) 'fecha': fecha,
       if (operationId != null) 'operation_id': operationId,
+      if (medio != null) 'medio': medio,
     });
   }
 
@@ -1694,6 +1834,7 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
     Value<double>? monto,
     Value<DateTime>? fecha,
     Value<String?>? operationId,
+    Value<String?>? medio,
   }) {
     return PagosDeudaCompanion(
       id: id ?? this.id,
@@ -1701,6 +1842,7 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
       monto: monto ?? this.monto,
       fecha: fecha ?? this.fecha,
       operationId: operationId ?? this.operationId,
+      medio: medio ?? this.medio,
     );
   }
 
@@ -1722,6 +1864,9 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
     if (operationId.present) {
       map['operation_id'] = Variable<String>(operationId.value);
     }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
     return map;
   }
 
@@ -1732,7 +1877,8 @@ class PagosDeudaCompanion extends UpdateCompanion<PagosDeudaData> {
           ..write('deudaId: $deudaId, ')
           ..write('monto: $monto, ')
           ..write('fecha: $fecha, ')
-          ..write('operationId: $operationId')
+          ..write('operationId: $operationId, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
@@ -1784,8 +1930,17 @@ class $MovimientosAhorroTable extends MovimientosAhorro
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
   @override
-  List<GeneratedColumn> get $columns => [id, monto, tipo, fecha];
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, monto, tipo, fecha, medio];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1825,6 +1980,12 @@ class $MovimientosAhorroTable extends MovimientosAhorro
     } else if (isInserting) {
       context.missing(_fechaMeta);
     }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
     return context;
   }
 
@@ -1850,6 +2011,10 @@ class $MovimientosAhorroTable extends MovimientosAhorro
         DriftSqlType.dateTime,
         data['${effectivePrefix}fecha'],
       )!,
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
     );
   }
 
@@ -1865,11 +2030,13 @@ class MovimientosAhorroData extends DataClass
   final double monto;
   final String tipo;
   final DateTime fecha;
+  final String? medio;
   const MovimientosAhorroData({
     required this.id,
     required this.monto,
     required this.tipo,
     required this.fecha,
+    this.medio,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1878,6 +2045,9 @@ class MovimientosAhorroData extends DataClass
     map['monto'] = Variable<double>(monto);
     map['tipo'] = Variable<String>(tipo);
     map['fecha'] = Variable<DateTime>(fecha);
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
+    }
     return map;
   }
 
@@ -1887,6 +2057,9 @@ class MovimientosAhorroData extends DataClass
       monto: Value(monto),
       tipo: Value(tipo),
       fecha: Value(fecha),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
     );
   }
 
@@ -1900,6 +2073,7 @@ class MovimientosAhorroData extends DataClass
       monto: serializer.fromJson<double>(json['monto']),
       tipo: serializer.fromJson<String>(json['tipo']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
+      medio: serializer.fromJson<String?>(json['medio']),
     );
   }
   @override
@@ -1910,6 +2084,7 @@ class MovimientosAhorroData extends DataClass
       'monto': serializer.toJson<double>(monto),
       'tipo': serializer.toJson<String>(tipo),
       'fecha': serializer.toJson<DateTime>(fecha),
+      'medio': serializer.toJson<String?>(medio),
     };
   }
 
@@ -1918,11 +2093,13 @@ class MovimientosAhorroData extends DataClass
     double? monto,
     String? tipo,
     DateTime? fecha,
+    Value<String?> medio = const Value.absent(),
   }) => MovimientosAhorroData(
     id: id ?? this.id,
     monto: monto ?? this.monto,
     tipo: tipo ?? this.tipo,
     fecha: fecha ?? this.fecha,
+    medio: medio.present ? medio.value : this.medio,
   );
   MovimientosAhorroData copyWithCompanion(MovimientosAhorroCompanion data) {
     return MovimientosAhorroData(
@@ -1930,6 +2107,7 @@ class MovimientosAhorroData extends DataClass
       monto: data.monto.present ? data.monto.value : this.monto,
       tipo: data.tipo.present ? data.tipo.value : this.tipo,
       fecha: data.fecha.present ? data.fecha.value : this.fecha,
+      medio: data.medio.present ? data.medio.value : this.medio,
     );
   }
 
@@ -1939,13 +2117,14 @@ class MovimientosAhorroData extends DataClass
           ..write('id: $id, ')
           ..write('monto: $monto, ')
           ..write('tipo: $tipo, ')
-          ..write('fecha: $fecha')
+          ..write('fecha: $fecha, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, monto, tipo, fecha);
+  int get hashCode => Object.hash(id, monto, tipo, fecha, medio);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1953,7 +2132,8 @@ class MovimientosAhorroData extends DataClass
           other.id == this.id &&
           other.monto == this.monto &&
           other.tipo == this.tipo &&
-          other.fecha == this.fecha);
+          other.fecha == this.fecha &&
+          other.medio == this.medio);
 }
 
 class MovimientosAhorroCompanion
@@ -1962,17 +2142,20 @@ class MovimientosAhorroCompanion
   final Value<double> monto;
   final Value<String> tipo;
   final Value<DateTime> fecha;
+  final Value<String?> medio;
   const MovimientosAhorroCompanion({
     this.id = const Value.absent(),
     this.monto = const Value.absent(),
     this.tipo = const Value.absent(),
     this.fecha = const Value.absent(),
+    this.medio = const Value.absent(),
   });
   MovimientosAhorroCompanion.insert({
     this.id = const Value.absent(),
     required double monto,
     required String tipo,
     required DateTime fecha,
+    this.medio = const Value.absent(),
   }) : monto = Value(monto),
        tipo = Value(tipo),
        fecha = Value(fecha);
@@ -1981,12 +2164,14 @@ class MovimientosAhorroCompanion
     Expression<double>? monto,
     Expression<String>? tipo,
     Expression<DateTime>? fecha,
+    Expression<String>? medio,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (monto != null) 'monto': monto,
       if (tipo != null) 'tipo': tipo,
       if (fecha != null) 'fecha': fecha,
+      if (medio != null) 'medio': medio,
     });
   }
 
@@ -1995,12 +2180,14 @@ class MovimientosAhorroCompanion
     Value<double>? monto,
     Value<String>? tipo,
     Value<DateTime>? fecha,
+    Value<String?>? medio,
   }) {
     return MovimientosAhorroCompanion(
       id: id ?? this.id,
       monto: monto ?? this.monto,
       tipo: tipo ?? this.tipo,
       fecha: fecha ?? this.fecha,
+      medio: medio ?? this.medio,
     );
   }
 
@@ -2019,6 +2206,9 @@ class MovimientosAhorroCompanion
     if (fecha.present) {
       map['fecha'] = Variable<DateTime>(fecha.value);
     }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
     return map;
   }
 
@@ -2028,7 +2218,8 @@ class MovimientosAhorroCompanion
           ..write('id: $id, ')
           ..write('monto: $monto, ')
           ..write('tipo: $tipo, ')
-          ..write('fecha: $fecha')
+          ..write('fecha: $fecha, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
@@ -2491,6 +2682,15 @@ class $MovimientosPrestamoTable extends MovimientosPrestamo
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2499,6 +2699,7 @@ class $MovimientosPrestamoTable extends MovimientosPrestamo
     monto,
     fecha,
     operationId,
+    medio,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2558,6 +2759,12 @@ class $MovimientosPrestamoTable extends MovimientosPrestamo
     } else if (isInserting) {
       context.missing(_operationIdMeta);
     }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
     return context;
   }
 
@@ -2594,6 +2801,10 @@ class $MovimientosPrestamoTable extends MovimientosPrestamo
         DriftSqlType.string,
         data['${effectivePrefix}operation_id'],
       )!,
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
     );
   }
 
@@ -2611,6 +2822,7 @@ class MovimientosPrestamoData extends DataClass
   final double monto;
   final DateTime fecha;
   final String operationId;
+  final String? medio;
   const MovimientosPrestamoData({
     required this.id,
     required this.prestamoId,
@@ -2618,6 +2830,7 @@ class MovimientosPrestamoData extends DataClass
     required this.monto,
     required this.fecha,
     required this.operationId,
+    this.medio,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2628,6 +2841,9 @@ class MovimientosPrestamoData extends DataClass
     map['monto'] = Variable<double>(monto);
     map['fecha'] = Variable<DateTime>(fecha);
     map['operation_id'] = Variable<String>(operationId);
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
+    }
     return map;
   }
 
@@ -2639,6 +2855,9 @@ class MovimientosPrestamoData extends DataClass
       monto: Value(monto),
       fecha: Value(fecha),
       operationId: Value(operationId),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
     );
   }
 
@@ -2654,6 +2873,7 @@ class MovimientosPrestamoData extends DataClass
       monto: serializer.fromJson<double>(json['monto']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       operationId: serializer.fromJson<String>(json['operationId']),
+      medio: serializer.fromJson<String?>(json['medio']),
     );
   }
   @override
@@ -2666,6 +2886,7 @@ class MovimientosPrestamoData extends DataClass
       'monto': serializer.toJson<double>(monto),
       'fecha': serializer.toJson<DateTime>(fecha),
       'operationId': serializer.toJson<String>(operationId),
+      'medio': serializer.toJson<String?>(medio),
     };
   }
 
@@ -2676,6 +2897,7 @@ class MovimientosPrestamoData extends DataClass
     double? monto,
     DateTime? fecha,
     String? operationId,
+    Value<String?> medio = const Value.absent(),
   }) => MovimientosPrestamoData(
     id: id ?? this.id,
     prestamoId: prestamoId ?? this.prestamoId,
@@ -2683,6 +2905,7 @@ class MovimientosPrestamoData extends DataClass
     monto: monto ?? this.monto,
     fecha: fecha ?? this.fecha,
     operationId: operationId ?? this.operationId,
+    medio: medio.present ? medio.value : this.medio,
   );
   MovimientosPrestamoData copyWithCompanion(MovimientosPrestamoCompanion data) {
     return MovimientosPrestamoData(
@@ -2696,6 +2919,7 @@ class MovimientosPrestamoData extends DataClass
       operationId: data.operationId.present
           ? data.operationId.value
           : this.operationId,
+      medio: data.medio.present ? data.medio.value : this.medio,
     );
   }
 
@@ -2707,14 +2931,15 @@ class MovimientosPrestamoData extends DataClass
           ..write('tipo: $tipo, ')
           ..write('monto: $monto, ')
           ..write('fecha: $fecha, ')
-          ..write('operationId: $operationId')
+          ..write('operationId: $operationId, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(id, prestamoId, tipo, monto, fecha, operationId);
+      Object.hash(id, prestamoId, tipo, monto, fecha, operationId, medio);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2724,7 +2949,8 @@ class MovimientosPrestamoData extends DataClass
           other.tipo == this.tipo &&
           other.monto == this.monto &&
           other.fecha == this.fecha &&
-          other.operationId == this.operationId);
+          other.operationId == this.operationId &&
+          other.medio == this.medio);
 }
 
 class MovimientosPrestamoCompanion
@@ -2735,6 +2961,7 @@ class MovimientosPrestamoCompanion
   final Value<double> monto;
   final Value<DateTime> fecha;
   final Value<String> operationId;
+  final Value<String?> medio;
   const MovimientosPrestamoCompanion({
     this.id = const Value.absent(),
     this.prestamoId = const Value.absent(),
@@ -2742,6 +2969,7 @@ class MovimientosPrestamoCompanion
     this.monto = const Value.absent(),
     this.fecha = const Value.absent(),
     this.operationId = const Value.absent(),
+    this.medio = const Value.absent(),
   });
   MovimientosPrestamoCompanion.insert({
     this.id = const Value.absent(),
@@ -2750,6 +2978,7 @@ class MovimientosPrestamoCompanion
     required double monto,
     required DateTime fecha,
     required String operationId,
+    this.medio = const Value.absent(),
   }) : prestamoId = Value(prestamoId),
        tipo = Value(tipo),
        monto = Value(monto),
@@ -2762,6 +2991,7 @@ class MovimientosPrestamoCompanion
     Expression<double>? monto,
     Expression<DateTime>? fecha,
     Expression<String>? operationId,
+    Expression<String>? medio,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2770,6 +3000,7 @@ class MovimientosPrestamoCompanion
       if (monto != null) 'monto': monto,
       if (fecha != null) 'fecha': fecha,
       if (operationId != null) 'operation_id': operationId,
+      if (medio != null) 'medio': medio,
     });
   }
 
@@ -2780,6 +3011,7 @@ class MovimientosPrestamoCompanion
     Value<double>? monto,
     Value<DateTime>? fecha,
     Value<String>? operationId,
+    Value<String?>? medio,
   }) {
     return MovimientosPrestamoCompanion(
       id: id ?? this.id,
@@ -2788,6 +3020,7 @@ class MovimientosPrestamoCompanion
       monto: monto ?? this.monto,
       fecha: fecha ?? this.fecha,
       operationId: operationId ?? this.operationId,
+      medio: medio ?? this.medio,
     );
   }
 
@@ -2812,6 +3045,9 @@ class MovimientosPrestamoCompanion
     if (operationId.present) {
       map['operation_id'] = Variable<String>(operationId.value);
     }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
     return map;
   }
 
@@ -2823,7 +3059,8 @@ class MovimientosPrestamoCompanion
           ..write('tipo: $tipo, ')
           ..write('monto: $monto, ')
           ..write('fecha: $fecha, ')
-          ..write('operationId: $operationId')
+          ..write('operationId: $operationId, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
@@ -3531,6 +3768,15 @@ class $MovimientosReservaGastoFuturoTable extends MovimientosReservaGastoFuturo
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3540,6 +3786,7 @@ class $MovimientosReservaGastoFuturoTable extends MovimientosReservaGastoFuturo
     monto,
     fecha,
     operationId,
+    medio,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3608,6 +3855,12 @@ class $MovimientosReservaGastoFuturoTable extends MovimientosReservaGastoFuturo
     } else if (isInserting) {
       context.missing(_operationIdMeta);
     }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
     return context;
   }
 
@@ -3648,6 +3901,10 @@ class $MovimientosReservaGastoFuturoTable extends MovimientosReservaGastoFuturo
         DriftSqlType.string,
         data['${effectivePrefix}operation_id'],
       )!,
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
     );
   }
 
@@ -3666,6 +3923,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
   final double monto;
   final DateTime fecha;
   final String operationId;
+  final String? medio;
   const MovimientosReservaGastoFuturoData({
     required this.id,
     this.gastoFuturoId,
@@ -3674,6 +3932,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
     required this.monto,
     required this.fecha,
     required this.operationId,
+    this.medio,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3687,6 +3946,9 @@ class MovimientosReservaGastoFuturoData extends DataClass
     map['monto'] = Variable<double>(monto);
     map['fecha'] = Variable<DateTime>(fecha);
     map['operation_id'] = Variable<String>(operationId);
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
+    }
     return map;
   }
 
@@ -3701,6 +3963,9 @@ class MovimientosReservaGastoFuturoData extends DataClass
       monto: Value(monto),
       fecha: Value(fecha),
       operationId: Value(operationId),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
     );
   }
 
@@ -3717,6 +3982,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
       monto: serializer.fromJson<double>(json['monto']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       operationId: serializer.fromJson<String>(json['operationId']),
+      medio: serializer.fromJson<String?>(json['medio']),
     );
   }
   @override
@@ -3730,6 +3996,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
       'monto': serializer.toJson<double>(monto),
       'fecha': serializer.toJson<DateTime>(fecha),
       'operationId': serializer.toJson<String>(operationId),
+      'medio': serializer.toJson<String?>(medio),
     };
   }
 
@@ -3741,6 +4008,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
     double? monto,
     DateTime? fecha,
     String? operationId,
+    Value<String?> medio = const Value.absent(),
   }) => MovimientosReservaGastoFuturoData(
     id: id ?? this.id,
     gastoFuturoId: gastoFuturoId.present
@@ -3751,6 +4019,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
     monto: monto ?? this.monto,
     fecha: fecha ?? this.fecha,
     operationId: operationId ?? this.operationId,
+    medio: medio.present ? medio.value : this.medio,
   );
   MovimientosReservaGastoFuturoData copyWithCompanion(
     MovimientosReservaGastoFuturoCompanion data,
@@ -3769,6 +4038,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
       operationId: data.operationId.present
           ? data.operationId.value
           : this.operationId,
+      medio: data.medio.present ? data.medio.value : this.medio,
     );
   }
 
@@ -3781,7 +4051,8 @@ class MovimientosReservaGastoFuturoData extends DataClass
           ..write('tipo: $tipo, ')
           ..write('monto: $monto, ')
           ..write('fecha: $fecha, ')
-          ..write('operationId: $operationId')
+          ..write('operationId: $operationId, ')
+          ..write('medio: $medio')
           ..write(')'))
         .toString();
   }
@@ -3795,6 +4066,7 @@ class MovimientosReservaGastoFuturoData extends DataClass
     monto,
     fecha,
     operationId,
+    medio,
   );
   @override
   bool operator ==(Object other) =>
@@ -3806,7 +4078,8 @@ class MovimientosReservaGastoFuturoData extends DataClass
           other.tipo == this.tipo &&
           other.monto == this.monto &&
           other.fecha == this.fecha &&
-          other.operationId == this.operationId);
+          other.operationId == this.operationId &&
+          other.medio == this.medio);
 }
 
 class MovimientosReservaGastoFuturoCompanion
@@ -3818,6 +4091,7 @@ class MovimientosReservaGastoFuturoCompanion
   final Value<double> monto;
   final Value<DateTime> fecha;
   final Value<String> operationId;
+  final Value<String?> medio;
   const MovimientosReservaGastoFuturoCompanion({
     this.id = const Value.absent(),
     this.gastoFuturoId = const Value.absent(),
@@ -3826,6 +4100,7 @@ class MovimientosReservaGastoFuturoCompanion
     this.monto = const Value.absent(),
     this.fecha = const Value.absent(),
     this.operationId = const Value.absent(),
+    this.medio = const Value.absent(),
   });
   MovimientosReservaGastoFuturoCompanion.insert({
     this.id = const Value.absent(),
@@ -3835,6 +4110,7 @@ class MovimientosReservaGastoFuturoCompanion
     required double monto,
     required DateTime fecha,
     required String operationId,
+    this.medio = const Value.absent(),
   }) : nombrePlan = Value(nombrePlan),
        tipo = Value(tipo),
        monto = Value(monto),
@@ -3848,6 +4124,7 @@ class MovimientosReservaGastoFuturoCompanion
     Expression<double>? monto,
     Expression<DateTime>? fecha,
     Expression<String>? operationId,
+    Expression<String>? medio,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3857,6 +4134,7 @@ class MovimientosReservaGastoFuturoCompanion
       if (monto != null) 'monto': monto,
       if (fecha != null) 'fecha': fecha,
       if (operationId != null) 'operation_id': operationId,
+      if (medio != null) 'medio': medio,
     });
   }
 
@@ -3868,6 +4146,7 @@ class MovimientosReservaGastoFuturoCompanion
     Value<double>? monto,
     Value<DateTime>? fecha,
     Value<String>? operationId,
+    Value<String?>? medio,
   }) {
     return MovimientosReservaGastoFuturoCompanion(
       id: id ?? this.id,
@@ -3877,6 +4156,7 @@ class MovimientosReservaGastoFuturoCompanion
       monto: monto ?? this.monto,
       fecha: fecha ?? this.fecha,
       operationId: operationId ?? this.operationId,
+      medio: medio ?? this.medio,
     );
   }
 
@@ -3904,6 +4184,9 @@ class MovimientosReservaGastoFuturoCompanion
     if (operationId.present) {
       map['operation_id'] = Variable<String>(operationId.value);
     }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
     return map;
   }
 
@@ -3916,7 +4199,352 @@ class MovimientosReservaGastoFuturoCompanion
           ..write('tipo: $tipo, ')
           ..write('monto: $monto, ')
           ..write('fecha: $fecha, ')
-          ..write('operationId: $operationId')
+          ..write('operationId: $operationId, ')
+          ..write('medio: $medio')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AsignacionesDineroTable extends AsignacionesDinero
+    with TableInfo<$AsignacionesDineroTable, AsignacionesDineroData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AsignacionesDineroTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _montoMeta = const VerificationMeta('monto');
+  @override
+  late final GeneratedColumn<double> monto = GeneratedColumn<double>(
+    'monto',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _origenMeta = const VerificationMeta('origen');
+  @override
+  late final GeneratedColumn<String> origen = GeneratedColumn<String>(
+    'origen',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _origenIdMeta = const VerificationMeta(
+    'origenId',
+  );
+  @override
+  late final GeneratedColumn<int> origenId = GeneratedColumn<int>(
+    'origen_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, medio, monto, origen, origenId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'asignaciones_dinero';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AsignacionesDineroData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_medioMeta);
+    }
+    if (data.containsKey('monto')) {
+      context.handle(
+        _montoMeta,
+        monto.isAcceptableOrUnknown(data['monto']!, _montoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_montoMeta);
+    }
+    if (data.containsKey('origen')) {
+      context.handle(
+        _origenMeta,
+        origen.isAcceptableOrUnknown(data['origen']!, _origenMeta),
+      );
+    }
+    if (data.containsKey('origen_id')) {
+      context.handle(
+        _origenIdMeta,
+        origenId.isAcceptableOrUnknown(data['origen_id']!, _origenIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AsignacionesDineroData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AsignacionesDineroData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      )!,
+      monto: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}monto'],
+      )!,
+      origen: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origen'],
+      ),
+      origenId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}origen_id'],
+      ),
+    );
+  }
+
+  @override
+  $AsignacionesDineroTable createAlias(String alias) {
+    return $AsignacionesDineroTable(attachedDatabase, alias);
+  }
+}
+
+class AsignacionesDineroData extends DataClass
+    implements Insertable<AsignacionesDineroData> {
+  final int id;
+  final String medio;
+  final double monto;
+  final String? origen;
+  final int? origenId;
+  const AsignacionesDineroData({
+    required this.id,
+    required this.medio,
+    required this.monto,
+    this.origen,
+    this.origenId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['medio'] = Variable<String>(medio);
+    map['monto'] = Variable<double>(monto);
+    if (!nullToAbsent || origen != null) {
+      map['origen'] = Variable<String>(origen);
+    }
+    if (!nullToAbsent || origenId != null) {
+      map['origen_id'] = Variable<int>(origenId);
+    }
+    return map;
+  }
+
+  AsignacionesDineroCompanion toCompanion(bool nullToAbsent) {
+    return AsignacionesDineroCompanion(
+      id: Value(id),
+      medio: Value(medio),
+      monto: Value(monto),
+      origen: origen == null && nullToAbsent
+          ? const Value.absent()
+          : Value(origen),
+      origenId: origenId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(origenId),
+    );
+  }
+
+  factory AsignacionesDineroData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AsignacionesDineroData(
+      id: serializer.fromJson<int>(json['id']),
+      medio: serializer.fromJson<String>(json['medio']),
+      monto: serializer.fromJson<double>(json['monto']),
+      origen: serializer.fromJson<String?>(json['origen']),
+      origenId: serializer.fromJson<int?>(json['origenId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'medio': serializer.toJson<String>(medio),
+      'monto': serializer.toJson<double>(monto),
+      'origen': serializer.toJson<String?>(origen),
+      'origenId': serializer.toJson<int?>(origenId),
+    };
+  }
+
+  AsignacionesDineroData copyWith({
+    int? id,
+    String? medio,
+    double? monto,
+    Value<String?> origen = const Value.absent(),
+    Value<int?> origenId = const Value.absent(),
+  }) => AsignacionesDineroData(
+    id: id ?? this.id,
+    medio: medio ?? this.medio,
+    monto: monto ?? this.monto,
+    origen: origen.present ? origen.value : this.origen,
+    origenId: origenId.present ? origenId.value : this.origenId,
+  );
+  AsignacionesDineroData copyWithCompanion(AsignacionesDineroCompanion data) {
+    return AsignacionesDineroData(
+      id: data.id.present ? data.id.value : this.id,
+      medio: data.medio.present ? data.medio.value : this.medio,
+      monto: data.monto.present ? data.monto.value : this.monto,
+      origen: data.origen.present ? data.origen.value : this.origen,
+      origenId: data.origenId.present ? data.origenId.value : this.origenId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AsignacionesDineroData(')
+          ..write('id: $id, ')
+          ..write('medio: $medio, ')
+          ..write('monto: $monto, ')
+          ..write('origen: $origen, ')
+          ..write('origenId: $origenId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, medio, monto, origen, origenId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AsignacionesDineroData &&
+          other.id == this.id &&
+          other.medio == this.medio &&
+          other.monto == this.monto &&
+          other.origen == this.origen &&
+          other.origenId == this.origenId);
+}
+
+class AsignacionesDineroCompanion
+    extends UpdateCompanion<AsignacionesDineroData> {
+  final Value<int> id;
+  final Value<String> medio;
+  final Value<double> monto;
+  final Value<String?> origen;
+  final Value<int?> origenId;
+  const AsignacionesDineroCompanion({
+    this.id = const Value.absent(),
+    this.medio = const Value.absent(),
+    this.monto = const Value.absent(),
+    this.origen = const Value.absent(),
+    this.origenId = const Value.absent(),
+  });
+  AsignacionesDineroCompanion.insert({
+    this.id = const Value.absent(),
+    required String medio,
+    required double monto,
+    this.origen = const Value.absent(),
+    this.origenId = const Value.absent(),
+  }) : medio = Value(medio),
+       monto = Value(monto);
+  static Insertable<AsignacionesDineroData> custom({
+    Expression<int>? id,
+    Expression<String>? medio,
+    Expression<double>? monto,
+    Expression<String>? origen,
+    Expression<int>? origenId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (medio != null) 'medio': medio,
+      if (monto != null) 'monto': monto,
+      if (origen != null) 'origen': origen,
+      if (origenId != null) 'origen_id': origenId,
+    });
+  }
+
+  AsignacionesDineroCompanion copyWith({
+    Value<int>? id,
+    Value<String>? medio,
+    Value<double>? monto,
+    Value<String?>? origen,
+    Value<int?>? origenId,
+  }) {
+    return AsignacionesDineroCompanion(
+      id: id ?? this.id,
+      medio: medio ?? this.medio,
+      monto: monto ?? this.monto,
+      origen: origen ?? this.origen,
+      origenId: origenId ?? this.origenId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
+    if (monto.present) {
+      map['monto'] = Variable<double>(monto.value);
+    }
+    if (origen.present) {
+      map['origen'] = Variable<String>(origen.value);
+    }
+    if (origenId.present) {
+      map['origen_id'] = Variable<int>(origenId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AsignacionesDineroCompanion(')
+          ..write('id: $id, ')
+          ..write('medio: $medio, ')
+          ..write('monto: $monto, ')
+          ..write('origen: $origen, ')
+          ..write('origenId: $origenId')
           ..write(')'))
         .toString();
   }
@@ -3938,6 +4566,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $GastosFuturosTable gastosFuturos = $GastosFuturosTable(this);
   late final $MovimientosReservaGastoFuturoTable movimientosReservaGastoFuturo =
       $MovimientosReservaGastoFuturoTable(this);
+  late final $AsignacionesDineroTable asignacionesDinero =
+      $AsignacionesDineroTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3952,6 +4582,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     movimientosPrestamo,
     gastosFuturos,
     movimientosReservaGastoFuturo,
+    asignacionesDinero,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3998,6 +4629,7 @@ typedef $$IngresosTableCreateCompanionBuilder =
       Value<String> tipo,
       required DateTime fecha,
       Value<String?> descripcion,
+      Value<String?> medio,
     });
 typedef $$IngresosTableUpdateCompanionBuilder =
     IngresosCompanion Function({
@@ -4006,6 +4638,7 @@ typedef $$IngresosTableUpdateCompanionBuilder =
       Value<String> tipo,
       Value<DateTime> fecha,
       Value<String?> descripcion,
+      Value<String?> medio,
     });
 
 final class $$IngresosTableReferences
@@ -4063,6 +4696,11 @@ class $$IngresosTableFilterComposer
 
   ColumnFilters<String> get descripcion => $composableBuilder(
     column: $table.descripcion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4125,6 +4763,11 @@ class $$IngresosTableOrderingComposer
     column: $table.descripcion,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$IngresosTableAnnotationComposer
@@ -4152,6 +4795,9 @@ class $$IngresosTableAnnotationComposer
     column: $table.descripcion,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
 
   Expression<T> deudasRefs<T extends Object>(
     Expression<T> Function($$DeudasTableAnnotationComposer a) f,
@@ -4212,12 +4858,14 @@ class $$IngresosTableTableManager
                 Value<String> tipo = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String?> descripcion = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => IngresosCompanion(
                 id: id,
                 monto: monto,
                 tipo: tipo,
                 fecha: fecha,
                 descripcion: descripcion,
+                medio: medio,
               ),
           createCompanionCallback:
               ({
@@ -4226,12 +4874,14 @@ class $$IngresosTableTableManager
                 Value<String> tipo = const Value.absent(),
                 required DateTime fecha,
                 Value<String?> descripcion = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => IngresosCompanion.insert(
                 id: id,
                 monto: monto,
                 tipo: tipo,
                 fecha: fecha,
                 descripcion: descripcion,
+                medio: medio,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -4289,6 +4939,7 @@ typedef $$GastosTableCreateCompanionBuilder =
       required String categoria,
       required DateTime fecha,
       Value<String?> nota,
+      Value<String?> medio,
     });
 typedef $$GastosTableUpdateCompanionBuilder =
     GastosCompanion Function({
@@ -4298,6 +4949,7 @@ typedef $$GastosTableUpdateCompanionBuilder =
       Value<String> categoria,
       Value<DateTime> fecha,
       Value<String?> nota,
+      Value<String?> medio,
     });
 
 class $$GastosTableFilterComposer
@@ -4336,6 +4988,11 @@ class $$GastosTableFilterComposer
 
   ColumnFilters<String> get nota => $composableBuilder(
     column: $table.nota,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4378,6 +5035,11 @@ class $$GastosTableOrderingComposer
     column: $table.nota,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$GastosTableAnnotationComposer
@@ -4406,6 +5068,9 @@ class $$GastosTableAnnotationComposer
 
   GeneratedColumn<String> get nota =>
       $composableBuilder(column: $table.nota, builder: (column) => column);
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
 }
 
 class $$GastosTableTableManager
@@ -4442,6 +5107,7 @@ class $$GastosTableTableManager
                 Value<String> categoria = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String?> nota = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => GastosCompanion(
                 id: id,
                 nombre: nombre,
@@ -4449,6 +5115,7 @@ class $$GastosTableTableManager
                 categoria: categoria,
                 fecha: fecha,
                 nota: nota,
+                medio: medio,
               ),
           createCompanionCallback:
               ({
@@ -4458,6 +5125,7 @@ class $$GastosTableTableManager
                 required String categoria,
                 required DateTime fecha,
                 Value<String?> nota = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => GastosCompanion.insert(
                 id: id,
                 nombre: nombre,
@@ -4465,6 +5133,7 @@ class $$GastosTableTableManager
                 categoria: categoria,
                 fecha: fecha,
                 nota: nota,
+                medio: medio,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5006,6 +5675,7 @@ typedef $$PagosDeudaTableCreateCompanionBuilder =
       required double monto,
       required DateTime fecha,
       Value<String?> operationId,
+      Value<String?> medio,
     });
 typedef $$PagosDeudaTableUpdateCompanionBuilder =
     PagosDeudaCompanion Function({
@@ -5014,6 +5684,7 @@ typedef $$PagosDeudaTableUpdateCompanionBuilder =
       Value<double> monto,
       Value<DateTime> fecha,
       Value<String?> operationId,
+      Value<String?> medio,
     });
 
 final class $$PagosDeudaTableReferences
@@ -5064,6 +5735,11 @@ class $$PagosDeudaTableFilterComposer
 
   ColumnFilters<String> get operationId => $composableBuilder(
     column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5120,6 +5796,11 @@ class $$PagosDeudaTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$DeudasTableOrderingComposer get deudaId {
     final $$DeudasTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5166,6 +5847,9 @@ class $$PagosDeudaTableAnnotationComposer
     column: $table.operationId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
 
   $$DeudasTableAnnotationComposer get deudaId {
     final $$DeudasTableAnnotationComposer composer = $composerBuilder(
@@ -5224,12 +5908,14 @@ class $$PagosDeudaTableTableManager
                 Value<double> monto = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String?> operationId = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => PagosDeudaCompanion(
                 id: id,
                 deudaId: deudaId,
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: medio,
               ),
           createCompanionCallback:
               ({
@@ -5238,12 +5924,14 @@ class $$PagosDeudaTableTableManager
                 required double monto,
                 required DateTime fecha,
                 Value<String?> operationId = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => PagosDeudaCompanion.insert(
                 id: id,
                 deudaId: deudaId,
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: medio,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5318,6 +6006,7 @@ typedef $$MovimientosAhorroTableCreateCompanionBuilder =
       required double monto,
       required String tipo,
       required DateTime fecha,
+      Value<String?> medio,
     });
 typedef $$MovimientosAhorroTableUpdateCompanionBuilder =
     MovimientosAhorroCompanion Function({
@@ -5325,6 +6014,7 @@ typedef $$MovimientosAhorroTableUpdateCompanionBuilder =
       Value<double> monto,
       Value<String> tipo,
       Value<DateTime> fecha,
+      Value<String?> medio,
     });
 
 class $$MovimientosAhorroTableFilterComposer
@@ -5353,6 +6043,11 @@ class $$MovimientosAhorroTableFilterComposer
 
   ColumnFilters<DateTime> get fecha => $composableBuilder(
     column: $table.fecha,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5385,6 +6080,11 @@ class $$MovimientosAhorroTableOrderingComposer
     column: $table.fecha,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MovimientosAhorroTableAnnotationComposer
@@ -5407,6 +6107,9 @@ class $$MovimientosAhorroTableAnnotationComposer
 
   GeneratedColumn<DateTime> get fecha =>
       $composableBuilder(column: $table.fecha, builder: (column) => column);
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
 }
 
 class $$MovimientosAhorroTableTableManager
@@ -5453,11 +6156,13 @@ class $$MovimientosAhorroTableTableManager
                 Value<double> monto = const Value.absent(),
                 Value<String> tipo = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => MovimientosAhorroCompanion(
                 id: id,
                 monto: monto,
                 tipo: tipo,
                 fecha: fecha,
+                medio: medio,
               ),
           createCompanionCallback:
               ({
@@ -5465,11 +6170,13 @@ class $$MovimientosAhorroTableTableManager
                 required double monto,
                 required String tipo,
                 required DateTime fecha,
+                Value<String?> medio = const Value.absent(),
               }) => MovimientosAhorroCompanion.insert(
                 id: id,
                 monto: monto,
                 tipo: tipo,
                 fecha: fecha,
+                medio: medio,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5843,6 +6550,7 @@ typedef $$MovimientosPrestamoTableCreateCompanionBuilder =
       required double monto,
       required DateTime fecha,
       required String operationId,
+      Value<String?> medio,
     });
 typedef $$MovimientosPrestamoTableUpdateCompanionBuilder =
     MovimientosPrestamoCompanion Function({
@@ -5852,6 +6560,7 @@ typedef $$MovimientosPrestamoTableUpdateCompanionBuilder =
       Value<double> monto,
       Value<DateTime> fecha,
       Value<String> operationId,
+      Value<String?> medio,
     });
 
 final class $$MovimientosPrestamoTableReferences
@@ -5920,6 +6629,11 @@ class $$MovimientosPrestamoTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$PrestamosTercerosTableFilterComposer get prestamoId {
     final $$PrestamosTercerosTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -5978,6 +6692,11 @@ class $$MovimientosPrestamoTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PrestamosTercerosTableOrderingComposer get prestamoId {
     final $$PrestamosTercerosTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6027,6 +6746,9 @@ class $$MovimientosPrestamoTableAnnotationComposer
     column: $table.operationId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
 
   $$PrestamosTercerosTableAnnotationComposer get prestamoId {
     final $$PrestamosTercerosTableAnnotationComposer composer =
@@ -6095,6 +6817,7 @@ class $$MovimientosPrestamoTableTableManager
                 Value<double> monto = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String> operationId = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => MovimientosPrestamoCompanion(
                 id: id,
                 prestamoId: prestamoId,
@@ -6102,6 +6825,7 @@ class $$MovimientosPrestamoTableTableManager
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: medio,
               ),
           createCompanionCallback:
               ({
@@ -6111,6 +6835,7 @@ class $$MovimientosPrestamoTableTableManager
                 required double monto,
                 required DateTime fecha,
                 required String operationId,
+                Value<String?> medio = const Value.absent(),
               }) => MovimientosPrestamoCompanion.insert(
                 id: id,
                 prestamoId: prestamoId,
@@ -6118,6 +6843,7 @@ class $$MovimientosPrestamoTableTableManager
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: medio,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -6626,6 +7352,7 @@ typedef $$MovimientosReservaGastoFuturoTableCreateCompanionBuilder =
       required double monto,
       required DateTime fecha,
       required String operationId,
+      Value<String?> medio,
     });
 typedef $$MovimientosReservaGastoFuturoTableUpdateCompanionBuilder =
     MovimientosReservaGastoFuturoCompanion Function({
@@ -6636,6 +7363,7 @@ typedef $$MovimientosReservaGastoFuturoTableUpdateCompanionBuilder =
       Value<double> monto,
       Value<DateTime> fecha,
       Value<String> operationId,
+      Value<String?> medio,
     });
 
 final class $$MovimientosReservaGastoFuturoTableReferences
@@ -6710,6 +7438,11 @@ class $$MovimientosReservaGastoFuturoTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$GastosFuturosTableFilterComposer get gastoFuturoId {
     final $$GastosFuturosTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -6773,6 +7506,11 @@ class $$MovimientosReservaGastoFuturoTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$GastosFuturosTableOrderingComposer get gastoFuturoId {
     final $$GastosFuturosTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6827,6 +7565,9 @@ class $$MovimientosReservaGastoFuturoTableAnnotationComposer
     column: $table.operationId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
 
   $$GastosFuturosTableAnnotationComposer get gastoFuturoId {
     final $$GastosFuturosTableAnnotationComposer composer = $composerBuilder(
@@ -6901,6 +7642,7 @@ class $$MovimientosReservaGastoFuturoTableTableManager
                 Value<double> monto = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String> operationId = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
               }) => MovimientosReservaGastoFuturoCompanion(
                 id: id,
                 gastoFuturoId: gastoFuturoId,
@@ -6909,6 +7651,7 @@ class $$MovimientosReservaGastoFuturoTableTableManager
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: medio,
               ),
           createCompanionCallback:
               ({
@@ -6919,6 +7662,7 @@ class $$MovimientosReservaGastoFuturoTableTableManager
                 required double monto,
                 required DateTime fecha,
                 required String operationId,
+                Value<String?> medio = const Value.absent(),
               }) => MovimientosReservaGastoFuturoCompanion.insert(
                 id: id,
                 gastoFuturoId: gastoFuturoId,
@@ -6927,6 +7671,7 @@ class $$MovimientosReservaGastoFuturoTableTableManager
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: medio,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -7003,6 +7748,224 @@ typedef $$MovimientosReservaGastoFuturoTableProcessedTableManager =
       MovimientosReservaGastoFuturoData,
       PrefetchHooks Function({bool gastoFuturoId})
     >;
+typedef $$AsignacionesDineroTableCreateCompanionBuilder =
+    AsignacionesDineroCompanion Function({
+      Value<int> id,
+      required String medio,
+      required double monto,
+      Value<String?> origen,
+      Value<int?> origenId,
+    });
+typedef $$AsignacionesDineroTableUpdateCompanionBuilder =
+    AsignacionesDineroCompanion Function({
+      Value<int> id,
+      Value<String> medio,
+      Value<double> monto,
+      Value<String?> origen,
+      Value<int?> origenId,
+    });
+
+class $$AsignacionesDineroTableFilterComposer
+    extends Composer<_$AppDatabase, $AsignacionesDineroTable> {
+  $$AsignacionesDineroTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get monto => $composableBuilder(
+    column: $table.monto,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origen => $composableBuilder(
+    column: $table.origen,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get origenId => $composableBuilder(
+    column: $table.origenId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AsignacionesDineroTableOrderingComposer
+    extends Composer<_$AppDatabase, $AsignacionesDineroTable> {
+  $$AsignacionesDineroTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get monto => $composableBuilder(
+    column: $table.monto,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origen => $composableBuilder(
+    column: $table.origen,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get origenId => $composableBuilder(
+    column: $table.origenId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AsignacionesDineroTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AsignacionesDineroTable> {
+  $$AsignacionesDineroTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
+
+  GeneratedColumn<double> get monto =>
+      $composableBuilder(column: $table.monto, builder: (column) => column);
+
+  GeneratedColumn<String> get origen =>
+      $composableBuilder(column: $table.origen, builder: (column) => column);
+
+  GeneratedColumn<int> get origenId =>
+      $composableBuilder(column: $table.origenId, builder: (column) => column);
+}
+
+class $$AsignacionesDineroTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AsignacionesDineroTable,
+          AsignacionesDineroData,
+          $$AsignacionesDineroTableFilterComposer,
+          $$AsignacionesDineroTableOrderingComposer,
+          $$AsignacionesDineroTableAnnotationComposer,
+          $$AsignacionesDineroTableCreateCompanionBuilder,
+          $$AsignacionesDineroTableUpdateCompanionBuilder,
+          (
+            AsignacionesDineroData,
+            BaseReferences<
+              _$AppDatabase,
+              $AsignacionesDineroTable,
+              AsignacionesDineroData
+            >,
+          ),
+          AsignacionesDineroData,
+          PrefetchHooks Function()
+        > {
+  $$AsignacionesDineroTableTableManager(
+    _$AppDatabase db,
+    $AsignacionesDineroTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AsignacionesDineroTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AsignacionesDineroTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AsignacionesDineroTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> medio = const Value.absent(),
+                Value<double> monto = const Value.absent(),
+                Value<String?> origen = const Value.absent(),
+                Value<int?> origenId = const Value.absent(),
+              }) => AsignacionesDineroCompanion(
+                id: id,
+                medio: medio,
+                monto: monto,
+                origen: origen,
+                origenId: origenId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String medio,
+                required double monto,
+                Value<String?> origen = const Value.absent(),
+                Value<int?> origenId = const Value.absent(),
+              }) => AsignacionesDineroCompanion.insert(
+                id: id,
+                medio: medio,
+                monto: monto,
+                origen: origen,
+                origenId: origenId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AsignacionesDineroTable, AsignacionesDineroData>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $AsignacionesDineroTable,
+                    AsignacionesDineroData
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AsignacionesDineroTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AsignacionesDineroTable,
+      AsignacionesDineroData,
+      $$AsignacionesDineroTableFilterComposer,
+      $$AsignacionesDineroTableOrderingComposer,
+      $$AsignacionesDineroTableAnnotationComposer,
+      $$AsignacionesDineroTableCreateCompanionBuilder,
+      $$AsignacionesDineroTableUpdateCompanionBuilder,
+      (
+        AsignacionesDineroData,
+        BaseReferences<
+          _$AppDatabase,
+          $AsignacionesDineroTable,
+          AsignacionesDineroData
+        >,
+      ),
+      AsignacionesDineroData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7029,4 +7992,6 @@ class $AppDatabaseManager {
         _db,
         _db.movimientosReservaGastoFuturo,
       );
+  $$AsignacionesDineroTableTableManager get asignacionesDinero =>
+      $$AsignacionesDineroTableTableManager(_db, _db.asignacionesDinero);
 }

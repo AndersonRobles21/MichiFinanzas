@@ -4,11 +4,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../database/app_database.dart';
+import '../../models/money_medium.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/money_medium_selector.dart';
 
 class DebtsScreen extends StatefulWidget {
   const DebtsScreen({super.key, this.isActive = true, this.databaseService});
@@ -116,6 +118,7 @@ class _DebtsScreenState extends State<DebtsScreen> {
             monto: draft.monto,
             fecha: draft.fecha,
             operationId: draft.operationId,
+            medio: draft.medio,
           ),
         ),
       );
@@ -126,7 +129,7 @@ class _DebtsScreenState extends State<DebtsScreen> {
         _debtsFuture = Future.value(data);
       });
       _showMessage(
-        'Abono guardado. El saldo ya está actualizado.',
+        '¡Buen avance! El abono quedó registrado y el saldo actualizado 😸',
         isSuccess: true,
       );
     } catch (error, stackTrace) {
@@ -459,11 +462,13 @@ class _PaymentDraft {
     required this.monto,
     required this.fecha,
     required this.operationId,
+    required this.medio,
   });
 
   final double monto;
   final DateTime fecha;
   final String operationId;
+  final MoneyMedium medio;
 }
 
 int _countCompletedInstallments(Deuda debt, double totalPaid) {
@@ -715,6 +720,7 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
     widget.remainingBalance,
   );
   _PaymentAmountOption _selectedOption = _PaymentAmountOption.installment;
+  MoneyMedium _medium = MoneyMedium.cash;
   DateTime _date = DateTime.now();
 
   @override
@@ -747,6 +753,7 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
         monto: _parseAmount(_amountController.text),
         fecha: _date,
         operationId: _newPaymentOperationId(),
+        medio: _medium,
       ),
     );
   }
@@ -854,6 +861,14 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
                   onPressed: _selectDate,
                   icon: const Icon(Icons.calendar_today_outlined),
                   label: Text('Fecha del abono: ${_formatDate(_date)}'),
+                ),
+                const SizedBox(height: 8),
+                MoneyMediumSelector(
+                  selected: _medium,
+                  title: 'Medio de pago',
+                  onChanged: (medium) {
+                    if (medium != null) setState(() => _medium = medium);
+                  },
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -1293,7 +1308,7 @@ class _PaymentHistorySheet extends StatelessWidget {
               child: payments.isEmpty
                   ? Center(
                       child: Text(
-                        'Todavía no hay abonos por aquí.',
+                        'Todavía no hay abonos por aquí. Cada avance cuenta.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
@@ -1347,7 +1362,8 @@ class _DebtEmpty extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Tus compras a crédito y préstamos aparecerán aquí.',
+              'Tus compras a crédito y préstamos aparecerán aquí. '
+              'Aquí solo te ayudamos a tenerlas en orden.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

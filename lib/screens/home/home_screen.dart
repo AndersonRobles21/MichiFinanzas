@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../database/app_database.dart';
 import '../../models/future_expense.dart';
 import '../../models/income_type.dart';
+import '../../services/app_settings_service.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/date_format.dart';
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<_DashboardData> _dashboardFuture;
   late final StreamSubscription<void> _financialChanges;
   bool _isSavingIncome = false;
+  bool _isSavingDistribution = false;
 
   @override
   void initState() {
@@ -97,13 +99,17 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
       if (!mounted) return;
+      final userName = (await _dashboardFuture).userName;
+      if (!mounted) return;
       setState(() {
         _dashboardFuture = _loadDashboard(_databaseService);
       });
       _showMessage(
-        draft.type == IncomeType.loan
+        userName.isNotEmpty
+            ? '¡Listo, $userName! Tu dinero quedó registrado.'
+            : draft.type == IncomeType.loan
             ? 'Préstamo guardado y cuotas listas para organizar.'
-            : '¡Listo! El ingreso quedó guardado.',
+            : 'El ingreso quedó guardado.',
         isSuccess: true,
         successAsset: CatAssets.ingresos,
       );
@@ -116,6 +122,120 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSavingIncome = false);
+    }
+  }
+
+  Future<void> _editIncome(Ingreso income) async {
+    final draft = await showModalBottomSheet<_IncomeDraft>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) => _IncomeFormSheet(income: income),
+    );
+    if (draft == null || !mounted) return;
+    try {
+      await _databaseService.actualizarIngreso(
+        id: income.id,
+        monto: draft.monto,
+        fecha: draft.fecha,
+        descripcion: draft.descripcion,
+        tipo: draft.type.storageValue,
+      );
+      if (!mounted) return;
+      setState(() => _dashboardFuture = _loadDashboard(_databaseService));
+      _showMessage('Ingreso actualizado.', isSuccess: true);
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'actualizar un ingreso',
+      );
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'actualizar el ingreso'),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteIncome(Ingreso income) async {
+    final linkedDebt = IncomeType.fromStorage(income.tipo) == IncomeType.loan;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar este ingreso?'),
+        content: Text(
+          linkedDebt
+              ? 'También se eliminarán la deuda vinculada y su historial de abonos. Esta acción no se puede deshacer.'
+              : 'El registro se eliminará y el saldo se recalculará. Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Conservar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar ingreso'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _databaseService.eliminarIngreso(income.id);
+      if (!mounted) return;
+      setState(() => _dashboardFuture = _loadDashboard(_databaseService));
+      _showMessage('Ingreso eliminado.', isSuccess: true);
+    } catch (error, stackTrace) {
+      logOperationFailure(error, stackTrace, operation: 'eliminar un ingreso');
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'eliminar el ingreso'),
+        );
+      }
+    }
+  }
+
+  Future<void> _editDistribution() async {
+    if (_isSavingDistribution) return;
+    try {
+      final current = await _databaseService.obtenerSaldosPorMedio();
+      if (!mounted) return;
+      final draft = await showDialog<_DistributionDraft>(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: AppColors.surface,
+          child: _DistributionFormSheet(
+            total: current.total,
+            cash: current.cash,
+            digital: current.digital,
+          ),
+        ),
+      );
+      if (draft == null || !mounted) return;
+      setState(() => _isSavingDistribution = true);
+      await _databaseService.distribuirSaldoDisponible(
+        efectivo: draft.cash,
+        digital: draft.digital,
+      );
+      if (!mounted) return;
+      setState(() => _dashboardFuture = _loadDashboard(_databaseService));
+      _showMessage('Distribución actualizada.', isSuccess: true);
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'distribuir el dinero disponible',
+      );
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'guardar la distribución'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingDistribution = false);
     }
   }
 
@@ -181,9 +301,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Aquí ves cómo va tu dinero, sin enredos.',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                    FutureBuilder<_DashboardData>(
+                      future: _dashboardFuture,
+                      builder: (context, snapshot) {
+                        final name = snapshot.data?.userName ?? '';
+                        return Text(
+                          name.isEmpty
+                              ? 'Aquí ves cómo va tu dinero, sin enredos.'
+                              : 'Hola, $name. Aquí ves cómo va tu dinero.',
+                          key: const ValueKey('home-user-greeting'),
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        );
+                      },
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -205,6 +334,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           data: snapshot.data!,
                           onAddIncome: _addIncome,
                           isSavingIncome: _isSavingIncome,
+                          onEditIncome: _editIncome,
+                          onDeleteIncome: _deleteIncome,
+                          onDistributeBalance: _editDistribution,
+                          isSavingDistribution: _isSavingDistribution,
                           onViewFutureExpenses: widget.onViewFutureExpenses,
                         );
                       },
@@ -222,13 +355,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
 Future<_DashboardData> _loadDashboard(DatabaseService service) async {
   return runWithLoggedErrors('cargar el resumen financiero', () async {
+    var userName = '';
+    try {
+      userName = (await const AppSettingsService().load()).userName;
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'cargar el nombre del usuario',
+      );
+    }
+    final balanceBreakdown = await service.obtenerSaldosPorMedio();
     final results = await Future.wait<Object>([
       service.obtenerIngresos(),
       service.obtenerGastos(),
       service.obtenerDeudas(),
       service.obtenerTodosLosPagosDeuda(),
       service.obtenerPlanesGastosFuturos(),
-      service.obtenerSaldoDisponible(),
     ]);
 
     return _DashboardData.fromRecords(
@@ -237,7 +380,8 @@ Future<_DashboardData> _loadDashboard(DatabaseService service) async {
       deudas: results[2] as List<Deuda>,
       pagos: results[3] as List<PagosDeudaData>,
       futureExpenses: results[4] as List<FutureExpenseSummary>,
-      availableBalance: results[5] as double,
+      balanceBreakdown: balanceBreakdown,
+      userName: userName,
     );
   });
 }
@@ -252,6 +396,9 @@ class _DashboardData {
     required this.totalGastos,
     required this.totalPagosDeuda,
     required this.dineroDisponible,
+    required this.balanceBreakdown,
+    required this.userName,
+    required this.allIncomes,
     required this.porcentajeGastado,
     required this.cantidadIngresos,
     required this.cantidadGastos,
@@ -269,13 +416,16 @@ class _DashboardData {
     required List<Deuda> deudas,
     required List<PagosDeudaData> pagos,
     required List<FutureExpenseSummary> futureExpenses,
-    required double availableBalance,
+    required AvailableBalanceBreakdown balanceBreakdown,
+    required String userName,
   }) {
     final totalIngresos = ingresos.fold<double>(
       0,
       (total, ingreso) => total + ingreso.monto,
     );
     final now = DateTime.now();
+    final allIncomes = [...ingresos]
+      ..sort((first, second) => second.fecha.compareTo(first.fecha));
     final ingresosDelMes =
         ingresos
             .where(
@@ -347,7 +497,10 @@ class _DashboardData {
       totalPrestamosDelMes: totalPrestamosDelMes,
       totalGastos: totalGastos,
       totalPagosDeuda: totalPagosDeuda,
-      dineroDisponible: availableBalance,
+      dineroDisponible: balanceBreakdown.total,
+      balanceBreakdown: balanceBreakdown,
+      userName: userName,
+      allIncomes: allIncomes,
       porcentajeGastado: porcentajeGastado,
       cantidadIngresos: ingresos.length,
       cantidadGastos: gastos.length,
@@ -371,6 +524,9 @@ class _DashboardData {
   final double totalGastos;
   final double totalPagosDeuda;
   final double dineroDisponible;
+  final AvailableBalanceBreakdown balanceBreakdown;
+  final String userName;
+  final List<Ingreso> allIncomes;
   final double? porcentajeGastado;
   final int cantidadIngresos;
   final int cantidadGastos;
@@ -437,7 +593,9 @@ class _IncomeDraft {
 }
 
 class _IncomeFormSheet extends StatefulWidget {
-  const _IncomeFormSheet();
+  const _IncomeFormSheet({this.income});
+
+  final Ingreso? income;
 
   @override
   State<_IncomeFormSheet> createState() => _IncomeFormSheetState();
@@ -448,14 +606,21 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   final _installmentsController = TextEditingController(text: '1');
-  IncomeType _type = IncomeType.salary;
-  DateTime _receivedDate = DateTime.now();
+  late IncomeType _type;
+  late DateTime _receivedDate;
   late DateTime _firstPaymentDate;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
+    final income = widget.income;
+    _type = income == null
+        ? IncomeType.salary
+        : IncomeType.fromStorage(income.tipo);
+    _descriptionController.text = income?.descripcion ?? '';
+    _amountController.text = income == null ? '' : formatAmount(income.monto);
+    _receivedDate = income?.fecha ?? now;
     _firstPaymentDate = DateTime(now.year, now.month, now.day + 30);
   }
 
@@ -519,7 +684,9 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Agregar dinero',
+                        widget.income == null
+                            ? 'Agregar dinero'
+                            : 'Editar ingreso',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -544,13 +711,16 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
                     for (final type in [
                       IncomeType.salary,
                       IncomeType.extra,
-                      IncomeType.loan,
+                      if (widget.income == null) IncomeType.loan,
+                      if (widget.income != null) IncomeType.legacy,
                     ])
                       DropdownMenuItem(value: type, child: Text(type.label)),
                   ],
-                  onChanged: (type) {
-                    if (type != null) setState(() => _type = type);
-                  },
+                  onChanged: widget.income == null || _type != IncomeType.loan
+                      ? (type) {
+                          if (type != null) setState(() => _type = type);
+                        }
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -599,7 +769,7 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
                     ],
                   ),
                 ),
-                if (_type == IncomeType.loan) ...[
+                if (_type == IncomeType.loan && widget.income == null) ...[
                   const SizedBox(height: 8),
                   TextFormField(
                     key: const ValueKey('income-installments'),
@@ -645,7 +815,9 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
                     onPressed: _save,
                     icon: const Icon(Icons.add_rounded),
                     label: Text(
-                      _type == IncomeType.loan
+                      widget.income != null
+                          ? 'Guardar cambios'
+                          : _type == IncomeType.loan
                           ? 'Registrar préstamo'
                           : 'Guardar ingreso',
                     ),
@@ -660,17 +832,175 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
   }
 }
 
+class _DistributionDraft {
+  const _DistributionDraft({required this.cash, required this.digital});
+
+  final double cash;
+  final double digital;
+}
+
+class _DistributionFormSheet extends StatefulWidget {
+  const _DistributionFormSheet({
+    required this.total,
+    required this.cash,
+    required this.digital,
+  });
+
+  final double total;
+  final double cash;
+  final double digital;
+
+  @override
+  State<_DistributionFormSheet> createState() => _DistributionFormSheetState();
+}
+
+class _DistributionFormSheetState extends State<_DistributionFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _cashController;
+  late final TextEditingController _digitalController;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cashController = TextEditingController(text: formatAmount(widget.cash));
+    _digitalController = TextEditingController(
+      text: formatAmount(widget.digital),
+    );
+  }
+
+  @override
+  void dispose() {
+    _cashController.dispose();
+    _digitalController.dispose();
+    super.dispose();
+  }
+
+  String? _validateAmount(String? value) {
+    final amount = tryParseMoney(value);
+    return amount == null || amount < 0
+        ? 'Escribe un valor válido igual o mayor que cero.'
+        : null;
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    final cash = parseMoney(_cashController.text);
+    final digital = parseMoney(_digitalController.text);
+    if (cash + digital > widget.total + 1e-8) {
+      setState(() {
+        _error = 'La suma no puede superar el total disponible.';
+      });
+      return;
+    }
+    Navigator.pop(context, _DistributionDraft(cash: cash, digital: digital));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(22, 22, 22, 24 + bottomInset),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Distribuir dinero disponible',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Total disponible: ${_formatMoney(widget.total)}. '
+                    'Puedes dejar una parte por distribuir y asignarla después.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    key: const ValueKey('distribution-cash'),
+                    controller: _cashController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: const [ThousandsInputFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Dinero en efectivo',
+                      prefixText: r'$ ',
+                    ),
+                    validator: _validateAmount,
+                    onChanged: (_) => setState(() => _error = null),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('distribution-digital'),
+                    controller: _digitalController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: const [ThousandsInputFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Dinero digital',
+                      prefixText: r'$ ',
+                    ),
+                    validator: _validateAmount,
+                    onChanged: (_) => setState(() => _error = null),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _save,
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: const Text('Guardar distribución'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
+    required this.onEditIncome,
+    required this.onDeleteIncome,
+    required this.onDistributeBalance,
+    required this.isSavingDistribution,
     required this.onViewFutureExpenses,
   });
 
   final _DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
+  final ValueChanged<Ingreso> onEditIncome;
+  final ValueChanged<Ingreso> onDeleteIncome;
+  final VoidCallback onDistributeBalance;
+  final bool isSavingDistribution;
   final VoidCallback? onViewFutureExpenses;
 
   @override
@@ -678,12 +1008,18 @@ class _DashboardContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AvailableBalanceCard(data: data),
+        _AvailableBalanceCard(
+          data: data,
+          onDistributeBalance: onDistributeBalance,
+          isSavingDistribution: isSavingDistribution,
+        ),
         const SizedBox(height: 18),
         _IncomeSummaryPanel(
           data: data,
           onAddIncome: onAddIncome,
           isSavingIncome: isSavingIncome,
+          onEditIncome: onEditIncome,
+          onDeleteIncome: onDeleteIncome,
         ),
         const SizedBox(height: 18),
         _MetricsGrid(data: data),
@@ -714,11 +1050,15 @@ class _IncomeSummaryPanel extends StatelessWidget {
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
+    required this.onEditIncome,
+    required this.onDeleteIncome,
   });
 
   final _DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
+  final ValueChanged<Ingreso> onEditIncome;
+  final ValueChanged<Ingreso> onDeleteIncome;
 
   @override
   Widget build(BuildContext context) {
@@ -784,13 +1124,13 @@ class _IncomeSummaryPanel extends StatelessWidget {
               ),
             ],
           ),
-          if (data.ingresosDelMes.isNotEmpty) ...[
+          if (data.allIncomes.isNotEmpty) ...[
             const Divider(height: 24),
             Text(
-              'Movimientos de este mes',
+              'Historial de ingresos',
               style: Theme.of(context).textTheme.titleSmall,
             ),
-            for (final income in data.ingresosDelMes)
+            for (final income in data.allIncomes)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 7),
                 child: Row(
@@ -829,6 +1169,26 @@ class _IncomeSummaryPanel extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    PopupMenuButton<_IncomeAction>(
+                      tooltip: 'Acciones del ingreso',
+                      onSelected: (action) {
+                        if (action == _IncomeAction.edit) {
+                          onEditIncome(income);
+                        } else {
+                          onDeleteIncome(income);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: _IncomeAction.edit,
+                          child: Text('Editar'),
+                        ),
+                        PopupMenuItem(
+                          value: _IncomeAction.delete,
+                          child: Text('Eliminar'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -861,10 +1221,18 @@ class _IncomeBreakdown extends StatelessWidget {
   }
 }
 
+enum _IncomeAction { edit, delete }
+
 class _AvailableBalanceCard extends StatelessWidget {
-  const _AvailableBalanceCard({required this.data});
+  const _AvailableBalanceCard({
+    required this.data,
+    required this.onDistributeBalance,
+    required this.isSavingDistribution,
+  });
 
   final _DashboardData data;
+  final VoidCallback onDistributeBalance;
+  final bool isSavingDistribution;
 
   @override
   Widget build(BuildContext context) {
@@ -909,10 +1277,63 @@ class _AvailableBalanceCard extends StatelessWidget {
               context,
             ).textTheme.headlineMedium?.copyWith(fontSize: 32),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          Text(
+            'Total disponible',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
           Text(description, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 18),
+          _BalanceMediumLine(
+            label: 'Efectivo',
+            amount: data.balanceBreakdown.cash,
+          ),
+          const SizedBox(height: 8),
+          _BalanceMediumLine(
+            label: 'Digital',
+            amount: data.balanceBreakdown.digital,
+          ),
+          const SizedBox(height: 8),
+          _BalanceMediumLine(
+            label: 'Por distribuir',
+            amount: data.balanceBreakdown.unclassified,
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('distribute-available-balance'),
+              onPressed: isSavingDistribution ? null : onDistributeBalance,
+              icon: isSavingDistribution
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.swap_horiz_rounded),
+              label: const Text('Distribuir / editar'),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _BalanceMediumLine extends StatelessWidget {
+  const _BalanceMediumLine({required this.label, required this.amount});
+
+  final String label;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        Text(_formatMoney(amount)),
+      ],
     );
   }
 }
@@ -957,7 +1378,7 @@ class _MetricsGrid extends StatelessWidget {
                     : '—',
                 detail: data.cantidadGastos > 0
                     ? _recordCount(data.cantidadGastos, 'gasto', 'gastos')
-                    : 'Todavía no hay gastos por aquí.',
+                    : 'Todavía no hay gastos por aquí. ¡Ojalá siga así un buen rato!',
               ),
             ),
             SizedBox(

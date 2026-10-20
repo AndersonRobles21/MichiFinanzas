@@ -9,31 +9,37 @@ class AppSettings {
   const AppSettings({
     required this.currencyCode,
     required this.expenseCategories,
+    this.userName = '',
   });
 
   factory AppSettings.defaults() {
     return const AppSettings(
       currencyCode: 'COP',
       expenseCategories: AppSettingsService.defaultExpenseCategories,
+      userName: '',
     );
   }
 
   final String currencyCode;
   final List<String> expenseCategories;
+  final String userName;
 
   AppSettings copyWith({
     String? currencyCode,
     List<String>? expenseCategories,
+    String? userName,
   }) {
     return AppSettings(
       currencyCode: currencyCode ?? this.currencyCode,
       expenseCategories: expenseCategories ?? this.expenseCategories,
+      userName: userName ?? this.userName,
     );
   }
 
   Map<String, Object?> toJson() => {
     'currencyCode': currencyCode,
     'expenseCategories': expenseCategories,
+    'userName': userName,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -49,6 +55,11 @@ class AppSettings {
           ? json['currencyCode'] as String
           : 'COP',
       expenseCategories: categories,
+      userName:
+          json['userName'] is String &&
+              AppSettingsService.isValidUserName(json['userName'] as String)
+          ? AppSettingsService.normalizeUserName(json['userName'] as String)
+          : '',
     );
   }
 }
@@ -66,6 +77,19 @@ class AppSettingsService {
     'Resivos xd',
     'Otros',
   ];
+
+  static final _userNamePattern = RegExp(
+    r'^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*$',
+  );
+
+  static String normalizeUserName(String userName) {
+    return userName.trim().replaceAll(RegExp(r' +'), ' ');
+  }
+
+  static bool isValidUserName(String userName) {
+    final normalized = normalizeUserName(userName);
+    return normalized.isNotEmpty && _userNamePattern.hasMatch(normalized);
+  }
 
   static const _foodCategoryAliases = {
     'comidas': 'Comidaaaa',
@@ -115,12 +139,33 @@ class AppSettingsService {
   }
 
   Future<void> save(AppSettings settings) async {
+    final userName = normalizeUserName(settings.userName);
+    if (userName.isNotEmpty && !isValidUserName(userName)) {
+      throw ArgumentError.value(
+        settings.userName,
+        'userName',
+        'Usa solo letras españolas y espacios entre nombres.',
+      );
+    }
     final normalizedSettings = settings.copyWith(
       expenseCategories: normalizeCategories(settings.expenseCategories),
+      userName: userName,
     );
     await settings_storage.writeSettings(
       jsonEncode(normalizedSettings.toJson()),
     );
+  }
+
+  Future<void> saveUserName(AppSettings settings, String userName) async {
+    final normalized = normalizeUserName(userName);
+    if (!isValidUserName(normalized)) {
+      throw ArgumentError.value(
+        userName,
+        'userName',
+        'Usa solo letras españolas y espacios entre nombres.',
+      );
+    }
+    await save(settings.copyWith(userName: normalized));
   }
 
   Future<void> reset() async {

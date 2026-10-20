@@ -102,6 +102,52 @@ void main() {
             descripcion TEXT
           )
         ''');
+        database.execute('''
+          CREATE TABLE gastos (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            monto REAL NOT NULL,
+            categoria TEXT NOT NULL,
+            fecha INTEGER NOT NULL,
+            nota TEXT
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE pagos_deuda (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            deuda_id INTEGER NOT NULL,
+            monto REAL NOT NULL,
+            fecha INTEGER NOT NULL,
+            operation_id TEXT
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE movimientos_ahorro (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            monto REAL NOT NULL,
+            tipo TEXT NOT NULL,
+            fecha INTEGER NOT NULL
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE prestamos_terceros (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            persona TEXT NOT NULL,
+            monto_principal REAL NOT NULL,
+            fecha_entrega INTEGER NOT NULL,
+            fecha_devolucion_acordada INTEGER NOT NULL
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE movimientos_prestamo (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            prestamo_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            monto REAL NOT NULL,
+            fecha INTEGER NOT NULL,
+            operation_id TEXT NOT NULL UNIQUE
+          )
+        ''');
         final date = DateTime(2026, 10, 1).millisecondsSinceEpoch;
         database.execute(
           "INSERT INTO ingresos (monto, tipo, fecha, descripcion) "

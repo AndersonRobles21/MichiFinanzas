@@ -4,12 +4,14 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../database/app_database.dart';
+import '../../models/money_medium.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/money_medium_selector.dart';
 
 class SavingsScreen extends StatefulWidget {
   const SavingsScreen({super.key, this.isActive = true, this.databaseService});
@@ -89,29 +91,32 @@ class _SavingsScreenState extends State<SavingsScreen> {
     if (_isSaving) return;
     final data = await _dataFuture;
     if (!mounted) return;
-    final result = await showModalBottomSheet<double>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => _SavingsAmountSheet(
-        isWithdrawal: isWithdrawal,
-        limit: isWithdrawal ? data.total : data.available,
-      ),
-    );
+    final result =
+        await showModalBottomSheet<({double amount, MoneyMedium medium})>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: AppColors.surface,
+          builder: (context) => _SavingsAmountSheet(
+            isWithdrawal: isWithdrawal,
+            limit: isWithdrawal ? data.total : data.available,
+          ),
+        );
     if (result == null || !mounted || _isSaving) return;
 
     setState(() => _isSaving = true);
     try {
       if (isWithdrawal) {
         await _databaseService.retirarAhorro(
-          monto: result,
+          monto: result.amount,
           fecha: DateTime.now(),
+          medio: result.medium,
         );
       } else {
         await _databaseService.registrarAporteAhorro(
-          monto: result,
+          monto: result.amount,
           fecha: DateTime.now(),
+          medio: result.medium,
         );
       }
       if (!mounted) return;
@@ -166,6 +171,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
             fechaEntrega: draft.deliveryDate,
             fechaDevolucionAcordada: draft.dueDate,
             operationId: draft.operationId,
+            medio: draft.medium,
           ),
         ),
       );
@@ -211,6 +217,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
         monto: draft.amount,
         fecha: draft.date,
         operationId: draft.operationId,
+        medio: draft.medium,
       );
       if (!mounted) return;
       setState(() {
@@ -458,6 +465,7 @@ class _LoanDraft {
     required this.deliveryDate,
     required this.dueDate,
     required this.operationId,
+    required this.medium,
   });
 
   final String person;
@@ -465,6 +473,7 @@ class _LoanDraft {
   final DateTime deliveryDate;
   final DateTime dueDate;
   final String operationId;
+  final MoneyMedium medium;
 }
 
 class _ReturnDraft {
@@ -472,11 +481,13 @@ class _ReturnDraft {
     required this.amount,
     required this.date,
     required this.operationId,
+    required this.medium,
   });
 
   final double amount;
   final DateTime date;
   final String operationId;
+  final MoneyMedium medium;
 }
 
 String _newLoanOperationId() {
@@ -796,6 +807,7 @@ class _LoanFormSheetState extends State<_LoanFormSheet> {
   final _amountController = TextEditingController();
   DateTime _deliveryDate = DateTime.now();
   DateTime _dueDate = DateTime.now().add(const Duration(days: 30));
+  MoneyMedium _medium = MoneyMedium.cash;
 
   @override
   void dispose() {
@@ -836,6 +848,7 @@ class _LoanFormSheetState extends State<_LoanFormSheet> {
         deliveryDate: _deliveryDate,
         dueDate: _dueDate,
         operationId: _newLoanOperationId(),
+        medium: _medium,
       ),
     );
   }
@@ -893,9 +906,17 @@ class _LoanFormSheetState extends State<_LoanFormSheet> {
                             return 'Escribe un monto mayor que cero.';
                           }
                           if (amount > widget.available) {
-                            return 'Te falta un poquito de plata para completar esto.';
+                            return 'Uy, parece que no alcanza la platica para eso.';
                           }
                           return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      MoneyMediumSelector(
+                        selected: _medium,
+                        title: 'Medio de entrega',
+                        onChanged: (medium) {
+                          if (medium != null) setState(() => _medium = medium);
                         },
                       ),
                       const SizedBox(height: 8),
@@ -1038,6 +1059,7 @@ class _LoanReturnSheetState extends State<_LoanReturnSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   DateTime _date = DateTime.now();
+  MoneyMedium _medium = MoneyMedium.cash;
 
   @override
   void dispose() {
@@ -1063,6 +1085,7 @@ class _LoanReturnSheetState extends State<_LoanReturnSheet> {
         amount: parseMoney(_amountController.text),
         date: _date,
         operationId: _newLoanOperationId(),
+        medium: _medium,
       ),
     );
   }
@@ -1116,6 +1139,14 @@ class _LoanReturnSheetState extends State<_LoanReturnSheet> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 14),
+                      MoneyMediumSelector(
+                        selected: _medium,
+                        title: 'Medio de recepción',
+                        onChanged: (medium) {
+                          if (medium != null) setState(() => _medium = medium);
+                        },
+                      ),
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: _selectDate,
@@ -1155,6 +1186,7 @@ class _SavingsAmountSheet extends StatefulWidget {
 class _SavingsAmountSheetState extends State<_SavingsAmountSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  MoneyMedium _medium = MoneyMedium.cash;
 
   @override
   void dispose() {
@@ -1164,7 +1196,10 @@ class _SavingsAmountSheetState extends State<_SavingsAmountSheet> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.pop(context, parseMoney(_amountController.text));
+    Navigator.pop(context, (
+      amount: parseMoney(_amountController.text),
+      medium: _medium,
+    ));
   }
 
   @override
@@ -1206,9 +1241,17 @@ class _SavingsAmountSheetState extends State<_SavingsAmountSheet> {
                 if (amount > widget.limit) {
                   return widget.isWithdrawal
                       ? 'No puedes retirar más de lo que tienes ahorrado.'
-                      : 'Te falta un poquito de plata para completar esto.';
+                      : 'Uy, parece que no alcanza la platica para eso.';
                 }
                 return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            MoneyMediumSelector(
+              selected: _medium,
+              title: 'Medio del movimiento',
+              onChanged: (medium) {
+                if (medium != null) setState(() => _medium = medium);
               },
             ),
             const SizedBox(height: 16),

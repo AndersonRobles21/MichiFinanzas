@@ -43,3 +43,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Archivos privados y configuracion local
+.env
+.env.*
+!.env.example
+/android/local.properties
+key.properties
+*.jks
+*.keystore
+
+# Bases de datos locales y temporales
+*.db
+*.sqlite
+*.sqlite3

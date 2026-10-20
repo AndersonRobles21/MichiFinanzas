@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
-import 'package:flutter/material.dart' show SizedBox;
+import 'package:flutter/material.dart' show SizedBox, Text;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,7 +24,9 @@ void main() {
     await _pumpUntilFound(tester, find.text('Dinero disponible'));
 
     expect(find.text('Todavía no hay ingresos por aquí.'), findsNWidgets(2));
-    expect(find.text('Todavía no hay gastos por aquí.'), findsOneWidget);
+    final emptyExpenses = find.textContaining('Todavía no hay gastos por aquí.');
+    await _pumpUntilFound(tester, emptyExpenses);
+    expect(emptyExpenses, findsOneWidget);
     expect(find.text('Todavía no hay deudas por aquí.'), findsNWidgets(2));
     expect(
       find.text('Agrega tu primer ingreso y empieza a organizar tu dinero.'),
@@ -119,7 +121,11 @@ void main() {
     await tester.pumpWidget(app.FinanzasApp(databaseService: service));
     await _pumpUntilFound(tester, find.text('25,0%'));
 
-    expect(find.text(r'$ 750'), findsOneWidget);
+    final availableBalance = find.byKey(
+      const ValueKey('home-available-balance'),
+    );
+    expect(availableBalance, findsOneWidget);
+    expect(tester.widget<Text>(availableBalance).data, r'$ 750');
     expect(find.byKey(const ValueKey('home-monthly-received')), findsOneWidget);
     expect(find.text(r'$ 1.000'), findsNWidgets(4));
     expect(find.text(r'$ 200'), findsOneWidget);

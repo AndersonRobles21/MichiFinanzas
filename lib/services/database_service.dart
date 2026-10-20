@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../models/future_expense.dart';
 import '../models/income_type.dart';
+import '../models/money_medium.dart';
 
 class DatabaseService {
   DatabaseService(this._database);
@@ -38,6 +39,7 @@ class DatabaseService {
         await _database.delete(_database.movimientosAhorro).go();
         await _database.delete(_database.gastos).go();
         await _database.delete(_database.ingresos).go();
+        await _database.delete(_database.asignacionesDinero).go();
       }),
     );
   }
@@ -47,6 +49,7 @@ class DatabaseService {
     required DateTime fecha,
     String? descripcion,
     String tipo = 'ingreso',
+    MoneyMedium? medio,
   }) {
     return _modificar('agregar ingreso', () async {
       _validarMonto(monto);
@@ -55,6 +58,7 @@ class DatabaseService {
         fecha: fecha,
         descripcion: descripcion,
         tipo: tipo,
+        medio: medio,
       );
     });
   }
@@ -65,6 +69,7 @@ class DatabaseService {
     required DateTime fechaRecepcion,
     required int cuotasTotales,
     required DateTime fechaPrimerPago,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'registrar préstamo recibido',
@@ -86,6 +91,7 @@ class DatabaseService {
           fecha: fechaRecepcion,
           descripcion: nombre.trim(),
           tipo: IncomeType.loan.storageValue,
+          medio: medio,
         );
         final debtId = await _database
             .into(_database.deudas)
@@ -109,6 +115,98 @@ class DatabaseService {
       'obtener ingresos',
       () => _database.select(_database.ingresos).get(),
     );
+  }
+
+  Future<int> actualizarIngreso({
+    required int id,
+    required double monto,
+    required DateTime fecha,
+    required String? descripcion,
+    required String tipo,
+    MoneyMedium? medio,
+  }) {
+    return _modificar('actualizar ingreso', () async {
+      _validarMonto(monto);
+      return _database.transaction(() async {
+        final income = await (_database.select(
+          _database.ingresos,
+        )..where((item) => item.id.equals(id))).getSingleOrNull();
+        if (income == null) throw StateError('El ingreso ya no existe.');
+
+        final linkedDebt = await (_database.select(
+          _database.deudas,
+        )..where((debt) => debt.ingresoId.equals(id))).getSingleOrNull();
+        if (!IncomeType.values.any(
+          (incomeType) => incomeType.storageValue == tipo,
+        )) {
+          throw ArgumentError.value(tipo, 'tipo', 'Tipo de ingreso no válido.');
+        }
+        if ((linkedDebt != null) != (tipo == IncomeType.loan.storageValue)) {
+          throw ArgumentError.value(
+            tipo,
+            'tipo',
+            'Los préstamos recibidos conservan su tipo y deuda vinculada.',
+          );
+        }
+        if (linkedDebt != null) {
+          final payments = await (_database.select(
+            _database.pagosDeuda,
+          )..where((payment) => payment.deudaId.equals(linkedDebt.id))).get();
+          final paid = payments.fold<double>(
+            0,
+            (total, payment) => total + payment.monto,
+          );
+          if (monto < paid) {
+            throw ArgumentError.value(
+              monto,
+              'monto',
+              'No puede ser menor que los abonos ya registrados ($paid).',
+            );
+          }
+          final cleanDescription = _cleanOptionalText(descripcion);
+          final amountChanged = monto != income.monto;
+          final updatedInstallment = monto / linkedDebt.cuotasTotales;
+          final updatedPaidInstallments = monto - paid <= 1e-8
+              ? linkedDebt.cuotasTotales
+              : ((paid + 1e-8) / updatedInstallment).floor().clamp(
+                  0,
+                  linkedDebt.cuotasTotales,
+                );
+          await (_database.update(
+            _database.deudas,
+          )..where((debt) => debt.id.equals(linkedDebt.id))).write(
+            DeudasCompanion(
+              nombre: cleanDescription == null
+                  ? const Value.absent()
+                  : Value(cleanDescription),
+              montoOriginal: amountChanged
+                  ? Value(monto)
+                  : const Value.absent(),
+              cuota: amountChanged
+                  ? Value(updatedInstallment)
+                  : const Value.absent(),
+              cuotasPagadas: amountChanged
+                  ? Value(updatedPaidInstallments)
+                  : const Value.absent(),
+            ),
+          );
+        }
+
+        final updated =
+            await (_database.update(
+              _database.ingresos,
+            )..where((item) => item.id.equals(id))).write(
+              IngresosCompanion(
+                monto: Value(monto),
+                tipo: Value(tipo),
+                fecha: Value(fecha),
+                descripcion: Value(_cleanOptionalText(descripcion)),
+              ),
+            );
+        await _validarAsignacionDentroDelSaldo();
+        return updated;
+      });
+    });
   }
 
   Future<List<MovimientosAhorroData>> obtenerMovimientosAhorro() {
@@ -304,6 +402,7 @@ class DatabaseService {
     required double monto,
     required DateTime fecha,
     required String operationId,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'reservar dinero para un gasto futuro',
@@ -326,7 +425,8 @@ class DatabaseService {
           if (previous.gastoFuturoId != planId ||
               previous.tipo != reservaGastoFuturo ||
               previous.monto != monto ||
-              previous.fecha != fecha) {
+              previous.fecha != fecha ||
+              previous.medio != medio?.storageValue) {
             throw ArgumentError.value(
               operationId,
               'operationId',
@@ -362,7 +462,11 @@ class DatabaseService {
             available: available,
           );
         }
-        return _database
+        final reclassified = await _validarCanalDisponible(
+          medio: medio,
+          monto: monto,
+        );
+        final id = await _database
             .into(_database.movimientosReservaGastoFuturo)
             .insert(
               MovimientosReservaGastoFuturoCompanion.insert(
@@ -372,8 +476,19 @@ class DatabaseService {
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: Value(medio?.storageValue),
               ),
             );
+        if (medio != null) {
+          await _guardarImpactoMovimiento(
+            origen: 'reserva_gasto_futuro',
+            origenId: id,
+            medio: medio,
+            monto: -monto,
+            reclassified: reclassified,
+          );
+        }
+        return id;
       }),
     );
   }
@@ -383,6 +498,7 @@ class DatabaseService {
     required double monto,
     required DateTime fecha,
     required String operationId,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'liberar dinero reservado para un gasto futuro',
@@ -405,7 +521,8 @@ class DatabaseService {
           if (previous.gastoFuturoId != planId ||
               previous.tipo != liberacionGastoFuturo ||
               previous.monto != monto ||
-              previous.fecha != fecha) {
+              previous.fecha != fecha ||
+              previous.medio != medio?.storageValue) {
             throw ArgumentError.value(
               operationId,
               'operationId',
@@ -426,7 +543,7 @@ class DatabaseService {
             'No puedes liberar más dinero del que está reservado.',
           );
         }
-        return _database
+        final id = await _database
             .into(_database.movimientosReservaGastoFuturo)
             .insert(
               MovimientosReservaGastoFuturoCompanion.insert(
@@ -436,8 +553,18 @@ class DatabaseService {
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: Value(medio?.storageValue),
               ),
             );
+        if (medio != null) {
+          await _guardarImpactoMovimiento(
+            origen: 'liberacion_gasto_futuro',
+            origenId: id,
+            medio: medio,
+            monto: monto,
+          );
+        }
+        return id;
       }),
     );
   }
@@ -448,6 +575,7 @@ class DatabaseService {
     required DateTime fechaEntrega,
     required DateTime fechaDevolucionAcordada,
     required String operationId,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'registrar préstamo a terceros',
@@ -472,6 +600,7 @@ class DatabaseService {
           if (previousMovement.tipo != entregaPrestamo ||
               previousMovement.monto != monto ||
               previousMovement.fecha != fechaEntrega ||
+              previousMovement.medio != medio?.storageValue ||
               previousLoan?.persona != persona.trim() ||
               previousLoan?.fechaDevolucionAcordada !=
                   fechaDevolucionAcordada) {
@@ -485,13 +614,17 @@ class DatabaseService {
         }
 
         final disponible = await _calcularSaldoDisponible();
-        if (monto > disponible) {
+        if (monto > disponible + 1e-8) {
           throw ArgumentError.value(
             monto,
             'monto',
             'No puedes prestar más que tu saldo disponible ($disponible).',
           );
         }
+        final reclassified = await _validarCanalDisponible(
+          medio: medio,
+          monto: monto,
+        );
 
         final loanId = await _database
             .into(_database.prestamosTerceros)
@@ -503,7 +636,7 @@ class DatabaseService {
                 fechaDevolucionAcordada: fechaDevolucionAcordada,
               ),
             );
-        await _database
+        final movementId = await _database
             .into(_database.movimientosPrestamo)
             .insert(
               MovimientosPrestamoCompanion.insert(
@@ -512,8 +645,18 @@ class DatabaseService {
                 monto: monto,
                 fecha: fechaEntrega,
                 operationId: operationId,
+                medio: Value(medio?.storageValue),
               ),
             );
+        if (medio != null) {
+          await _guardarImpactoMovimiento(
+            origen: 'entrega_prestamo',
+            origenId: movementId,
+            medio: medio,
+            monto: -monto,
+            reclassified: reclassified,
+          );
+        }
         return loanId;
       }),
     );
@@ -524,6 +667,7 @@ class DatabaseService {
     required double monto,
     required DateTime fecha,
     required String operationId,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'registrar devolución de préstamo',
@@ -545,7 +689,8 @@ class DatabaseService {
           if (previousMovement.prestamoId != prestamoId ||
               previousMovement.tipo != devolucionPrestamo ||
               previousMovement.monto != monto ||
-              previousMovement.fecha != fecha) {
+              previousMovement.fecha != fecha ||
+              previousMovement.medio != medio?.storageValue) {
             throw ArgumentError.value(
               operationId,
               'operationId',
@@ -575,7 +720,7 @@ class DatabaseService {
           );
         }
 
-        return _database
+        final movementId = await _database
             .into(_database.movimientosPrestamo)
             .insert(
               MovimientosPrestamoCompanion.insert(
@@ -584,8 +729,18 @@ class DatabaseService {
                 monto: monto,
                 fecha: fecha,
                 operationId: operationId,
+                medio: Value(medio?.storageValue),
               ),
             );
+        if (medio != null) {
+          await _guardarImpactoMovimiento(
+            origen: 'devolucion_prestamo',
+            origenId: movementId,
+            medio: medio,
+            monto: monto,
+          );
+        }
+        return movementId;
       }),
     );
   }
@@ -598,9 +753,58 @@ class DatabaseService {
     return _ejecutar('obtener saldo disponible', _calcularSaldoDisponible);
   }
 
+  Future<AvailableBalanceBreakdown> obtenerSaldosPorMedio() {
+    return _ejecutar('obtener saldos por medio', _calcularDesgloseSaldos);
+  }
+
+  Future<AvailableBalanceBreakdown> distribuirSaldoDisponible({
+    required double efectivo,
+    required double digital,
+  }) {
+    return _modificar(
+      'distribuir saldo disponible',
+      () => _database.transaction(() async {
+        if (!efectivo.isFinite || efectivo < 0) {
+          throw ArgumentError.value(
+            efectivo,
+            'efectivo',
+            'No puede ser negativo ni inválido.',
+          );
+        }
+        if (!digital.isFinite || digital < 0) {
+          throw ArgumentError.value(
+            digital,
+            'digital',
+            'No puede ser negativo ni inválido.',
+          );
+        }
+        final total = await _calcularSaldoDisponible();
+        if (efectivo + digital > total + 1e-8) {
+          throw ArgumentError.value(
+            efectivo + digital,
+            'distribución',
+            'La suma no puede superar el saldo disponible ($total).',
+          );
+        }
+
+        final current = await _calcularSaldoAsignado();
+        await _insertarEventoAsignacion(
+          MoneyMedium.cash,
+          efectivo - current.cash,
+        );
+        await _insertarEventoAsignacion(
+          MoneyMedium.digital,
+          digital - current.digital,
+        );
+        return _calcularDesgloseSaldos();
+      }),
+    );
+  }
+
   Future<int> registrarAporteAhorro({
     required double monto,
     required DateTime fecha,
+    MoneyMedium? medio,
   }) {
     return _modificar('registrar aporte de ahorro', () async {
       _validarMonto(monto);
@@ -613,20 +817,39 @@ class DatabaseService {
             'No puedes ahorrar más que tu saldo disponible ($disponible).',
           );
         }
-        return _database
+        final reclassified = await _validarCanalDisponible(
+          medio: medio,
+          monto: monto,
+        );
+        final id = await _database
             .into(_database.movimientosAhorro)
             .insert(
               MovimientosAhorroCompanion.insert(
                 monto: monto,
                 tipo: aporteAhorro,
                 fecha: fecha,
+                medio: Value(medio?.storageValue),
               ),
             );
+        if (medio != null) {
+          await _guardarImpactoMovimiento(
+            origen: 'aporte_ahorro',
+            origenId: id,
+            medio: medio,
+            monto: -monto,
+            reclassified: reclassified,
+          );
+        }
+        return id;
       });
     });
   }
 
-  Future<int> retirarAhorro({required double monto, required DateTime fecha}) {
+  Future<int> retirarAhorro({
+    required double monto,
+    required DateTime fecha,
+    MoneyMedium? medio,
+  }) {
     return _modificar('retirar ahorro', () async {
       _validarMonto(monto);
       return _database.transaction(() async {
@@ -638,15 +861,25 @@ class DatabaseService {
             'No puedes retirar más que el total ahorrado ($totalAhorros).',
           );
         }
-        return _database
+        final id = await _database
             .into(_database.movimientosAhorro)
             .insert(
               MovimientosAhorroCompanion.insert(
                 monto: monto,
                 tipo: retiroAhorro,
                 fecha: fecha,
+                medio: Value(medio?.storageValue),
               ),
             );
+        if (medio != null) {
+          await _guardarImpactoMovimiento(
+            origen: 'retiro_ahorro',
+            origenId: id,
+            medio: medio,
+            monto: monto,
+          );
+        }
+        return id;
       });
     });
   }
@@ -656,9 +889,30 @@ class DatabaseService {
   Future<int> eliminarIngreso(int id) {
     return _modificar(
       'eliminar ingreso',
-      () => (_database.delete(
-        _database.ingresos,
-      )..where((ingreso) => ingreso.id.equals(id))).go(),
+      () => _database.transaction(() async {
+        final linkedDebt = await (_database.select(
+          _database.deudas,
+        )..where((debt) => debt.ingresoId.equals(id))).getSingleOrNull();
+        if (linkedDebt != null) {
+          final payments = await (_database.select(
+            _database.pagosDeuda,
+          )..where((payment) => payment.deudaId.equals(linkedDebt.id))).get();
+          for (final payment in payments) {
+            await _eliminarImpactoMovimiento(
+              origen: 'pago_deuda',
+              origenId: payment.id,
+            );
+          }
+          await (_database.delete(
+            _database.deudas,
+          )..where((debt) => debt.id.equals(linkedDebt.id))).go();
+        }
+        final deleted = await (_database.delete(
+          _database.ingresos,
+        )..where((income) => income.id.equals(id))).go();
+        await _validarAsignacionDentroDelSaldo();
+        return deleted;
+      }),
     );
   }
 
@@ -668,20 +922,40 @@ class DatabaseService {
     required String categoria,
     required DateTime fecha,
     String? nota,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'agregar gasto',
-      () => _database
-          .into(_database.gastos)
-          .insert(
-            GastosCompanion.insert(
-              nombre: nombre,
-              monto: monto,
-              categoria: categoria,
-              fecha: fecha,
-              nota: Value(nota),
-            ),
-          ),
+      () => _database.transaction(() async {
+        _validarMonto(monto);
+        if (nombre.trim().isEmpty || categoria.trim().isEmpty) {
+          throw ArgumentError('El nombre y la categoría son obligatorios.');
+        }
+        final reclassified = await _validarCanalDisponible(
+          medio: medio,
+          monto: monto,
+        );
+        final id = await _database
+            .into(_database.gastos)
+            .insert(
+              GastosCompanion.insert(
+                nombre: nombre.trim(),
+                monto: monto,
+                categoria: categoria,
+                fecha: fecha,
+                nota: Value(nota),
+                medio: Value(medio?.storageValue),
+              ),
+            );
+        await _guardarImpactoMovimiento(
+          origen: 'gasto',
+          origenId: id,
+          medio: medio,
+          monto: -monto,
+          reclassified: reclassified,
+        );
+        return id;
+      }),
     );
   }
 
@@ -695,9 +969,12 @@ class DatabaseService {
   Future<int> eliminarGasto(int id) {
     return _modificar(
       'eliminar gasto',
-      () => (_database.delete(
-        _database.gastos,
-      )..where((gasto) => gasto.id.equals(id))).go(),
+      () => _database.transaction(() async {
+        await _eliminarImpactoMovimiento(origen: 'gasto', origenId: id);
+        return (_database.delete(
+          _database.gastos,
+        )..where((gasto) => gasto.id.equals(id))).go();
+      }),
     );
   }
 
@@ -708,26 +985,54 @@ class DatabaseService {
     required String categoria,
     required DateTime fecha,
     String? nota,
+    MoneyMedium? medio,
   }) {
     return _modificar('actualizar gasto', () async {
       _validarMonto(monto);
       if (nombre.trim().isEmpty || categoria.trim().isEmpty) {
         throw ArgumentError('El nombre y la categoría son obligatorios.');
       }
-      final updatedRows =
-          await (_database.update(
-            _database.gastos,
-          )..where((gasto) => gasto.id.equals(id))).write(
-            GastosCompanion(
-              nombre: Value(nombre.trim()),
-              monto: Value(monto),
-              categoria: Value(categoria),
-              fecha: Value(fecha),
-              nota: Value(nota),
-            ),
+      return _database.transaction(() async {
+        final current = await (_database.select(
+          _database.gastos,
+        )..where((expense) => expense.id.equals(id))).getSingleOrNull();
+        if (current == null) throw StateError('El gasto ya no existe.');
+        final allocation =
+            await (_database.select(_database.asignacionesDinero)..where(
+                  (event) =>
+                      event.origen.equals('gasto') & event.origenId.equals(id),
+                ))
+                .getSingleOrNull();
+        if (allocation != null) {
+          final reclassified = await _validarCanalDisponible(
+            medio: medio,
+            monto: monto,
           );
-      if (updatedRows == 0) throw StateError('El gasto ya no existe.');
-      return updatedRows;
+          await _guardarImpactoMovimiento(
+            origen: 'gasto',
+            origenId: id,
+            medio: medio,
+            monto: -monto,
+            crearSiNoExiste: false,
+            reclassified: reclassified,
+          );
+        }
+        final updatedRows =
+            await (_database.update(
+              _database.gastos,
+            )..where((gasto) => gasto.id.equals(id))).write(
+              GastosCompanion(
+                nombre: Value(nombre.trim()),
+                monto: Value(monto),
+                categoria: Value(categoria),
+                fecha: Value(fecha),
+                nota: Value(nota),
+                medio: Value(medio?.storageValue),
+              ),
+            );
+        await _validarAsignacionDentroDelSaldo();
+        return updatedRows;
+      });
     });
   }
 
@@ -768,6 +1073,7 @@ class DatabaseService {
     required double monto,
     required DateTime fecha,
     required String operationId,
+    MoneyMedium? medio,
   }) {
     return _modificar(
       'registrar pago de deuda',
@@ -782,7 +1088,6 @@ class DatabaseService {
         if (!monto.isFinite || monto <= 0) {
           throw ArgumentError.value(monto, 'monto', 'Debe ser mayor que cero.');
         }
-
         final previousPayment =
             await (_database.select(_database.pagosDeuda)
                   ..where((pago) => pago.operationId.equals(operationId)))
@@ -790,7 +1095,8 @@ class DatabaseService {
         if (previousPayment != null) {
           if (previousPayment.deudaId != deudaId ||
               previousPayment.monto != monto ||
-              previousPayment.fecha != fecha) {
+              previousPayment.fecha != fecha ||
+              previousPayment.medio != medio?.storageValue) {
             throw ArgumentError.value(
               operationId,
               'operationId',
@@ -829,6 +1135,10 @@ class DatabaseService {
           );
         }
 
+        final reclassified = await _validarCanalDisponible(
+          medio: medio,
+          monto: monto,
+        );
         final paymentId = await _database
             .into(_database.pagosDeuda)
             .insert(
@@ -837,8 +1147,16 @@ class DatabaseService {
                 monto: monto,
                 fecha: fecha,
                 operationId: Value(operationId),
+                medio: Value(medio?.storageValue),
               ),
             );
+        await _guardarImpactoMovimiento(
+          origen: 'pago_deuda',
+          origenId: paymentId,
+          medio: medio,
+          monto: -monto,
+          reclassified: reclassified,
+        );
 
         final totalAbonadoDespues = totalAbonadoAntes + monto;
         final nuevoSaldo = deuda.montoOriginal - totalAbonadoDespues;
@@ -890,9 +1208,22 @@ class DatabaseService {
   Future<int> eliminarDeuda(int id) {
     return _modificar(
       'eliminar deuda',
-      () => (_database.delete(
-        _database.deudas,
-      )..where((deuda) => deuda.id.equals(id))).go(),
+      () => _database.transaction(() async {
+        final payments = await (_database.select(
+          _database.pagosDeuda,
+        )..where((payment) => payment.deudaId.equals(id))).get();
+        for (final payment in payments) {
+          await _eliminarImpactoMovimiento(
+            origen: 'pago_deuda',
+            origenId: payment.id,
+          );
+        }
+        final deleted = await (_database.delete(
+          _database.deudas,
+        )..where((deuda) => deuda.id.equals(id))).go();
+        await _validarAsignacionDentroDelSaldo();
+        return deleted;
+      }),
     );
   }
 
@@ -924,6 +1255,7 @@ class DatabaseService {
     required DateTime fecha,
     required String tipo,
     String? descripcion,
+    MoneyMedium? medio,
   }) {
     return _database
         .into(_database.ingresos)
@@ -933,6 +1265,7 @@ class DatabaseService {
             tipo: Value(tipo),
             fecha: fecha,
             descripcion: Value(descripcion),
+            medio: const Value(null),
           ),
         );
   }
@@ -949,18 +1282,25 @@ class DatabaseService {
   }
 
   Future<double> _calcularSaldoDisponible() async {
-    final ingresos = await _database.select(_database.ingresos).get();
-    final gastos = await _database.select(_database.gastos).get();
-    final pagos = await _database.select(_database.pagosDeuda).get();
-    final movimientosPrestamos = await _database
-        .select(_database.movimientosPrestamo)
-        .get();
-    final movimientos = await _database
-        .select(_database.movimientosAhorro)
-        .get();
-    final reservasGastosFuturos = await _database
-        .select(_database.movimientosReservaGastoFuturo)
-        .get();
+    return (await _calcularDesgloseSaldos()).total;
+  }
+
+  Future<AvailableBalanceBreakdown> _calcularDesgloseSaldos() async {
+    final results = await Future.wait<Object>([
+      _database.select(_database.ingresos).get(),
+      _database.select(_database.gastos).get(),
+      _database.select(_database.pagosDeuda).get(),
+      _database.select(_database.movimientosPrestamo).get(),
+      _database.select(_database.movimientosAhorro).get(),
+      _database.select(_database.movimientosReservaGastoFuturo).get(),
+    ]);
+    final ingresos = results[0] as List<Ingreso>;
+    final gastos = results[1] as List<Gasto>;
+    final pagos = results[2] as List<PagosDeudaData>;
+    final movimientosPrestamos = results[3] as List<MovimientosPrestamoData>;
+    final movimientos = results[4] as List<MovimientosAhorroData>;
+    final reservas = results[5] as List<MovimientosReservaGastoFuturoData>;
+
     final totalIngresos = ingresos.fold<double>(
       0,
       (total, ingreso) => total + ingreso.monto,
@@ -986,7 +1326,7 @@ class DatabaseService {
           ? total + movimiento.monto
           : total - movimiento.monto;
     });
-    final reservaNeta = reservasGastosFuturos.fold<double>(
+    final reservaNeta = reservas.fold<double>(
       0,
       (total, movement) => movement.tipo == reservaGastoFuturo
           ? total + movement.monto
@@ -994,12 +1334,190 @@ class DatabaseService {
           ? total - movement.monto
           : total,
     );
-    return totalIngresos -
+    final total =
+        totalIngresos -
         totalGastos -
         totalPagos -
         ahorroNeto +
         impactoPrestamos -
         reservaNeta;
+
+    final assigned = await _calcularSaldoAsignado();
+
+    return AvailableBalanceBreakdown(
+      cash: assigned.cash,
+      digital: assigned.digital,
+      unclassified: total - assigned.cash - assigned.digital,
+      total: total,
+    );
+  }
+
+  Future<({double cash, double digital})> _calcularSaldoAsignado() async {
+    final events = await _database.select(_database.asignacionesDinero).get();
+    var cash = 0.0;
+    var digital = 0.0;
+    for (final event in events) {
+      switch (MoneyMedium.fromStorage(event.medio)) {
+        case MoneyMedium.cash:
+          cash += event.monto;
+        case MoneyMedium.digital:
+          digital += event.monto;
+        case null:
+          throw StateError('Hay una asignación con medio no válido.');
+      }
+    }
+    return (cash: cash, digital: digital);
+  }
+
+  Future<void> _insertarEventoAsignacion(
+    MoneyMedium medio,
+    double monto, {
+    String? origen,
+    int? origenId,
+  }) async {
+    if (monto.abs() <= 1e-8) return;
+    await _database
+        .into(_database.asignacionesDinero)
+        .insert(
+          AsignacionesDineroCompanion.insert(
+            medio: medio.storageValue,
+            monto: monto,
+            origen: Value(origen),
+            origenId: Value(origenId),
+          ),
+        );
+  }
+
+  Future<void> _guardarImpactoMovimiento({
+    required String origen,
+    required int origenId,
+    required MoneyMedium? medio,
+    required double monto,
+    bool crearSiNoExiste = true,
+    double reclassified = 0,
+  }) async {
+    final existing =
+        await (_database.select(_database.asignacionesDinero)..where(
+              (event) =>
+                  event.origen.equals(origen) & event.origenId.equals(origenId),
+            ))
+            .getSingleOrNull();
+    if (existing == null && (!crearSiNoExiste || medio == null)) return;
+    if (existing == null) {
+      if (medio != null && reclassified > 1e-8) {
+        await _insertarEventoAsignacion(
+          medio,
+          reclassified,
+          origen: '${origen}_asignacion',
+          origenId: origenId,
+        );
+      }
+      await _insertarEventoAsignacion(
+        medio!,
+        monto,
+        origen: origen,
+        origenId: origenId,
+      );
+      return;
+    }
+    final reclassification =
+        await (_database.select(_database.asignacionesDinero)..where(
+              (event) =>
+                  event.origen.equals('${origen}_asignacion') &
+                  event.origenId.equals(origenId),
+            ))
+            .getSingleOrNull();
+    if (medio != null && reclassified > 1e-8) {
+      if (reclassification == null) {
+        await _insertarEventoAsignacion(
+          medio,
+          reclassified,
+          origen: '${origen}_asignacion',
+          origenId: origenId,
+        );
+      } else {
+        await (_database.update(
+          _database.asignacionesDinero,
+        )..where((event) => event.id.equals(reclassification.id))).write(
+          AsignacionesDineroCompanion(
+            medio: Value(medio.storageValue),
+            monto: Value(reclassified),
+          ),
+        );
+      }
+    } else if (reclassification != null) {
+      await (_database.delete(
+        _database.asignacionesDinero,
+      )..where((event) => event.id.equals(reclassification.id))).go();
+    }
+    if (medio == null || monto.abs() <= 1e-8) {
+      await (_database.delete(
+        _database.asignacionesDinero,
+      )..where((event) => event.id.equals(existing.id))).go();
+      return;
+    }
+    await (_database.update(
+      _database.asignacionesDinero,
+    )..where((event) => event.id.equals(existing.id))).write(
+      AsignacionesDineroCompanion(
+        medio: Value(medio.storageValue),
+        monto: Value(monto),
+      ),
+    );
+  }
+
+  Future<void> _eliminarImpactoMovimiento({
+    required String origen,
+    required int origenId,
+  }) async {
+    await (_database.delete(_database.asignacionesDinero)..where(
+          (event) =>
+              (event.origen.equals(origen) |
+                  event.origen.equals('${origen}_asignacion')) &
+              event.origenId.equals(origenId),
+        ))
+        .go();
+  }
+
+  Future<double> _validarCanalDisponible({
+    required MoneyMedium? medio,
+    required double monto,
+  }) async {
+    final balances = await _calcularDesgloseSaldos();
+    if (medio == null) {
+      if (monto <= balances.unclassified + 1e-8) return 0;
+      throw ArgumentError.value(
+        monto,
+        'monto',
+        'No hay suficiente dinero sin distribuir para esta operación.',
+      );
+    }
+
+    final assigned = medio == MoneyMedium.cash
+        ? balances.cash
+        : balances.digital;
+    final reclassified = (monto - assigned).clamp(0.0, monto);
+    if (reclassified > balances.unclassified + 1e-8) {
+      throw ArgumentError.value(
+        monto,
+        'monto',
+        'No hay suficiente saldo en ${medio.label.toLowerCase()} '
+            '($assigned). Distribuye el dinero primero.',
+      );
+    }
+    return reclassified;
+  }
+
+  Future<void> _validarAsignacionDentroDelSaldo() async {
+    final balances = await _calcularDesgloseSaldos();
+    if (balances.cash < -1e-8 ||
+        balances.digital < -1e-8 ||
+        balances.cash + balances.digital > balances.total + 1e-8) {
+      throw StateError(
+        'La operación dejaría la distribución por encima del saldo '
+        'disponible. Reduce primero la distribución.',
+      );
+    }
   }
 
   Future<double> _totalReservadoPlan(int planId) async {
@@ -1078,4 +1596,18 @@ class DatabaseServiceException implements Exception {
 
   @override
   String toString() => 'Error al $operacion: $causa';
+}
+
+class AvailableBalanceBreakdown {
+  const AvailableBalanceBreakdown({
+    required this.cash,
+    required this.digital,
+    required this.unclassified,
+    required this.total,
+  });
+
+  final double cash;
+  final double digital;
+  final double unclassified;
+  final double total;
 }

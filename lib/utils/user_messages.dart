@@ -12,11 +12,11 @@ String friendlyOperationError(Object error, {required String action}) {
   final details = cause.toString().toLowerCase();
   if (details.contains('saldo disponible') ||
       details.contains('más que tu saldo')) {
-    return 'Te falta un poquito de plata para completar esto.';
+    return 'Uy, parece que no alcanza la platica para eso.';
   }
   if (details.contains('saldo restante') ||
       details.contains('supera lo pendiente')) {
-    return 'Esa cantidad supera lo que todavía falta por pagar.';
+    return 'Uy, ese abono pasa lo que todavía falta por pagar.';
   }
   if (cause is StateError && details.contains('libera el dinero reservado')) {
     return 'Libera primero el dinero reservado para poder borrar el plan.';

@@ -9,7 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
+import 'package:finanzas_app/models/future_expense.dart';
 import 'package:finanzas_app/models/income_type.dart';
+import 'package:finanzas_app/models/money_medium.dart';
 import 'package:finanzas_app/screens/home/home_screen.dart';
 import 'package:finanzas_app/screens/savings/savings_screen.dart';
 import 'package:finanzas_app/services/app_settings_service.dart';
@@ -179,6 +181,511 @@ void main() {
     }
   });
 
+  test('migra v8 sin asignar medios a movimientos históricos', () async {
+    final date = DateTime(2026, 10, 13).millisecondsSinceEpoch;
+    final executor = NativeDatabase.memory(
+      setup: (database) {
+        database.execute('''
+          CREATE TABLE ingresos (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            monto REAL NOT NULL,
+            tipo TEXT NOT NULL DEFAULT 'ingreso',
+            fecha INTEGER NOT NULL,
+            descripcion TEXT
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE gastos (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            monto REAL NOT NULL,
+            categoria TEXT NOT NULL,
+            fecha INTEGER NOT NULL,
+            nota TEXT
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE pagos_deuda (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            deuda_id INTEGER NOT NULL,
+            monto REAL NOT NULL,
+            fecha INTEGER NOT NULL,
+            operation_id TEXT
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE movimientos_ahorro (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            monto REAL NOT NULL,
+            tipo TEXT NOT NULL,
+            fecha INTEGER NOT NULL
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE movimientos_prestamo (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            prestamo_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            monto REAL NOT NULL,
+            fecha INTEGER NOT NULL,
+            operation_id TEXT NOT NULL
+          )
+        ''');
+        database.execute('''
+          CREATE TABLE movimientos_reserva_gasto_futuro (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            gasto_futuro_id INTEGER,
+            nombre_plan TEXT NOT NULL,
+            tipo TEXT NOT NULL,
+            monto REAL NOT NULL,
+            fecha INTEGER NOT NULL,
+            operation_id TEXT NOT NULL
+          )
+        ''');
+        database.execute(
+          "INSERT INTO ingresos (monto, tipo, fecha, descripcion) "
+          "VALUES (1000, 'sueldo', $date, 'Histórico')",
+        );
+        database.execute(
+          "INSERT INTO gastos (nombre, monto, categoria, fecha) "
+          "VALUES ('Compra', 20, 'Otros', $date)",
+        );
+        database.execute(
+          "INSERT INTO pagos_deuda (deuda_id, monto, fecha) "
+          "VALUES (1, 30, $date)",
+        );
+        database.execute(
+          "INSERT INTO movimientos_ahorro (monto, tipo, fecha) "
+          "VALUES (40, 'aporte', $date)",
+        );
+        database.execute(
+          "INSERT INTO movimientos_prestamo "
+          "(prestamo_id, tipo, monto, fecha, operation_id) "
+          "VALUES (1, 'entrega', 50, $date, 'legacy-loan')",
+        );
+        database.execute(
+          "INSERT INTO movimientos_reserva_gasto_futuro "
+          "(nombre_plan, tipo, monto, fecha, operation_id) "
+          "VALUES ('Meta', 'reserva', 60, $date, 'legacy-reserve')",
+        );
+        database.execute('PRAGMA user_version = 8');
+      },
+    );
+    final database = AppDatabase(executor);
+    final service = DatabaseService(database);
+    try {
+      final incomes = await service.obtenerIngresos();
+      final expenses = await service.obtenerGastos();
+      final payments = await service.obtenerTodosLosPagosDeuda();
+      final savings = await service.obtenerMovimientosAhorro();
+      final loans = await service.obtenerMovimientosPrestamo();
+      final reservations = await service
+          .obtenerTodosLosMovimientosReservaGastoFuturo();
+      expect(incomes.single.monto, 1000);
+      expect(expenses.single.monto, 20);
+      expect(payments.single.monto, 30);
+      expect(savings.single.monto, 40);
+      expect(loans.single.monto, 50);
+      expect(reservations.single.monto, 60);
+      expect(incomes.single.medio, isNull);
+      expect(expenses.single.medio, isNull);
+      expect(payments.single.medio, isNull);
+      expect(savings.single.medio, isNull);
+      expect(loans.single.medio, isNull);
+      expect(reservations.single.medio, isNull);
+
+      final balances = await service.obtenerSaldosPorMedio();
+      expect(balances.cash, 0);
+      expect(balances.digital, 0);
+      expect(balances.unclassified, 800);
+      expect(balances.total, 800);
+      expect(await service.obtenerSaldoDisponible(), balances.total);
+    } finally {
+      await database.close();
+    }
+  });
+
+  test(
+    'actualiza y elimina ingresos sin duplicarlos ni desincronizar préstamos',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final service = DatabaseService(database);
+      final date = DateTime(2026, 10, 15);
+      try {
+        final salaryId = await service.agregarIngreso(
+          monto: 1000,
+          fecha: date,
+          descripcion: 'Sueldo',
+          tipo: IncomeType.salary.storageValue,
+          medio: MoneyMedium.cash,
+        );
+        final extraId = await service.agregarIngreso(
+          monto: 500,
+          fecha: date,
+          descripcion: 'Venta',
+          tipo: IncomeType.extra.storageValue,
+          medio: MoneyMedium.digital,
+        );
+        expect(await service.obtenerSaldoDisponible(), 1500);
+        var balances = await service.obtenerSaldosPorMedio();
+        expect(balances.cash, 0);
+        expect(balances.digital, 0);
+        expect(balances.unclassified, 1500);
+        await service.distribuirSaldoDisponible(efectivo: 1000, digital: 500);
+
+        await service.actualizarIngreso(
+          id: salaryId,
+          monto: 1200,
+          fecha: date.add(const Duration(days: 1)),
+          descripcion: 'Sueldo actualizado',
+          tipo: IncomeType.salary.storageValue,
+          medio: MoneyMedium.digital,
+        );
+        var incomes = await service.obtenerIngresos();
+        expect(incomes, hasLength(2));
+        expect(
+          incomes.singleWhere((item) => item.id == salaryId).tipo,
+          IncomeType.salary.storageValue,
+        );
+        balances = await service.obtenerSaldosPorMedio();
+        expect(balances.cash, 1000);
+        expect(balances.digital, 500);
+        expect(balances.unclassified, 200);
+        expect(balances.total, 1700);
+
+        await expectLater(
+          service.eliminarIngreso(extraId),
+          throwsA(isA<DatabaseServiceException>()),
+        );
+        await service.distribuirSaldoDisponible(efectivo: 1000, digital: 200);
+        await service.eliminarIngreso(extraId);
+        incomes = await service.obtenerIngresos();
+        expect(incomes, hasLength(1));
+        expect(incomes.single.id, salaryId);
+        expect(await service.obtenerSaldoDisponible(), 1200);
+
+        final loan = await service.registrarPrestamo(
+          nombre: 'Crédito personal',
+          monto: 400,
+          fechaRecepcion: date,
+          cuotasTotales: 2,
+          fechaPrimerPago: date.add(const Duration(days: 30)),
+          medio: MoneyMedium.cash,
+        );
+        await service.registrarPagoDeuda(
+          deudaId: loan.deudaId,
+          monto: 100,
+          fecha: date,
+          operationId: 'income-edit-payment',
+          medio: MoneyMedium.cash,
+        );
+        await service.actualizarIngreso(
+          id: loan.ingresoId,
+          monto: 450,
+          fecha: date,
+          descripcion: 'Crédito actualizado',
+          tipo: IncomeType.loan.storageValue,
+          medio: MoneyMedium.digital,
+        );
+        final debt = (await service.obtenerDeudas()).single;
+        expect(debt.montoOriginal, 450);
+        expect(debt.cuota, 225);
+        expect(debt.cuotasPagadas, 0);
+        expect(debt.nombre, 'Crédito actualizado');
+        expect(await service.obtenerSaldoDisponible(), 1550);
+
+        await expectLater(
+          service.actualizarIngreso(
+            id: loan.ingresoId,
+            monto: 90,
+            fecha: date,
+            descripcion: 'Demasiado bajo',
+            tipo: IncomeType.loan.storageValue,
+            medio: MoneyMedium.cash,
+          ),
+          throwsA(isA<DatabaseServiceException>()),
+        );
+        expect((await service.obtenerIngresos()).last.monto, 450);
+
+        await service.eliminarIngreso(loan.ingresoId);
+        expect(await service.obtenerIngresos(), hasLength(1));
+        expect(await service.obtenerDeudas(), isEmpty);
+        expect(await service.obtenerTodosLosPagosDeuda(), isEmpty);
+        expect(await service.obtenerSaldoDisponible(), 1200);
+      } finally {
+        await database.close();
+      }
+    },
+  );
+
+  testWidgets('crea, edita y elimina ingresos desde el historial de Inicio', (
+    tester,
+  ) async {
+    await _prepareTemporaryStorage(tester);
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    await tester.runAsync(
+      () => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: HomeScreen(databaseService: service)),
+        ),
+      ),
+    );
+    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+
+    await _recordIncome(tester, 'Sueldo', 'Quincena', '600');
+    await _pumpUntilMonthlyReceived(tester, 600);
+    final incomeActions = find.byTooltip('Acciones del ingreso');
+    await tester.ensureVisible(incomeActions);
+    await tester.tap(incomeActions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('income-description')),
+      'Sueldo corregido',
+    );
+    await tester.enterText(find.byKey(const ValueKey('income-amount')), '800');
+    await tester.tap(find.byKey(const ValueKey('income-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(IncomeType.extra.label).last);
+    await tester.pumpAndSettle();
+    final saveChanges = find.text('Guardar cambios');
+    await tester.ensureVisible(saveChanges);
+    await tester.tap(saveChanges);
+    await tester.pumpAndSettle();
+    await _pumpUntilMonthlyReceived(tester, 800);
+
+    await tester.runAsync(() async {
+      final incomes = await service.obtenerIngresos();
+      expect(incomes, hasLength(1));
+      expect(incomes.single.descripcion, 'Sueldo corregido');
+      expect(incomes.single.monto, 800);
+      expect(incomes.single.tipo, IncomeType.extra.storageValue);
+      expect(await service.obtenerSaldoDisponible(), 800);
+    });
+
+    await tester.ensureVisible(incomeActions);
+    await tester.tap(incomeActions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eliminar'));
+    await tester.pumpAndSettle();
+    expect(find.text('¿Eliminar este ingreso?'), findsOneWidget);
+    await tester.tap(find.text('Eliminar ingreso'));
+    await tester.pumpAndSettle();
+    await _pumpUntilMonthlyReceived(tester, 0);
+    await tester.runAsync(() async {
+      expect(await service.obtenerIngresos(), isEmpty);
+      expect(await service.obtenerSaldoDisponible(), 0);
+    });
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() => service.close());
+  });
+
+  testWidgets('distribuye el saldo desde Inicio y persiste la asignación', (
+    tester,
+  ) async {
+    await _prepareTemporaryStorage(tester);
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    await tester.runAsync(
+      () => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: HomeScreen(databaseService: service)),
+        ),
+      ),
+    );
+    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+    await _recordIncome(tester, 'Sueldo', 'Quincena', '600');
+    await _pumpUntilMonthlyReceived(tester, 600);
+    expect(find.text('Medio de recepción'), findsNothing);
+
+    final distributeButton = find.byKey(
+      const ValueKey('distribute-available-balance'),
+    );
+    await tester.ensureVisible(distributeButton);
+    await tester.tap(distributeButton);
+    await tester.pumpAndSettle();
+    await _pumpUntilFound(tester, find.text('Distribuir dinero disponible'));
+    await tester.enterText(
+      find.byKey(const ValueKey('distribution-cash')),
+      '601',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('distribution-digital')),
+      '0',
+    );
+    await tester.ensureVisible(find.text('Guardar distribución'));
+    await tester.tap(find.text('Guardar distribución'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.text('La suma no puede superar el total disponible.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('distribution-cash')),
+      '400',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('distribution-digital')),
+      '200',
+    );
+    await tester.ensureVisible(find.text('Guardar distribución'));
+    await tester.tap(find.text('Guardar distribución'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.runAsync(() async {
+      final balances = await service.obtenerSaldosPorMedio();
+      expect(balances.cash, 400);
+      expect(balances.digital, 200);
+      expect(balances.unclassified, 0);
+      expect(await service.obtenerIngresos(), hasLength(1));
+      expect(await service.obtenerGastos(), isEmpty);
+    });
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() => service.close());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('conserva la distribución al reabrir la base local', (
+    tester,
+  ) async {
+    await _prepareTemporaryStorage(tester);
+    await tester.runAsync(() async {
+      var service = DatabaseService(AppDatabase());
+      await service.agregarIngreso(monto: 600, fecha: DateTime(2026, 10, 15));
+      await service.distribuirSaldoDisponible(efectivo: 400, digital: 200);
+      await service.close();
+
+      service = DatabaseService(AppDatabase());
+      final balances = await service.obtenerSaldosPorMedio();
+      expect(balances.cash, 400);
+      expect(balances.digital, 200);
+      expect(balances.total, 600);
+      await service.close();
+    });
+  });
+
+  test('distribuye el saldo y concilia los movimientos por canal', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    final date = DateTime(2026, 10, 15);
+    try {
+      await service.agregarIngreso(
+        monto: 1000,
+        fecha: date,
+        medio: MoneyMedium.cash,
+      );
+      await service.agregarIngreso(
+        monto: 500,
+        fecha: date,
+        medio: MoneyMedium.digital,
+      );
+      await service.distribuirSaldoDisponible(efectivo: 1000, digital: 500);
+      await expectLater(
+        service.distribuirSaldoDisponible(efectivo: 1000, digital: 501),
+        throwsA(isA<DatabaseServiceException>()),
+      );
+      await service.agregarGasto(
+        nombre: 'Compra en efectivo',
+        monto: 50,
+        categoria: 'Otros',
+        fecha: date,
+        medio: MoneyMedium.cash,
+      );
+      await service.agregarGasto(
+        nombre: 'Compra digital',
+        monto: 100,
+        categoria: 'Otros',
+        fecha: date,
+        medio: MoneyMedium.digital,
+      );
+      final debtId = await service.agregarDeuda(
+        nombre: 'Deuda',
+        montoOriginal: 300,
+        cuota: 100,
+        cuotasTotales: 3,
+      );
+      await service.registrarPagoDeuda(
+        deudaId: debtId,
+        monto: 25,
+        fecha: date,
+        operationId: 'medium-payment',
+        medio: MoneyMedium.digital,
+      );
+      await service.registrarAporteAhorro(
+        monto: 75,
+        fecha: date,
+        medio: MoneyMedium.cash,
+      );
+      await service.retirarAhorro(
+        monto: 25,
+        fecha: date,
+        medio: MoneyMedium.digital,
+      );
+      final loanId = await service.registrarPrestamoTercero(
+        persona: 'Amiga',
+        monto: 100,
+        fechaEntrega: date,
+        fechaDevolucionAcordada: date.add(const Duration(days: 30)),
+        operationId: 'medium-loan',
+        medio: MoneyMedium.cash,
+      );
+      await service.registrarDevolucionPrestamo(
+        prestamoId: loanId,
+        monto: 40,
+        fecha: date,
+        operationId: 'medium-return',
+        medio: MoneyMedium.digital,
+      );
+      final planId = await service.crearPlanGastoFuturo(
+        nombre: 'Meta',
+        categoria: 'Otros',
+        montoNecesario: 200,
+        montoPlaneado: 200,
+        frecuencia: FutureExpenseFrequency.monthly.storageValue,
+        fechaObjetivo: date.add(const Duration(days: 30)),
+      );
+      await service.registrarReservaGastoFuturo(
+        planId: planId,
+        monto: 50,
+        fecha: date,
+        operationId: 'medium-reserve',
+        medio: MoneyMedium.digital,
+      );
+      await service.liberarReservaGastoFuturo(
+        planId: planId,
+        monto: 10,
+        fecha: date,
+        operationId: 'medium-release',
+        medio: MoneyMedium.cash,
+      );
+
+      final balances = await service.obtenerSaldosPorMedio();
+      expect(balances.cash, 785);
+      expect(balances.digital, 390);
+      expect(balances.unclassified, 0);
+      expect(balances.cash + balances.digital, 1175);
+      expect(balances.total, 1175);
+      expect(await service.obtenerSaldoDisponible(), balances.total);
+    } finally {
+      await database.close();
+    }
+  });
+
   test(
     'cuenta cuatro abonos reales y hace idempotentes los reintentos',
     () async {
@@ -187,6 +694,7 @@ void main() {
       final paymentDate = DateTime(2026, 10, 15);
       try {
         await service.agregarIngreso(monto: 2000000, fecha: paymentDate);
+        await service.distribuirSaldoDisponible(efectivo: 2000000, digital: 0);
         final debtId = await service.agregarDeuda(
           nombre: 'Crédito de prueba',
           montoOriginal: 1700000,
@@ -200,6 +708,7 @@ void main() {
             monto: 170000,
             fecha: paymentDate.add(Duration(days: index)),
             operationId: 'installment-$index',
+            medio: MoneyMedium.cash,
           );
         }
 
@@ -219,6 +728,7 @@ void main() {
           monto: payments.first.monto,
           fecha: payments.first.fecha,
           operationId: 'installment-0',
+          medio: MoneyMedium.cash,
         );
         expect(replayedPaymentId, originalPaymentId);
         expect(await service.obtenerPagosDeuda(debtId), hasLength(4));
@@ -230,6 +740,7 @@ void main() {
             monto: 160000,
             fecha: payments.first.fecha,
             operationId: 'installment-0',
+            medio: MoneyMedium.cash,
           ),
           throwsA(isA<DatabaseServiceException>()),
         );
@@ -239,6 +750,7 @@ void main() {
           monto: 170000,
           fecha: payments.first.fecha,
           operationId: 'distinct-payment-same-amount-and-date',
+          medio: MoneyMedium.cash,
         );
         payments = await service.obtenerPagosDeuda(debtId);
         expect(payments, hasLength(5));
@@ -257,6 +769,7 @@ void main() {
       final date = DateTime(2026, 10, 15);
       try {
         await service.agregarIngreso(monto: 1000, fecha: date);
+        await service.distribuirSaldoDisponible(efectivo: 1000, digital: 0);
         final debtId = await service.agregarDeuda(
           nombre: 'Deuda irregular',
           montoOriginal: 500,
@@ -270,6 +783,7 @@ void main() {
             monto: installments[index],
             fecha: date.add(Duration(days: index)),
             operationId: 'irregular-$index',
+            medio: MoneyMedium.cash,
           );
         }
 
@@ -283,6 +797,7 @@ void main() {
           monto: 290,
           fecha: date.add(const Duration(days: 3)),
           operationId: 'irregular-final',
+          medio: MoneyMedium.cash,
         );
         debt = (await service.obtenerDeudas()).single;
         expect(debt.cuotasPagadas, 4);
@@ -447,6 +962,7 @@ void main() {
     final service = DatabaseService(database);
     addTearDown(database.close);
     await service.agregarIngreso(monto: 1000, fecha: DateTime(2026, 10, 15));
+    await service.distribuirSaldoDisponible(efectivo: 1000, digital: 0);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SavingsScreen(databaseService: service)),
@@ -483,7 +999,7 @@ void main() {
     await tester.tap(find.text('Revisar entrega'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Te falta un poquito de plata para completar esto.'),
+      find.text('Uy, parece que no alcanza la platica para eso.'),
       findsOneWidget,
     );
 
@@ -589,11 +1105,13 @@ void main() {
       expect(debts.single.ingresoId, loanIdFromIncome(incomes));
       expect(debts.single.cuota, 10000);
       expect(debts.single.cuotasTotales, 5);
+      await service.distribuirSaldoDisponible(efectivo: 700000, digital: 0);
       await service.registrarPagoDeuda(
         deudaId: debts.single.id,
         monto: 10000,
         fecha: DateTime(2026, 10, 13),
         operationId: 'home-payment-1',
+        medio: MoneyMedium.cash,
       );
     });
     await _pumpUntilKeyText(
@@ -768,11 +1286,13 @@ void main() {
           expect(debt.cuotasPagadas, 0);
           expect(debt.fechaProximoPago, DateTime(2026, 11, 8));
 
+          await service.distribuirSaldoDisponible(efectivo: 700000, digital: 0);
           await service.registrarPagoDeuda(
             deudaId: loan.deudaId,
             monto: 10000,
             fecha: DateTime(2026, 11, 8),
             operationId: 'received-loan-payment-1',
+            medio: MoneyMedium.cash,
           );
           final incomesAfterPayment = await service.obtenerIngresos();
           expect(incomesAfterPayment, hasLength(3));
@@ -827,11 +1347,13 @@ void main() {
       final date = DateTime(2026, 10, 13);
       try {
         await service.agregarIngreso(monto: 1000, fecha: date);
+        await service.distribuirSaldoDisponible(efectivo: 1000, digital: 0);
         await service.agregarGasto(
           nombre: 'Compra',
           monto: 200,
           categoria: 'Compras',
           fecha: date,
+          medio: MoneyMedium.cash,
         );
         await service.agregarDeuda(
           nombre: 'Cuota',
@@ -845,22 +1367,39 @@ void main() {
           monto: 100,
           fecha: date,
           operationId: 'savings-flow-payment-1',
+          medio: MoneyMedium.cash,
         );
         expect(await service.obtenerSaldoDisponible(), 700);
 
-        await service.registrarAporteAhorro(monto: 300, fecha: date);
+        await service.registrarAporteAhorro(
+          monto: 300,
+          fecha: date,
+          medio: MoneyMedium.cash,
+        );
         expect(await service.obtenerSaldoDisponible(), 400);
         expect(await service.obtenerTotalAhorros(), 300);
         await expectLater(
-          service.registrarAporteAhorro(monto: 401, fecha: date),
+          service.registrarAporteAhorro(
+            monto: 401,
+            fecha: date,
+            medio: MoneyMedium.cash,
+          ),
           throwsA(isA<DatabaseServiceException>()),
         );
 
-        await service.retirarAhorro(monto: 100, fecha: date);
+        await service.retirarAhorro(
+          monto: 100,
+          fecha: date,
+          medio: MoneyMedium.cash,
+        );
         expect(await service.obtenerSaldoDisponible(), 500);
         expect(await service.obtenerTotalAhorros(), 200);
         await expectLater(
-          service.retirarAhorro(monto: 201, fecha: date),
+          service.retirarAhorro(
+            monto: 201,
+            fecha: date,
+            medio: MoneyMedium.cash,
+          ),
           throwsA(isA<DatabaseServiceException>()),
         );
         expect(await service.obtenerIngresos(), hasLength(1));
@@ -903,11 +1442,17 @@ void main() {
       final database = AppDatabase();
       final service = DatabaseService(database);
       try {
+        await service.agregarIngreso(
+          monto: 2000000,
+          fecha: DateTime(2026, 10, 1),
+        );
+        await service.distribuirSaldoDisponible(efectivo: 2000000, digital: 0);
         final id = await service.agregarGasto(
           nombre: 'Comida anterior',
           monto: 1500,
           categoria: 'Comida',
           fecha: DateTime(2026, 10, 1),
+          medio: MoneyMedium.cash,
         );
         await service.actualizarGasto(
           id: id,
@@ -916,6 +1461,7 @@ void main() {
           categoria: 'Comida para gatos',
           fecha: DateTime(2026, 10, 13),
           nota: 'Alimento',
+          medio: MoneyMedium.cash,
         );
 
         final expenses = await service.obtenerGastos();
@@ -970,6 +1516,7 @@ Future<void> _recordIncome(
   String description,
   String amount,
 ) async {
+  await tester.ensureVisible(find.text('Agregar dinero'));
   await tester.tap(find.text('Agregar dinero'));
   await tester.pumpAndSettle();
   if (type != 'Sueldo') {

@@ -3,12 +3,13 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
-import 'package:flutter/material.dart' show MaterialApp, Size, SizedBox;
+import 'package:flutter/material.dart' show MaterialApp, Size, SizedBox, Text;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
 import 'package:finanzas_app/models/future_expense.dart';
+import 'package:finanzas_app/models/money_medium.dart';
 import 'package:finanzas_app/screens/statistics/statistics_screen.dart';
 import 'package:finanzas_app/services/database_service.dart';
 import 'package:finanzas_app/theme/app_theme.dart';
@@ -27,10 +28,19 @@ void main() {
     await _mountStatisticsScreen(tester);
     await _pumpUntilFound(
       tester,
-      find.text('Todavía no hay movimientos por aquí.'),
+      find.text(
+        'Todavía no hay movimientos por aquí. '
+        'Cuando aparezcan, los revisamos juntos.',
+      ),
     );
 
-    expect(find.text('Todavía no hay movimientos por aquí.'), findsOneWidget);
+    expect(
+      find.text(
+        'Todavía no hay movimientos por aquí. '
+        'Cuando aparezcan, los revisamos juntos.',
+      ),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('category-pie-chart')), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -78,6 +88,111 @@ void main() {
     expect(find.byKey(const ValueKey('category-pie-chart')), findsOneWidget);
     expect(find.byKey(const ValueKey('trend-bar-chart')), findsOneWidget);
     expect(find.text('Transporte'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('incluye abonos una vez y separa medios clasificados', (
+    tester,
+  ) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    addTearDown(service.close);
+    final now = DateTime.now();
+    final previousMonth = DateTime(now.year, now.month - 1, 15);
+    await service.agregarIngreso(monto: 1000, fecha: now);
+    await service.distribuirSaldoDisponible(efectivo: 400, digital: 600);
+    await service.agregarGasto(
+      nombre: 'Compra en efectivo',
+      monto: 100,
+      categoria: 'Compras',
+      fecha: now,
+      medio: MoneyMedium.cash,
+    );
+    await service.agregarGasto(
+      nombre: 'Compra digital',
+      monto: 200,
+      categoria: 'Compras',
+      fecha: now,
+      medio: MoneyMedium.digital,
+    );
+    await service.agregarIngreso(monto: 200, fecha: now);
+    await service.agregarGasto(
+      nombre: 'Gasto antiguo sin medio',
+      monto: 25,
+      categoria: 'Otros',
+      fecha: now,
+    );
+    final debtId = await service.agregarDeuda(
+      nombre: 'Cuotas de prueba',
+      montoOriginal: 150,
+      cuota: 50,
+      cuotasTotales: 3,
+    );
+    await service.registrarPagoDeuda(
+      deudaId: debtId,
+      monto: 50,
+      fecha: now,
+      operationId: 'statistics-debt-current',
+      medio: MoneyMedium.digital,
+    );
+    await service.registrarPagoDeuda(
+      deudaId: debtId,
+      monto: 25,
+      fecha: previousMonth,
+      operationId: 'statistics-debt-previous',
+      medio: MoneyMedium.digital,
+    );
+    await service.registrarPagoDeuda(
+      deudaId: debtId,
+      monto: 15,
+      fecha: now,
+      operationId: 'statistics-debt-unclassified',
+    );
+
+    await _mountStatisticsScreen(tester, service: service);
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('spending-medium-donut')),
+    );
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-total')),
+        matching: find.text(r'$ 390'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-count')),
+        matching: find.text('5'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Pagos de deudas'), findsOneWidget);
+    expect(find.text('Sin clasificar'), findsOneWidget);
+    expect(find.textContaining(r'$ 100 (29 %)'), findsOneWidget);
+    expect(find.textContaining(r'$ 250 (71 %)'), findsOneWidget);
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(
+              const ValueKey('statistics-recorded-spending-total'),
+            ),
+          )
+          .data,
+      r'$ 390',
+    );
+
+    await tester.tap(find.byKey(const ValueKey('period-previousMonth')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-total')),
+        matching: find.text(r'$ 25'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -335,6 +450,10 @@ Future<void> _seedExpenses(
     final database = AppDatabase();
     try {
       final service = DatabaseService(database);
+      await service.agregarIngreso(
+        monto: 100000000,
+        fecha: expenses.isEmpty ? DateTime.now() : expenses.first.date,
+      );
       for (var index = 0; index < expenses.length; index++) {
         final expense = expenses[index];
         await service.agregarGasto(

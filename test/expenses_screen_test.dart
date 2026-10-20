@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
+import 'package:finanzas_app/models/money_medium.dart';
 import 'package:finanzas_app/screens/expenses/expenses_screen.dart';
 import 'package:finanzas_app/services/database_service.dart';
 import 'package:finanzas_app/theme/app_theme.dart';
@@ -18,13 +19,28 @@ void main() {
     tester,
   ) async {
     await _prepareTemporaryDatabaseDirectory(tester);
+    await tester.runAsync(() async {
+      final database = AppDatabase();
+      try {
+        await DatabaseService(
+          database,
+        ).agregarIngreso(monto: 2000000, fecha: DateTime.now());
+      } finally {
+        await database.close();
+      }
+    });
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await _mountExpensesScreen(tester);
-    await _pumpUntilFound(tester, find.text('Todavía no hay gastos por aquí.'));
+    await _pumpUntilFound(
+      tester,
+      find.text(
+        'Todavía no hay gastos por aquí. ¡Ojalá siga así un buen rato!',
+      ),
+    );
 
     expect(find.text(r'$ 0'), findsOneWidget);
     expect(find.text('0'), findsNWidgets(2));
@@ -147,7 +163,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Borrar gasto'));
     await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Todavía no hay gastos por aquí.'));
+    await _pumpUntilFound(
+      tester,
+      find.text(
+        'Todavía no hay gastos por aquí. ¡Ojalá siga así un buen rato!',
+      ),
+    );
     expect(find.text(r'$ 0'), findsOneWidget);
     _expectNoTestException(tester);
   });
@@ -160,6 +181,7 @@ void main() {
       final database = AppDatabase();
       final service = DatabaseService(database);
       final now = DateTime.now();
+      await service.agregarIngreso(monto: 100, fecha: now);
       await service.agregarGasto(
         nombre: 'Gasto anterior',
         monto: 10,
@@ -197,6 +219,7 @@ void main() {
       final database = AppDatabase();
       final service = DatabaseService(database);
       try {
+        await service.agregarIngreso(monto: 100, fecha: DateTime(2026, 10, 1));
         await service.agregarGasto(
           nombre: 'Compra anterior',
           monto: 20,
@@ -267,6 +290,55 @@ void main() {
       find.byKey(const ValueKey('expense-category-option-Mascotas')),
       findsOneWidget,
     );
+    _expectNoTestException(tester);
+  });
+
+  testWidgets('muestra los abonos de deuda como movimientos de solo lectura', (
+    tester,
+  ) async {
+    await _prepareTemporaryDatabaseDirectory(tester);
+    await tester.runAsync(() async {
+      final database = AppDatabase();
+      try {
+        final service = DatabaseService(database);
+        final now = DateTime.now();
+        await service.agregarIngreso(monto: 300, fecha: now);
+        await service.distribuirSaldoDisponible(efectivo: 300, digital: 0);
+        final debtId = await service.agregarDeuda(
+          nombre: 'Préstamo del celular',
+          montoOriginal: 100,
+          cuota: 50,
+          cuotasTotales: 2,
+        );
+        await service.registrarPagoDeuda(
+          deudaId: debtId,
+          monto: 50,
+          fecha: now,
+          operationId: 'expenses-screen-debt-payment',
+          medio: MoneyMedium.cash,
+        );
+      } finally {
+        await database.close();
+      }
+    });
+
+    await _mountExpensesScreen(tester);
+    await _pumpUntilFound(
+      tester,
+      find.text('Pago de deuda · Préstamo del celular'),
+    );
+
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('debt-payment-expense-1')),
+        matching: find.byKey(const ValueKey('debt-payment-amount-1')),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Gastos y pagos de deudas'), findsOneWidget);
+    expect(find.byTooltip('Editar gasto'), findsNothing);
+    expect(find.byTooltip('Eliminar gasto'), findsNothing);
     _expectNoTestException(tester);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../database/app_database.dart';
 import '../../models/future_expense.dart';
+import '../../models/money_medium.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
@@ -13,6 +14,7 @@ import '../../utils/future_expense_calculator.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/money_medium_selector.dart';
 
 class FutureExpensesScreen extends StatefulWidget {
   const FutureExpensesScreen({super.key, this.databaseService});
@@ -178,12 +180,13 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
           summary: summary,
           progress: progress,
           available: available,
-          onReserve: (amount, operationId) =>
+          onReserve: (amount, operationId, medium) =>
               _databaseService.registrarReservaGastoFuturo(
                 planId: summary.plan.id,
                 monto: amount,
                 fecha: DateTime.now(),
                 operationId: operationId,
+                medio: medium,
               ),
         ),
       );
@@ -213,27 +216,45 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
 
   Future<void> _release(FutureExpenseSummary summary) async {
     if (_isSaving || summary.reservedAmount <= 0) return;
-    final confirmed = await showDialog<bool>(
+    var selectedMedium = '';
+    final selectedValue = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Liberar lo reservado?'),
-        content: Text(
-          'Los ${formatMoney(summary.reservedAmount)} de “${summary.plan.name}” '
-          'volverán a tu dinero disponible. El historial se conservará.',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('¿Liberar lo reservado?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Los ${formatMoney(summary.reservedAmount)} de “${summary.plan.name}” '
+                'volverán a tu dinero disponible. El historial se conservará.',
+              ),
+              const SizedBox(height: 16),
+              MoneyMediumSelector(
+                selected: MoneyMedium.fromStorage(selectedMedium),
+                title: 'Medio al que vuelve',
+                allowUnclassified: true,
+                onChanged: (medium) => setDialogState(
+                  () => selectedMedium = medium?.storageValue ?? '',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Ahora no'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selectedMedium),
+              child: const Text('Liberar dinero'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Ahora no'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Liberar dinero'),
-          ),
-        ],
       ),
     );
-    if (confirmed != true || !mounted || _isSaving) return;
+    if (selectedValue == null || !mounted || _isSaving) return;
     setState(() => _isSaving = true);
     try {
       await _databaseService.liberarReservaGastoFuturo(
@@ -241,6 +262,7 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
         monto: summary.reservedAmount,
         fecha: DateTime.now(),
         operationId: _newFutureExpenseOperationId(),
+        medio: MoneyMedium.fromStorage(selectedValue),
       );
       if (!mounted) return;
       setState(() {
@@ -876,7 +898,12 @@ class _FutureExpenseReservationDialog extends StatefulWidget {
   final FutureExpenseSummary summary;
   final FutureExpenseProgress progress;
   final double available;
-  final Future<int> Function(double amount, String operationId) onReserve;
+  final Future<int> Function(
+    double amount,
+    String operationId,
+    MoneyMedium medium,
+  )
+  onReserve;
 
   @override
   State<_FutureExpenseReservationDialog> createState() =>
@@ -890,6 +917,7 @@ class _FutureExpenseReservationDialogState
   late final String _operationId;
   bool _isSaving = false;
   String? _error;
+  MoneyMedium _medium = MoneyMedium.cash;
 
   double get _amount => tryParseMoney(_amountController.text) ?? 0;
 
@@ -922,7 +950,7 @@ class _FutureExpenseReservationDialogState
       _error = null;
     });
     try {
-      await widget.onReserve(_amount, _operationId);
+      await widget.onReserve(_amount, _operationId, _medium);
       if (mounted) Navigator.pop(context, true);
     } catch (error, stackTrace) {
       logOperationFailure(
@@ -1000,6 +1028,14 @@ class _FutureExpenseReservationDialogState
                       return 'Te faltan ${formatMoney(amount - widget.available)}.';
                     }
                     return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                MoneyMediumSelector(
+                  selected: _medium,
+                  title: 'Medio reservado',
+                  onChanged: (medium) {
+                    if (medium != null) setState(() => _medium = medium);
                   },
                 ),
                 const SizedBox(height: 8),

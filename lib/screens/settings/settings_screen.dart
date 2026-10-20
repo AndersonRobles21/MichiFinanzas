@@ -24,6 +24,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final bool _ownsDatabaseService;
   Future<_SettingsData>? _settingsFuture;
   _SettingsData? _loadedData;
+  final _nameFormKey = GlobalKey<FormState>();
+  final _userNameController = TextEditingController();
   bool _isSaving = false;
 
   @override
@@ -44,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    _userNameController.dispose();
     if (_ownsDatabaseService) unawaited(_databaseService.close());
     super.dispose();
   }
@@ -51,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<_SettingsData> _loadSettings() async {
     return runWithLoggedErrors('cargar ajustes y categorías', () async {
       final settings = await const AppSettingsService().load();
+      _userNameController.text = settings.userName;
       final expenses = await _databaseService.obtenerGastos();
       final usageCount = <String, int>{};
       for (final expense in expenses) {
@@ -73,11 +77,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  Future<void> _saveSettings(AppSettings settings, String message) async {
+  Future<void> _saveUserName(AppSettings settings) async {
+    if (!_nameFormKey.currentState!.validate() || _isSaving) return;
+    final userName = AppSettingsService.normalizeUserName(
+      _userNameController.text,
+    );
+    if (!AppSettingsService.isValidUserName(userName)) {
+      _showMessage('Escribe un nombre usando solo letras españolas.');
+      return;
+    }
+    await _saveSettings(
+      settings.copyWith(userName: userName),
+      '¡Listo, $userName! Guardamos tu nombre.',
+      validateUserName: true,
+    );
+  }
+
+  Future<void> _saveSettings(
+    AppSettings settings,
+    String message, {
+    bool validateUserName = false,
+  }) async {
     if (_isSaving) return;
     setState(() => _isSaving = true);
     try {
-      await const AppSettingsService().save(settings);
+      if (validateUserName) {
+        await const AppSettingsService().saveUserName(
+          settings,
+          settings.userName,
+        );
+      } else {
+        await const AppSettingsService().save(settings);
+      }
       if (!mounted) return;
       final categoryUsage = _loadedData?.categoryUsage ?? const <String, int>{};
       final updatedData = _SettingsData(
@@ -286,6 +317,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             style: Theme.of(context).textTheme.bodyLarge,
                           ),
                           const SizedBox(height: 26),
+                          _SettingsSection(
+                            title: 'Tu nombre',
+                            icon: Icons.person_outline_rounded,
+                            child: Form(
+                              key: _nameFormKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextFormField(
+                                    key: const ValueKey('settings-user-name'),
+                                    controller: _userNameController,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Nombre',
+                                      hintText: 'Pon tu nombre',
+                                      prefixIcon: Icon(Icons.person_outline),
+                                    ),
+                                    validator: (value) =>
+                                        AppSettingsService.isValidUserName(
+                                          value ?? '',
+                                        )
+                                        ? null
+                                        : 'Usa solo letras españolas y espacios entre nombres.',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton.icon(
+                                    key: const ValueKey(
+                                      'settings-save-user-name',
+                                    ),
+                                    onPressed: _isSaving
+                                        ? null
+                                        : () => _saveUserName(data.settings),
+                                    icon: const Icon(Icons.check_rounded),
+                                    label: const Text('Guardar nombre'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           _SettingsSection(
                             title: 'Categorías de gastos',
                             icon: Icons.category_outlined,

@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../database/app_database.dart';
+import '../../models/money_medium.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/money_medium_selector.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key, this.isActive = true, this.databaseService});
@@ -23,7 +25,7 @@ class ExpensesScreen extends StatefulWidget {
 class _ExpensesScreenState extends State<ExpensesScreen> {
   late final DatabaseService _databaseService;
   late final bool _ownsDatabaseService;
-  Future<List<Gasto>>? _expensesFuture;
+  Future<_ExpensesData>? _expensesFuture;
   AppSettings _settings = AppSettings.defaults();
   List<Gasto>? _loadedExpenses;
 
@@ -53,7 +55,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     super.dispose();
   }
 
-  Future<List<Gasto>> _loadExpenses() async {
+  Future<_ExpensesData> _loadExpenses() async {
     try {
       _settings = await const AppSettingsService().load();
     } catch (error, stackTrace) {
@@ -68,12 +70,21 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       _databaseService.obtenerGastos,
     );
     final sortedExpenses = _sortExpenses(expenses);
+    final results = await Future.wait<Object>([
+      _databaseService.obtenerTodosLosPagosDeuda(),
+      _databaseService.obtenerDeudas(),
+    ]);
+    final data = _ExpensesData(
+      expenses: sortedExpenses,
+      debtPayments: results[0] as List<PagosDeudaData>,
+      debts: results[1] as List<Deuda>,
+    );
     if (mounted) {
       setState(() => _loadedExpenses = sortedExpenses);
     } else {
       _loadedExpenses = sortedExpenses;
     }
-    return sortedExpenses;
+    return data;
   }
 
   Future<void> _addExpense() async {
@@ -101,14 +112,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         categoria: draft.categoria,
         fecha: draft.fecha,
         nota: draft.nota,
+        medio: draft.medio,
       );
       final expenses = _sortExpenses(await _databaseService.obtenerGastos());
       if (!mounted) return;
       setState(() {
         _loadedExpenses = expenses;
-        _expensesFuture = Future.value(expenses);
+        _expensesFuture = _loadExpenses();
       });
-      _showMessage('¡Listo! El gasto quedó guardado.', isSuccess: true);
+      _showMessage('¡Listo! Otro movimiento bajo control 🐱', isSuccess: true);
     } catch (error, stackTrace) {
       logOperationFailure(error, stackTrace, operation: 'guardar un gasto');
       if (mounted) {
@@ -142,12 +154,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         categoria: draft.categoria,
         fecha: draft.fecha,
         nota: draft.nota,
+        medio: draft.medio,
       );
       final expenses = _sortExpenses(await _databaseService.obtenerGastos());
       if (!mounted) return;
       setState(() {
         _loadedExpenses = expenses;
-        _expensesFuture = Future.value(expenses);
+        _expensesFuture = _loadExpenses();
       });
       _showMessage('Cambios guardados.', isSuccess: true);
     } catch (error, stackTrace) {
@@ -188,7 +201,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       if (!mounted) return;
       setState(() {
         _loadedExpenses = expenses;
-        _expensesFuture = Future.value(expenses);
+        _expensesFuture = _loadExpenses();
       });
       _showMessage('Gasto borrado.', isSuccess: true);
     } catch (error, stackTrace) {
@@ -216,7 +229,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 36.0;
-            return FutureBuilder<List<Gasto>>(
+            return FutureBuilder<_ExpensesData>(
               future: _expensesFuture,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -240,18 +253,41 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   );
                 }
 
-                final expenses = snapshot.data!;
+                final data = snapshot.data!;
+                final expenses = data.expenses;
+                final debtNames = {
+                  for (final debt in data.debts) debt.id: debt.nombre,
+                };
+                final history = <_ExpenseHistoryEntry>[
+                  for (final expense in expenses)
+                    _ExpenseHistoryEntry.expense(expense),
+                  for (final payment in data.debtPayments)
+                    _ExpenseHistoryEntry.payment(
+                      payment,
+                      debtNames[payment.deudaId] ?? 'Deuda',
+                    ),
+                ]..sort(
+                    (first, second) => second.date.compareTo(first.date),
+                  );
                 final now = DateTime.now();
                 final thisMonth = expenses.where(
                   (expense) =>
                       expense.fecha.year == now.year &&
                       expense.fecha.month == now.month,
                 );
+                final paymentsThisMonth = data.debtPayments.where(
+                  (payment) =>
+                      payment.fecha.year == now.year &&
+                      payment.fecha.month == now.month,
+                );
                 final monthlyTotal = thisMonth.fold<double>(
                   0,
                   (total, expense) => total + expense.monto,
+                ) + paymentsThisMonth.fold<double>(
+                  0,
+                  (total, payment) => total + payment.monto,
                 );
-                final monthlyCount = thisMonth.length;
+                final monthlyCount = thisMonth.length + paymentsThisMonth.length;
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
@@ -299,32 +335,41 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Todos los gastos',
+                                  'Gastos y pagos de deudas',
                                   style: Theme.of(context).textTheme.titleLarge,
                                 ),
                               ),
                               Text(
-                                '${expenses.length}',
+                                '${history.length}',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          if (expenses.isEmpty)
+                          if (history.isEmpty)
                             const _ExpensesMessage(
                               icon: Icons.receipt_long_outlined,
-                              message: 'Todavía no hay gastos por aquí.',
+                              message:
+                                  'Todavía no hay gastos por aquí. '
+                                  '¡Ojalá siga así un buen rato!',
                               illustration: CatAssets.vacio,
                             )
                           else
-                            ...expenses.map(
-                              (expense) => Padding(
+                            ...history.map(
+                              (entry) => Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
-                                child: _ExpenseTile(
-                                  expense: expense,
-                                  onEdit: () => _editExpense(expense),
-                                  onDelete: () => _deleteExpense(expense),
-                                ),
+                                child: entry.expense != null
+                                    ? _ExpenseTile(
+                                        expense: entry.expense!,
+                                        onEdit: () =>
+                                            _editExpense(entry.expense!),
+                                        onDelete: () =>
+                                            _deleteExpense(entry.expense!),
+                                      )
+                                    : _DebtPaymentTile(
+                                        payment: entry.payment!,
+                                        debtName: entry.debtName!,
+                                      ),
                               ),
                             ),
                         ],
@@ -348,6 +393,7 @@ class _ExpenseDraft {
     required this.categoria,
     required this.fecha,
     required this.nota,
+    required this.medio,
   });
 
   final String nombre;
@@ -355,6 +401,45 @@ class _ExpenseDraft {
   final String categoria;
   final DateTime fecha;
   final String? nota;
+  final MoneyMedium? medio;
+}
+
+class _ExpensesData {
+  const _ExpensesData({
+    required this.expenses,
+    required this.debtPayments,
+    required this.debts,
+  });
+
+  final List<Gasto> expenses;
+  final List<PagosDeudaData> debtPayments;
+  final List<Deuda> debts;
+}
+
+class _ExpenseHistoryEntry {
+  const _ExpenseHistoryEntry._({
+    required this.date,
+    this.expense,
+    this.payment,
+    this.debtName,
+  });
+
+  factory _ExpenseHistoryEntry.expense(Gasto expense) =>
+      _ExpenseHistoryEntry._(date: expense.fecha, expense: expense);
+
+  factory _ExpenseHistoryEntry.payment(
+    PagosDeudaData payment,
+    String debtName,
+  ) => _ExpenseHistoryEntry._(
+    date: payment.fecha,
+    payment: payment,
+    debtName: debtName,
+  );
+
+  final DateTime date;
+  final Gasto? expense;
+  final PagosDeudaData? payment;
+  final String? debtName;
 }
 
 class _ExpenseFormSheet extends StatefulWidget {
@@ -373,6 +458,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
   late final TextEditingController _amountController;
   late final TextEditingController _noteController;
   String? _category;
+  late MoneyMedium? _medium;
   late DateTime _date;
 
   @override
@@ -384,6 +470,9 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
       text: expense == null ? '' : formatAmount(expense.monto),
     );
     _noteController = TextEditingController(text: expense?.nota ?? '');
+    _medium = expense == null
+        ? MoneyMedium.cash
+        : MoneyMedium.fromStorage(expense.medio);
     _category = expense == null
         ? null
         : AppSettingsService.normalizeCategory(expense.categoria);
@@ -417,6 +506,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
         monto: parseMoney(_amountController.text),
         categoria: _category!,
         fecha: _date,
+        medio: _medium,
         nota: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
@@ -456,6 +546,13 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Escribe el nombre del gasto.'
                       : null,
+                ),
+                const SizedBox(height: 14),
+                MoneyMediumSelector(
+                  selected: _medium,
+                  title: 'Medio de pago',
+                  allowUnclassified: widget.expense != null,
+                  onChanged: (medium) => setState(() => _medium = medium),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -770,6 +867,60 @@ class _ExpenseTile extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DebtPaymentTile extends StatelessWidget {
+  const _DebtPaymentTile({required this.payment, required this.debtName});
+
+  final PagosDeudaData payment;
+  final String debtName;
+
+  @override
+  Widget build(BuildContext context) {
+    final medium = MoneyMedium.fromStorage(payment.medio);
+    return Container(
+      key: ValueKey('debt-payment-expense-${payment.id}'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.payments_outlined, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pago de deuda · $debtName',
+                  key: ValueKey('debt-payment-title-${payment.id}'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(_formatDate(payment.fecha)),
+                const SizedBox(height: 4),
+                Text(medium?.label ?? 'Medio sin clasificar'),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _formatMoney(payment.monto),
+            key: ValueKey('debt-payment-amount-${payment.id}'),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppColors.primary,
+            ),
           ),
         ],
       ),

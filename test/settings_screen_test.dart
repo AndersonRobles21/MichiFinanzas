@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
-import 'package:flutter/material.dart' show MaterialApp, Size, SizedBox;
+import 'package:flutter/material.dart'
+    show InputDecorator, MaterialApp, Size, SizedBox, TextFormField;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,104 @@ import 'package:finanzas_app/theme/app_theme.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('valida el nombre en Ajustes y lo recupera al reabrir', (
+    tester,
+  ) async {
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    await _prepareTemporaryStorage(tester);
+    _setMobileSize(tester);
+    await _mountSettingsScreen(tester, service);
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('settings-user-name')),
+    );
+    final nameField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey('settings-user-name')),
+    );
+    expect(nameField.controller?.text, isEmpty);
+    expect(
+      tester
+          .widget<InputDecorator>(
+            find.descendant(
+              of: find.byKey(const ValueKey('settings-user-name')),
+              matching: find.byType(InputDecorator),
+            ),
+          )
+          .decoration
+          .hintText,
+      'Pon tu nombre',
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-user-name')),
+      'María2',
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-save-user-name')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Usa solo letras españolas y espacios entre nombres.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-user-name')),
+      'María José Núñez',
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-save-user-name')));
+    await _pumpUntilFound(
+      tester,
+      find.text('¡Listo, María José Núñez! Guardamos tu nombre.'),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _mountSettingsScreen(tester, service);
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('settings-user-name')),
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('settings-user-name')),
+          )
+          .controller
+          ?.text,
+      'María José Núñez',
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() => service.close());
+  });
+
+  testWidgets('valida y persiste nombres españoles en preferencias locales', (
+    tester,
+  ) async {
+    await _prepareTemporaryStorage(tester);
+    const settingsService = AppSettingsService();
+
+    expect(AppSettingsService.isValidUserName('María José Núñez'), isTrue);
+    expect(AppSettingsService.isValidUserName('Ürsula Peña'), isTrue);
+    expect(AppSettingsService.isValidUserName('   '), isFalse);
+    expect(AppSettingsService.isValidUserName('Ana2'), isFalse);
+    expect(AppSettingsService.isValidUserName('Ana-Marie'), isFalse);
+    expect(AppSettingsService.isValidUserName('Ana!'), isFalse);
+
+    await tester.runAsync(() async {
+      await settingsService.save(
+        AppSettings.defaults().copyWith(userName: '  María   José Núñez  '),
+      );
+      final loaded = await settingsService.load();
+      expect(loaded.userName, 'María José Núñez');
+      await expectLater(
+        settingsService.saveUserName(AppSettings.defaults(), 'Ana2'),
+        throwsArgumentError,
+      );
+      await expectLater(
+        settingsService.saveUserName(AppSettings.defaults(), '   '),
+        throwsArgumentError,
+      );
+    });
+  });
 
   testWidgets('persiste categorías sin mostrar presupuesto mensual', (
     tester,
@@ -87,14 +186,15 @@ void main() {
   ) async {
     final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
     await _prepareTemporaryStorage(tester);
-    await tester.runAsync(
-      () => service.agregarGasto(
+    await tester.runAsync(() async {
+      await service.agregarIngreso(monto: 100, fecha: DateTime.now());
+      await service.agregarGasto(
         nombre: 'Mercado',
         monto: 25,
         categoria: 'Comida',
         fecha: DateTime.now(),
-      ),
-    );
+      );
+    });
     _setMobileSize(tester);
     await _mountSettingsScreen(tester, service);
     await _pumpUntilFound(tester, find.text('Usada en 1 gasto'));

@@ -13,6 +13,8 @@ class Ingresos extends Table {
   DateTimeColumn get fecha => dateTime()();
 
   TextColumn get descripcion => text().nullable()();
+
+  TextColumn get medio => text().nullable()();
 }
 
 class Gastos extends Table {
@@ -27,6 +29,8 @@ class Gastos extends Table {
   DateTimeColumn get fecha => dateTime()();
 
   TextColumn get nota => text().nullable()();
+
+  TextColumn get medio => text().nullable()();
 }
 
 class Deudas extends Table {
@@ -68,6 +72,8 @@ class PagosDeuda extends Table {
   DateTimeColumn get fecha => dateTime()();
 
   TextColumn get operationId => text().nullable()();
+
+  TextColumn get medio => text().nullable()();
 }
 
 class MovimientosAhorro extends Table {
@@ -78,6 +84,8 @@ class MovimientosAhorro extends Table {
   TextColumn get tipo => text()();
 
   DateTimeColumn get fecha => dateTime()();
+
+  TextColumn get medio => text().nullable()();
 }
 
 class PrestamosTerceros extends Table {
@@ -108,6 +116,8 @@ class MovimientosPrestamo extends Table {
   DateTimeColumn get fecha => dateTime()();
 
   TextColumn get operationId => text().unique()();
+
+  TextColumn get medio => text().nullable()();
 }
 
 class GastosFuturos extends Table {
@@ -150,6 +160,20 @@ class MovimientosReservaGastoFuturo extends Table {
   DateTimeColumn get fecha => dateTime()();
 
   TextColumn get operationId => text().unique()();
+
+  TextColumn get medio => text().nullable()();
+}
+
+class AsignacionesDinero extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get medio => text()();
+
+  RealColumn get monto => real()();
+
+  TextColumn get origen => text().nullable()();
+
+  IntColumn get origenId => integer().nullable()();
 }
 
 @DriftDatabase(
@@ -163,13 +187,14 @@ class MovimientosReservaGastoFuturo extends Table {
     MovimientosPrestamo,
     GastosFuturos,
     MovimientosReservaGastoFuturo,
+    AsignacionesDinero,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -178,6 +203,11 @@ class AppDatabase extends _$AppDatabase {
       await customStatement(
         'CREATE UNIQUE INDEX pagos_deuda_operation_id_unique '
         'ON pagos_deuda (operation_id)',
+      );
+      await customStatement(
+        'CREATE UNIQUE INDEX asignaciones_dinero_origen_unique '
+        'ON asignaciones_dinero (origen, origen_id) '
+        'WHERE origen IS NOT NULL AND origen_id IS NOT NULL',
       );
     },
     onUpgrade: (migrator, from, to) async {
@@ -223,6 +253,34 @@ class AppDatabase extends _$AppDatabase {
       if (from < 8) {
         await migrator.createTable(gastosFuturos);
         await migrator.createTable(movimientosReservaGastoFuturo);
+      }
+      if (from < 9) {
+        await migrator.addColumn(ingresos, ingresos.medio);
+        await migrator.addColumn(gastos, gastos.medio);
+        await migrator.addColumn(pagosDeuda, pagosDeuda.medio);
+        if (from >= 4) {
+          await migrator.addColumn(movimientosAhorro, movimientosAhorro.medio);
+        }
+        if (from >= 6) {
+          await migrator.addColumn(
+            movimientosPrestamo,
+            movimientosPrestamo.medio,
+          );
+        }
+        if (from >= 8) {
+          await migrator.addColumn(
+            movimientosReservaGastoFuturo,
+            movimientosReservaGastoFuturo.medio,
+          );
+        }
+      }
+      if (from < 10) {
+        await migrator.createTable(asignacionesDinero);
+        await customStatement(
+          'CREATE UNIQUE INDEX asignaciones_dinero_origen_unique '
+          'ON asignaciones_dinero (origen, origen_id) '
+          'WHERE origen IS NOT NULL AND origen_id IS NOT NULL',
+        );
       }
     },
     beforeOpen: (details) async {

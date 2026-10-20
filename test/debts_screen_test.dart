@@ -40,6 +40,16 @@ void main() {
     'crea deudas, registra abonos y elimina el historial en cascada',
     (tester) async {
       await _prepareTemporaryDatabaseDirectory(tester);
+      await tester.runAsync(() async {
+        final database = AppDatabase();
+        try {
+          await DatabaseService(
+            database,
+          ).agregarIngreso(monto: 10000, fecha: DateTime.now());
+        } finally {
+          await database.close();
+        }
+      });
       _setMobileSize(tester);
       await _mountDebtsScreen(tester);
       await _pumpUntilFound(
@@ -108,7 +118,10 @@ void main() {
       await tester.ensureVisible(find.text('Historial (0)'));
       await tester.tap(find.text('Historial (0)'));
       await tester.pumpAndSettle();
-      expect(find.text('Todavía no hay abonos por aquí.'), findsOneWidget);
+      expect(
+        find.text('Todavía no hay abonos por aquí. Cada avance cuenta.'),
+        findsOneWidget,
+      );
       await tester.tap(find.byTooltip('Cerrar historial'));
       await tester.pumpAndSettle();
 
@@ -141,7 +154,9 @@ void main() {
       await _confirmPayment(tester);
       await _pumpUntilFound(
         tester,
-        find.text('Abono guardado. El saldo ya está actualizado.'),
+        find.text(
+          '¡Buen avance! El abono quedó registrado y el saldo actualizado 😸',
+        ),
       );
       await tester.runAsync(() async {
         final database = AppDatabase();
@@ -269,7 +284,9 @@ void main() {
     await tester.tapAt(saveButton);
     await _pumpUntilFound(
       tester,
-      find.text('Abono guardado. El saldo ya está actualizado.'),
+      find.text(
+        '¡Buen avance! El abono quedó registrado y el saldo actualizado 😸',
+      ),
     );
 
     final payments = await service.obtenerPagosDeuda(debtId);
@@ -364,12 +381,14 @@ void main() {
     await tester.tap(find.text('Guardar'));
     await _pumpUntilFound(
       tester,
-      find.text('Esa cantidad supera lo que todavía falta por pagar.'),
+      find.text('Uy, ese abono pasa lo que todavía falta por pagar.'),
     );
 
     expect(find.text('Revisar abono'), findsOneWidget);
     expect(
-      find.text('Abono guardado. El saldo ya está actualizado.'),
+      find.text(
+        '¡Buen avance! El abono quedó registrado y el saldo actualizado 😸',
+      ),
       findsNothing,
     );
     expect(await service.obtenerPagosDeuda(debtId), hasLength(1));
@@ -397,7 +416,9 @@ Future<void> _confirmPayment(WidgetTester tester) async {
   await tester.tap(find.text('Guardar'));
   await _pumpUntilFound(
     tester,
-    find.text('Abono guardado. El saldo ya está actualizado.'),
+    find.text(
+      '¡Buen avance! El abono quedó registrado y el saldo actualizado 😸',
+    ),
   );
 }
 
