@@ -6,6 +6,7 @@ import '../database/app_database.dart';
 import '../models/future_expense.dart';
 import '../models/income_type.dart';
 import '../models/money_medium.dart';
+import '../models/subscription.dart';
 
 class DatabaseService {
   DatabaseService(this._database);
@@ -30,6 +31,7 @@ class DatabaseService {
     return _modificar(
       'borrar datos financieros',
       () => _database.transaction(() async {
+        await _database.delete(_database.suscripciones).go();
         await _database.delete(_database.pagosDeuda).go();
         await _database.delete(_database.deudas).go();
         await _database.delete(_database.movimientosPrestamo).go();
@@ -201,6 +203,7 @@ class DatabaseService {
                 tipo: Value(tipo),
                 fecha: Value(fecha),
                 descripcion: Value(_cleanOptionalText(descripcion)),
+                medio: Value(medio?.storageValue),
               ),
             );
         await _validarAsignacionDentroDelSaldo();
@@ -757,6 +760,83 @@ class DatabaseService {
     return _ejecutar('obtener saldos por medio', _calcularDesgloseSaldos);
   }
 
+  Future<List<Suscripcion>> obtenerSuscripciones() {
+    return _ejecutar(
+      'obtener suscripciones',
+      () =>
+          (_database.select(_database.suscripciones)..orderBy([
+                (subscription) => OrderingTerm.asc(subscription.proximoPago),
+                (subscription) => OrderingTerm.asc(subscription.nombre),
+              ]))
+              .get(),
+    );
+  }
+
+  Future<int> agregarSuscripcion({
+    required String nombre,
+    required double precio,
+    required DateTime proximoPago,
+    required SubscriptionFrequency frecuencia,
+    MoneyMedium? medio,
+  }) {
+    return _ejecutar('agregar suscripción', () async {
+      _validarMonto(precio);
+      if (nombre.trim().isEmpty) {
+        throw ArgumentError.value(nombre, 'nombre', 'No puede estar vacío.');
+      }
+      return _database
+          .into(_database.suscripciones)
+          .insert(
+            SuscripcionesCompanion.insert(
+              nombre: nombre.trim(),
+              precio: precio,
+              proximoPago: proximoPago,
+              frecuencia: frecuencia.storageValue,
+              medio: Value(medio?.storageValue),
+            ),
+          );
+    });
+  }
+
+  Future<int> actualizarSuscripcion({
+    required int id,
+    required String nombre,
+    required double precio,
+    required DateTime proximoPago,
+    required SubscriptionFrequency frecuencia,
+    MoneyMedium? medio,
+  }) {
+    return _ejecutar('actualizar suscripción', () async {
+      _validarMonto(precio);
+      if (nombre.trim().isEmpty) {
+        throw ArgumentError.value(nombre, 'nombre', 'No puede estar vacío.');
+      }
+      final updated =
+          await (_database.update(
+            _database.suscripciones,
+          )..where((subscription) => subscription.id.equals(id))).write(
+            SuscripcionesCompanion(
+              nombre: Value(nombre.trim()),
+              precio: Value(precio),
+              proximoPago: Value(proximoPago),
+              frecuencia: Value(frecuencia.storageValue),
+              medio: Value(medio?.storageValue),
+            ),
+          );
+      if (updated == 0) throw StateError('La suscripción ya no existe.');
+      return updated;
+    });
+  }
+
+  Future<int> eliminarSuscripcion(int id) {
+    return _ejecutar(
+      'eliminar suscripción',
+      () => (_database.delete(
+        _database.suscripciones,
+      )..where((subscription) => subscription.id.equals(id))).go(),
+    );
+  }
+
   Future<AvailableBalanceBreakdown> distribuirSaldoDisponible({
     required double efectivo,
     required double digital,
@@ -1265,7 +1345,7 @@ class DatabaseService {
             tipo: Value(tipo),
             fecha: fecha,
             descripcion: Value(descripcion),
-            medio: const Value(null),
+            medio: Value(medio?.storageValue),
           ),
         );
   }

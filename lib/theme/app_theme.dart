@@ -14,6 +14,38 @@ class AppColors {
   static const outline = Color(0xFF4A3D5A);
 }
 
+abstract final class AppCardDecorations {
+  static BoxDecoration get surface => BoxDecoration(
+    color: AppColors.surface,
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+    boxShadow: [
+      BoxShadow(
+        color: const Color(0xFF000000).withValues(alpha: 0.16),
+        blurRadius: 16,
+        offset: const Offset(0, 6),
+      ),
+    ],
+  );
+
+  static BoxDecoration get featured => BoxDecoration(
+    gradient: const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [AppColors.surfaceRaised, AppColors.surface],
+    ),
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+    boxShadow: [
+      BoxShadow(
+        color: AppColors.primaryDeep.withValues(alpha: 0.08),
+        blurRadius: 20,
+        offset: const Offset(0, 7),
+      ),
+    ],
+  );
+}
+
 class AppTheme {
   const AppTheme._();
 
@@ -96,9 +128,13 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
-        elevation: 2,
-        shadowColor: const Color(0xFF000000).withValues(alpha: 0.32),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        elevation: 0,
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        shadowColor: const Color(0xFF000000).withValues(alpha: 0.16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.8)),
+        ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.primary,

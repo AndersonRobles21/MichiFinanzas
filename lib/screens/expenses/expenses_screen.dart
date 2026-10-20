@@ -266,9 +266,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       payment,
                       debtNames[payment.deudaId] ?? 'Deuda',
                     ),
-                ]..sort(
-                    (first, second) => second.date.compareTo(first.date),
-                  );
+                ]..sort((first, second) => second.date.compareTo(first.date));
                 final now = DateTime.now();
                 final thisMonth = expenses.where(
                   (expense) =>
@@ -280,14 +278,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       payment.fecha.year == now.year &&
                       payment.fecha.month == now.month,
                 );
-                final monthlyTotal = thisMonth.fold<double>(
-                  0,
-                  (total, expense) => total + expense.monto,
-                ) + paymentsThisMonth.fold<double>(
-                  0,
-                  (total, payment) => total + payment.monto,
-                );
-                final monthlyCount = thisMonth.length + paymentsThisMonth.length;
+                final monthlyTotal =
+                    thisMonth.fold<double>(
+                      0,
+                      (total, expense) => total + expense.monto,
+                    ) +
+                    paymentsThisMonth.fold<double>(
+                      0,
+                      (total, payment) => total + payment.monto,
+                    );
+                final monthlyCount =
+                    thisMonth.length + paymentsThisMonth.length;
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
@@ -716,15 +717,7 @@ class _MonthlySummary extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.surfaceRaised, AppColors.surface],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.featured,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final totalItem = _SummaryValue(
@@ -806,11 +799,7 @@ class _ExpenseTile extends StatelessWidget {
       key: ValueKey('expense-${expense.id}'),
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -887,11 +876,7 @@ class _DebtPaymentTile extends StatelessWidget {
       key: ValueKey('debt-payment-expense-${payment.id}'),
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Row(
         children: [
           const Icon(Icons.payments_outlined, color: AppColors.primary),
@@ -918,9 +903,9 @@ class _DebtPaymentTile extends StatelessWidget {
           Text(
             _formatMoney(payment.monto),
             key: ValueKey('debt-payment-amount-${payment.id}'),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.primary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppColors.primary),
           ),
         ],
       ),

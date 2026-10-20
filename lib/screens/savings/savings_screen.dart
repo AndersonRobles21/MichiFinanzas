@@ -509,7 +509,7 @@ class _SavingsBalancePanel extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: AppColors.surfaceRaised,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.outline),
         boxShadow: const [
           BoxShadow(
@@ -574,11 +574,7 @@ class _SavingsMovementTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Row(
         children: [
           CircleAvatar(
@@ -628,11 +624,7 @@ class _SavingsEmpty extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Row(
         children: [
           const AnimatedCat(
@@ -662,11 +654,7 @@ class _LoansEmpty extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Text(
         'Todavía no has prestado dinero a nadie.',
         style: Theme.of(context).textTheme.bodyLarge,
@@ -695,11 +683,7 @@ class _ThirdPartyLoanCard extends StatelessWidget {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

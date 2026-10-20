@@ -13,7 +13,7 @@ import 'package:finanzas_app/services/database_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('navega entre las siete secciones en móvil', (tester) async {
+  testWidgets('navega con el menú lateral entre las secciones', (tester) async {
     await _prepareTemporaryDatabaseDirectory(tester);
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
@@ -24,7 +24,9 @@ void main() {
     await _pumpUntilFound(tester, find.text('Dinero disponible'));
 
     expect(find.text('Todavía no hay ingresos por aquí.'), findsNWidgets(2));
-    final emptyExpenses = find.textContaining('Todavía no hay gastos por aquí.');
+    final emptyExpenses = find.textContaining(
+      'Todavía no hay gastos por aquí.',
+    );
     await _pumpUntilFound(tester, emptyExpenses);
     expect(emptyExpenses, findsOneWidget);
     expect(find.text('Todavía no hay deudas por aquí.'), findsNWidgets(2));
@@ -34,11 +36,18 @@ void main() {
     );
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Gastos'));
+    await _openDrawerAndSelect(tester, 'Ingresos');
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-monthly-received')),
+    );
+    expect(find.byKey(const ValueKey('home-monthly-received')), findsOneWidget);
+    _expectNoTestException(tester);
+
+    await _openDrawerAndSelect(tester, 'Gastos');
     await _pumpUntilFound(tester, find.text('Gastos'));
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Gastos futuros'));
+    await _openDrawerAndSelect(tester, 'Gastos futuros');
     await _pumpUntilFound(
       tester,
       find.byKey(const ValueKey('future-expense-add')),
@@ -46,21 +55,21 @@ void main() {
     expect(find.text('Gastos futuros'), findsOneWidget);
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Estadísticas'));
+    await _openDrawerAndSelect(tester, 'Estadísticas');
     await tester.pumpAndSettle();
     expect(find.text('Estamos preparando tus estadísticas...'), findsOneWidget);
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Ahorros'));
+    await _openDrawerAndSelect(tester, 'Ahorros');
     await _pumpUntilFound(tester, find.text('Tu historial'));
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Deudas'));
+    await _openDrawerAndSelect(tester, 'Deudas');
     await tester.pumpAndSettle();
     expect(find.text('Estamos cargando tus deudas...'), findsOneWidget);
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Ajustes'));
+    await _openDrawerAndSelect(tester, 'Configuración');
     await _pumpUntilFound(
       tester,
       find.text('Personaliza tus preferencias locales.'),
@@ -68,7 +77,12 @@ void main() {
     expect(find.text('Personaliza tus preferencias locales.'), findsOneWidget);
     _expectNoTestException(tester);
 
-    await tester.tap(find.byTooltip('Inicio'));
+    await _openDrawerAndSelect(tester, 'Suscripciones');
+    await _pumpUntilFound(tester, find.text('Suscripciones'));
+    expect(find.text('Todavía no tienes suscripciones.'), findsOneWidget);
+    _expectNoTestException(tester);
+
+    await _openDrawerAndSelect(tester, 'Inicio');
     await tester.pumpAndSettle();
     expect(find.text('Dinero disponible'), findsOneWidget);
     _expectNoTestException(tester);
@@ -157,6 +171,16 @@ void main() {
     expect(tester.takeException(), isNull);
     await _unmountApp(tester);
   });
+}
+
+Future<void> _openDrawerAndSelect(
+  WidgetTester tester,
+  String destination,
+) async {
+  await tester.tap(find.byTooltip('Abrir menú'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(ValueKey('navigation-$destination')));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _prepareTemporaryDatabaseDirectory(WidgetTester tester) async {

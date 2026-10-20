@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
+import 'package:finanzas_app/models/subscription.dart';
 import 'package:finanzas_app/screens/settings/settings_screen.dart';
 import 'package:finanzas_app/services/app_settings_service.dart';
 import 'package:finanzas_app/services/database_service.dart';
@@ -235,6 +236,12 @@ void main() {
         fecha: DateTime.now(),
         operationId: 'settings-test-payment-1',
       );
+      await service.agregarSuscripcion(
+        nombre: 'Servicio recurrente',
+        precio: 25,
+        proximoPago: DateTime.now().add(const Duration(days: 10)),
+        frecuencia: SubscriptionFrequency.monthly,
+      );
     });
     _setMobileSize(tester);
     await _mountSettingsScreen(tester, service);
@@ -277,6 +284,7 @@ void main() {
       expect(await service.obtenerGastos(), isEmpty);
       expect(await service.obtenerDeudas(), isEmpty);
       expect(await service.obtenerTodosLosPagosDeuda(), isEmpty);
+      expect(await service.obtenerSuscripciones(), isEmpty);
     });
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());

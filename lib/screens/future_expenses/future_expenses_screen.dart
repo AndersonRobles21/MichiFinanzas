@@ -1128,11 +1128,7 @@ class _AvailableFutureFunds extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final balance = Row(
@@ -1220,11 +1216,7 @@ class _FutureExpenseCard extends StatelessWidget {
     return Container(
       key: ValueKey('future-expense-${plan.id}'),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

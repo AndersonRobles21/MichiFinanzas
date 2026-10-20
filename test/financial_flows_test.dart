@@ -347,6 +347,10 @@ void main() {
           incomes.singleWhere((item) => item.id == salaryId).tipo,
           IncomeType.salary.storageValue,
         );
+        expect(
+          incomes.singleWhere((item) => item.id == salaryId).medio,
+          MoneyMedium.digital.storageValue,
+        );
         balances = await service.obtenerSaldosPorMedio();
         expect(balances.cash, 1000);
         expect(balances.digital, 500);
@@ -388,6 +392,12 @@ void main() {
           medio: MoneyMedium.digital,
         );
         final debt = (await service.obtenerDeudas()).single;
+        expect(
+          (await service.obtenerIngresos())
+              .singleWhere((item) => item.id == loan.ingresoId)
+              .medio,
+          MoneyMedium.digital.storageValue,
+        );
         expect(debt.montoOriginal, 450);
         expect(debt.cuota, 225);
         expect(debt.cuotasPagadas, 0);
@@ -455,6 +465,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(IncomeType.extra.label).last);
     await tester.pumpAndSettle();
+    final digitalMedium = find.text('Digital').last;
+    await tester.ensureVisible(digitalMedium);
+    await tester.tap(digitalMedium);
+    await tester.pumpAndSettle();
     final saveChanges = find.text('Guardar cambios');
     await tester.ensureVisible(saveChanges);
     await tester.tap(saveChanges);
@@ -467,6 +481,7 @@ void main() {
       expect(incomes.single.descripcion, 'Sueldo corregido');
       expect(incomes.single.monto, 800);
       expect(incomes.single.tipo, IncomeType.extra.storageValue);
+      expect(incomes.single.medio, MoneyMedium.digital.storageValue);
       expect(await service.obtenerSaldoDisponible(), 800);
     });
 
@@ -755,6 +770,66 @@ void main() {
         payments = await service.obtenerPagosDeuda(debtId);
         expect(payments, hasLength(5));
         expect(await service.obtenerSaldoDisponible(), 1150000);
+      } finally {
+        await database.close();
+      }
+    },
+  );
+
+  test(
+    'una falla al guardar la distribución no deja cambios parciales',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final service = DatabaseService(database);
+      try {
+        await service.agregarIngreso(monto: 500, fecha: DateTime(2026, 10, 15));
+        await database.customStatement('''
+        CREATE TRIGGER fail_distribution_insert
+        BEFORE INSERT ON asignaciones_dinero
+        WHEN NEW.origen IS NULL
+        BEGIN
+          SELECT RAISE(ABORT, 'fallo de persistencia de prueba');
+        END
+      ''');
+
+        await expectLater(
+          service.distribuirSaldoDisponible(efectivo: 300, digital: 200),
+          throwsA(isA<DatabaseServiceException>()),
+        );
+
+        final balances = await service.obtenerSaldosPorMedio();
+        expect(balances.total, 500);
+        expect(balances.cash, 0);
+        expect(balances.digital, 0);
+        expect(balances.unclassified, 500);
+        expect(
+          await database.select(database.asignacionesDinero).get(),
+          isEmpty,
+        );
+      } finally {
+        await database.close();
+      }
+    },
+  );
+
+  test(
+    'editar la distribución solo cambia la clasificación, no el saldo',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final service = DatabaseService(database);
+      try {
+        final date = DateTime(2026, 10, 15);
+        await service.agregarIngreso(monto: 800, fecha: date);
+        await service.distribuirSaldoDisponible(efectivo: 600, digital: 200);
+        expect(await service.obtenerSaldoDisponible(), 800);
+
+        await service.distribuirSaldoDisponible(efectivo: 350, digital: 250);
+        final balances = await service.obtenerSaldosPorMedio();
+        expect(balances.cash, 350);
+        expect(balances.digital, 250);
+        expect(balances.unclassified, 200);
+        expect(balances.total, 800);
+        expect(await service.obtenerSaldoDisponible(), 800);
       } finally {
         await database.close();
       }

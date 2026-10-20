@@ -4550,6 +4550,408 @@ class AsignacionesDineroCompanion
   }
 }
 
+class $SuscripcionesTable extends Suscripciones
+    with TableInfo<$SuscripcionesTable, Suscripcion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SuscripcionesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nombreMeta = const VerificationMeta('nombre');
+  @override
+  late final GeneratedColumn<String> nombre = GeneratedColumn<String>(
+    'nombre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _precioMeta = const VerificationMeta('precio');
+  @override
+  late final GeneratedColumn<double> precio = GeneratedColumn<double>(
+    'precio',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _proximoPagoMeta = const VerificationMeta(
+    'proximoPago',
+  );
+  @override
+  late final GeneratedColumn<DateTime> proximoPago = GeneratedColumn<DateTime>(
+    'proximo_pago',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _frecuenciaMeta = const VerificationMeta(
+    'frecuencia',
+  );
+  @override
+  late final GeneratedColumn<String> frecuencia = GeneratedColumn<String>(
+    'frecuencia',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    nombre,
+    precio,
+    proximoPago,
+    frecuencia,
+    medio,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'suscripciones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Suscripcion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('nombre')) {
+      context.handle(
+        _nombreMeta,
+        nombre.isAcceptableOrUnknown(data['nombre']!, _nombreMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nombreMeta);
+    }
+    if (data.containsKey('precio')) {
+      context.handle(
+        _precioMeta,
+        precio.isAcceptableOrUnknown(data['precio']!, _precioMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_precioMeta);
+    }
+    if (data.containsKey('proximo_pago')) {
+      context.handle(
+        _proximoPagoMeta,
+        proximoPago.isAcceptableOrUnknown(
+          data['proximo_pago']!,
+          _proximoPagoMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_proximoPagoMeta);
+    }
+    if (data.containsKey('frecuencia')) {
+      context.handle(
+        _frecuenciaMeta,
+        frecuencia.isAcceptableOrUnknown(data['frecuencia']!, _frecuenciaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_frecuenciaMeta);
+    }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Suscripcion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Suscripcion(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      nombre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nombre'],
+      )!,
+      precio: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}precio'],
+      )!,
+      proximoPago: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}proximo_pago'],
+      )!,
+      frecuencia: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}frecuencia'],
+      )!,
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
+    );
+  }
+
+  @override
+  $SuscripcionesTable createAlias(String alias) {
+    return $SuscripcionesTable(attachedDatabase, alias);
+  }
+}
+
+class Suscripcion extends DataClass implements Insertable<Suscripcion> {
+  final int id;
+  final String nombre;
+  final double precio;
+  final DateTime proximoPago;
+  final String frecuencia;
+  final String? medio;
+  const Suscripcion({
+    required this.id,
+    required this.nombre,
+    required this.precio,
+    required this.proximoPago,
+    required this.frecuencia,
+    this.medio,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['nombre'] = Variable<String>(nombre);
+    map['precio'] = Variable<double>(precio);
+    map['proximo_pago'] = Variable<DateTime>(proximoPago);
+    map['frecuencia'] = Variable<String>(frecuencia);
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
+    }
+    return map;
+  }
+
+  SuscripcionesCompanion toCompanion(bool nullToAbsent) {
+    return SuscripcionesCompanion(
+      id: Value(id),
+      nombre: Value(nombre),
+      precio: Value(precio),
+      proximoPago: Value(proximoPago),
+      frecuencia: Value(frecuencia),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
+    );
+  }
+
+  factory Suscripcion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Suscripcion(
+      id: serializer.fromJson<int>(json['id']),
+      nombre: serializer.fromJson<String>(json['nombre']),
+      precio: serializer.fromJson<double>(json['precio']),
+      proximoPago: serializer.fromJson<DateTime>(json['proximoPago']),
+      frecuencia: serializer.fromJson<String>(json['frecuencia']),
+      medio: serializer.fromJson<String?>(json['medio']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'nombre': serializer.toJson<String>(nombre),
+      'precio': serializer.toJson<double>(precio),
+      'proximoPago': serializer.toJson<DateTime>(proximoPago),
+      'frecuencia': serializer.toJson<String>(frecuencia),
+      'medio': serializer.toJson<String?>(medio),
+    };
+  }
+
+  Suscripcion copyWith({
+    int? id,
+    String? nombre,
+    double? precio,
+    DateTime? proximoPago,
+    String? frecuencia,
+    Value<String?> medio = const Value.absent(),
+  }) => Suscripcion(
+    id: id ?? this.id,
+    nombre: nombre ?? this.nombre,
+    precio: precio ?? this.precio,
+    proximoPago: proximoPago ?? this.proximoPago,
+    frecuencia: frecuencia ?? this.frecuencia,
+    medio: medio.present ? medio.value : this.medio,
+  );
+  Suscripcion copyWithCompanion(SuscripcionesCompanion data) {
+    return Suscripcion(
+      id: data.id.present ? data.id.value : this.id,
+      nombre: data.nombre.present ? data.nombre.value : this.nombre,
+      precio: data.precio.present ? data.precio.value : this.precio,
+      proximoPago: data.proximoPago.present
+          ? data.proximoPago.value
+          : this.proximoPago,
+      frecuencia: data.frecuencia.present
+          ? data.frecuencia.value
+          : this.frecuencia,
+      medio: data.medio.present ? data.medio.value : this.medio,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Suscripcion(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre, ')
+          ..write('precio: $precio, ')
+          ..write('proximoPago: $proximoPago, ')
+          ..write('frecuencia: $frecuencia, ')
+          ..write('medio: $medio')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, nombre, precio, proximoPago, frecuencia, medio);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Suscripcion &&
+          other.id == this.id &&
+          other.nombre == this.nombre &&
+          other.precio == this.precio &&
+          other.proximoPago == this.proximoPago &&
+          other.frecuencia == this.frecuencia &&
+          other.medio == this.medio);
+}
+
+class SuscripcionesCompanion extends UpdateCompanion<Suscripcion> {
+  final Value<int> id;
+  final Value<String> nombre;
+  final Value<double> precio;
+  final Value<DateTime> proximoPago;
+  final Value<String> frecuencia;
+  final Value<String?> medio;
+  const SuscripcionesCompanion({
+    this.id = const Value.absent(),
+    this.nombre = const Value.absent(),
+    this.precio = const Value.absent(),
+    this.proximoPago = const Value.absent(),
+    this.frecuencia = const Value.absent(),
+    this.medio = const Value.absent(),
+  });
+  SuscripcionesCompanion.insert({
+    this.id = const Value.absent(),
+    required String nombre,
+    required double precio,
+    required DateTime proximoPago,
+    required String frecuencia,
+    this.medio = const Value.absent(),
+  }) : nombre = Value(nombre),
+       precio = Value(precio),
+       proximoPago = Value(proximoPago),
+       frecuencia = Value(frecuencia);
+  static Insertable<Suscripcion> custom({
+    Expression<int>? id,
+    Expression<String>? nombre,
+    Expression<double>? precio,
+    Expression<DateTime>? proximoPago,
+    Expression<String>? frecuencia,
+    Expression<String>? medio,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (nombre != null) 'nombre': nombre,
+      if (precio != null) 'precio': precio,
+      if (proximoPago != null) 'proximo_pago': proximoPago,
+      if (frecuencia != null) 'frecuencia': frecuencia,
+      if (medio != null) 'medio': medio,
+    });
+  }
+
+  SuscripcionesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? nombre,
+    Value<double>? precio,
+    Value<DateTime>? proximoPago,
+    Value<String>? frecuencia,
+    Value<String?>? medio,
+  }) {
+    return SuscripcionesCompanion(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      precio: precio ?? this.precio,
+      proximoPago: proximoPago ?? this.proximoPago,
+      frecuencia: frecuencia ?? this.frecuencia,
+      medio: medio ?? this.medio,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (nombre.present) {
+      map['nombre'] = Variable<String>(nombre.value);
+    }
+    if (precio.present) {
+      map['precio'] = Variable<double>(precio.value);
+    }
+    if (proximoPago.present) {
+      map['proximo_pago'] = Variable<DateTime>(proximoPago.value);
+    }
+    if (frecuencia.present) {
+      map['frecuencia'] = Variable<String>(frecuencia.value);
+    }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SuscripcionesCompanion(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre, ')
+          ..write('precio: $precio, ')
+          ..write('proximoPago: $proximoPago, ')
+          ..write('frecuencia: $frecuencia, ')
+          ..write('medio: $medio')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4568,6 +4970,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $MovimientosReservaGastoFuturoTable(this);
   late final $AsignacionesDineroTable asignacionesDinero =
       $AsignacionesDineroTable(this);
+  late final $SuscripcionesTable suscripciones = $SuscripcionesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4583,6 +4986,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     gastosFuturos,
     movimientosReservaGastoFuturo,
     asignacionesDinero,
+    suscripciones,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -7966,6 +8370,232 @@ typedef $$AsignacionesDineroTableProcessedTableManager =
       AsignacionesDineroData,
       PrefetchHooks Function()
     >;
+typedef $$SuscripcionesTableCreateCompanionBuilder =
+    SuscripcionesCompanion Function({
+      Value<int> id,
+      required String nombre,
+      required double precio,
+      required DateTime proximoPago,
+      required String frecuencia,
+      Value<String?> medio,
+    });
+typedef $$SuscripcionesTableUpdateCompanionBuilder =
+    SuscripcionesCompanion Function({
+      Value<int> id,
+      Value<String> nombre,
+      Value<double> precio,
+      Value<DateTime> proximoPago,
+      Value<String> frecuencia,
+      Value<String?> medio,
+    });
+
+class $$SuscripcionesTableFilterComposer
+    extends Composer<_$AppDatabase, $SuscripcionesTable> {
+  $$SuscripcionesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get precio => $composableBuilder(
+    column: $table.precio,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get proximoPago => $composableBuilder(
+    column: $table.proximoPago,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get frecuencia => $composableBuilder(
+    column: $table.frecuencia,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SuscripcionesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SuscripcionesTable> {
+  $$SuscripcionesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get precio => $composableBuilder(
+    column: $table.precio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get proximoPago => $composableBuilder(
+    column: $table.proximoPago,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get frecuencia => $composableBuilder(
+    column: $table.frecuencia,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SuscripcionesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SuscripcionesTable> {
+  $$SuscripcionesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get nombre =>
+      $composableBuilder(column: $table.nombre, builder: (column) => column);
+
+  GeneratedColumn<double> get precio =>
+      $composableBuilder(column: $table.precio, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get proximoPago => $composableBuilder(
+    column: $table.proximoPago,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get frecuencia => $composableBuilder(
+    column: $table.frecuencia,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
+}
+
+class $$SuscripcionesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SuscripcionesTable,
+          Suscripcion,
+          $$SuscripcionesTableFilterComposer,
+          $$SuscripcionesTableOrderingComposer,
+          $$SuscripcionesTableAnnotationComposer,
+          $$SuscripcionesTableCreateCompanionBuilder,
+          $$SuscripcionesTableUpdateCompanionBuilder,
+          (
+            Suscripcion,
+            BaseReferences<_$AppDatabase, $SuscripcionesTable, Suscripcion>,
+          ),
+          Suscripcion,
+          PrefetchHooks Function()
+        > {
+  $$SuscripcionesTableTableManager(_$AppDatabase db, $SuscripcionesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SuscripcionesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SuscripcionesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SuscripcionesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> nombre = const Value.absent(),
+                Value<double> precio = const Value.absent(),
+                Value<DateTime> proximoPago = const Value.absent(),
+                Value<String> frecuencia = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
+              }) => SuscripcionesCompanion(
+                id: id,
+                nombre: nombre,
+                precio: precio,
+                proximoPago: proximoPago,
+                frecuencia: frecuencia,
+                medio: medio,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String nombre,
+                required double precio,
+                required DateTime proximoPago,
+                required String frecuencia,
+                Value<String?> medio = const Value.absent(),
+              }) => SuscripcionesCompanion.insert(
+                id: id,
+                nombre: nombre,
+                precio: precio,
+                proximoPago: proximoPago,
+                frecuencia: frecuencia,
+                medio: medio,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SuscripcionesTable, Suscripcion>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $SuscripcionesTable,
+                    Suscripcion
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SuscripcionesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SuscripcionesTable,
+      Suscripcion,
+      $$SuscripcionesTableFilterComposer,
+      $$SuscripcionesTableOrderingComposer,
+      $$SuscripcionesTableAnnotationComposer,
+      $$SuscripcionesTableCreateCompanionBuilder,
+      $$SuscripcionesTableUpdateCompanionBuilder,
+      (
+        Suscripcion,
+        BaseReferences<_$AppDatabase, $SuscripcionesTable, Suscripcion>,
+      ),
+      Suscripcion,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7994,4 +8624,6 @@ class $AppDatabaseManager {
       );
   $$AsignacionesDineroTableTableManager get asignacionesDinero =>
       $$AsignacionesDineroTableTableManager(_db, _db.asignacionesDinero);
+  $$SuscripcionesTableTableManager get suscripciones =>
+      $$SuscripcionesTableTableManager(_db, _db.suscripciones);
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../database/app_database.dart';
 import '../../models/future_expense.dart';
 import '../../models/income_type.dart';
+import '../../models/money_medium.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
@@ -12,6 +13,7 @@ import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/money_medium_selector.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -19,11 +21,13 @@ class HomeScreen extends StatefulWidget {
     this.databaseService,
     this.isActive = true,
     this.onViewFutureExpenses,
+    this.focusIncomes = false,
   });
 
   final DatabaseService? databaseService;
   final bool isActive;
   final VoidCallback? onViewFutureExpenses;
+  final bool focusIncomes;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -34,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final bool _ownsDatabaseService;
   late Future<_DashboardData> _dashboardFuture;
   late final StreamSubscription<void> _financialChanges;
+  final _incomePanelKey = GlobalKey();
   bool _isSavingIncome = false;
   bool _isSavingDistribution = false;
 
@@ -59,6 +64,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (widget.isActive && !oldWidget.isActive) {
       setState(() {
         _dashboardFuture = _loadDashboard(_databaseService);
+      });
+    }
+    if (widget.focusIncomes && !oldWidget.focusIncomes) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _incomePanelKey.currentContext;
+        if (target != null && mounted) {
+          unawaited(
+            Scrollable.ensureVisible(
+              target,
+              duration: const Duration(milliseconds: 250),
+              alignment: 0.12,
+            ),
+          );
+        }
       });
     }
   }
@@ -89,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
           fechaRecepcion: draft.fecha,
           cuotasTotales: draft.cuotasTotales!,
           fechaPrimerPago: draft.fechaPrimerPago!,
+          medio: draft.medium,
         );
       } else {
         await _databaseService.agregarIngreso(
@@ -96,6 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
           fecha: draft.fecha,
           descripcion: draft.descripcion,
           tipo: draft.type.storageValue,
+          medio: draft.medium,
         );
       }
       if (!mounted) return;
@@ -141,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
         fecha: draft.fecha,
         descripcion: draft.descripcion,
         tipo: draft.type.storageValue,
+        medio: draft.medium,
       );
       if (!mounted) return;
       setState(() => _dashboardFuture = _loadDashboard(_databaseService));
@@ -339,6 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onDistributeBalance: _editDistribution,
                           isSavingDistribution: _isSavingDistribution,
                           onViewFutureExpenses: widget.onViewFutureExpenses,
+                          incomePanelKey: _incomePanelKey,
                         );
                       },
                     ),
@@ -582,6 +605,7 @@ class _IncomeDraft {
     required this.fecha,
     this.cuotasTotales,
     this.fechaPrimerPago,
+    required this.medium,
   });
 
   final IncomeType type;
@@ -590,6 +614,7 @@ class _IncomeDraft {
   final DateTime fecha;
   final int? cuotasTotales;
   final DateTime? fechaPrimerPago;
+  final MoneyMedium? medium;
 }
 
 class _IncomeFormSheet extends StatefulWidget {
@@ -609,6 +634,7 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
   late IncomeType _type;
   late DateTime _receivedDate;
   late DateTime _firstPaymentDate;
+  MoneyMedium? _medium;
 
   @override
   void initState() {
@@ -622,6 +648,7 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
     _amountController.text = income == null ? '' : formatAmount(income.monto);
     _receivedDate = income?.fecha ?? now;
     _firstPaymentDate = DateTime(now.year, now.month, now.day + 30);
+    _medium = MoneyMedium.fromStorage(income?.medio);
   }
 
   @override
@@ -662,6 +689,7 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
             ? int.parse(_installmentsController.text.trim())
             : null,
         fechaPrimerPago: _type == IncomeType.loan ? _firstPaymentDate : null,
+        medium: _medium,
       ),
     );
   }
@@ -755,6 +783,13 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
                         ? 'Escribe un valor mayor que cero.'
                         : null;
                   },
+                ),
+                const SizedBox(height: 14),
+                MoneyMediumSelector(
+                  selected: _medium,
+                  onChanged: (value) => setState(() => _medium = value),
+                  title: 'Medio donde recibiste el dinero',
+                  allowUnclassified: true,
                 ),
                 const SizedBox(height: 8),
                 TextButton(
@@ -992,6 +1027,7 @@ class _DashboardContent extends StatelessWidget {
     required this.onDistributeBalance,
     required this.isSavingDistribution,
     required this.onViewFutureExpenses,
+    required this.incomePanelKey,
   });
 
   final _DashboardData data;
@@ -1002,6 +1038,7 @@ class _DashboardContent extends StatelessWidget {
   final VoidCallback onDistributeBalance;
   final bool isSavingDistribution;
   final VoidCallback? onViewFutureExpenses;
+  final GlobalKey incomePanelKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1015,6 +1052,7 @@ class _DashboardContent extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _IncomeSummaryPanel(
+          key: incomePanelKey,
           data: data,
           onAddIncome: onAddIncome,
           isSavingIncome: isSavingIncome,
@@ -1047,6 +1085,7 @@ class _DashboardContent extends StatelessWidget {
 
 class _IncomeSummaryPanel extends StatelessWidget {
   const _IncomeSummaryPanel({
+    super.key,
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
@@ -1065,11 +1104,7 @@ class _IncomeSummaryPanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1236,6 +1271,11 @@ class _AvailableBalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final separated =
+        data.balanceBreakdown.cash + data.balanceBreakdown.digital;
+    final distributionProgress = data.dineroDisponible <= 0
+        ? 0.0
+        : (separated / data.dineroDisponible).clamp(0.0, 1.0).toDouble();
     final description = data.cantidadIngresos == 0
         ? 'Todavía no hay ingresos por aquí.'
         : 'Ingresos menos gastos, pagos, ahorros y reservas reales.';
@@ -1243,15 +1283,7 @@ class _AvailableBalanceCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.surfaceRaised, AppColors.surface],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.featured,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1285,6 +1317,27 @@ class _AvailableBalanceCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(description, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Dinero separado',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              Text(_formatMoney(separated)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: distributionProgress,
+              minHeight: 8,
+              backgroundColor: AppColors.outline.withValues(alpha: 0.45),
+            ),
+          ),
+          const SizedBox(height: 12),
           _BalanceMediumLine(
             label: 'Efectivo',
             amount: data.balanceBreakdown.cash,
@@ -1296,7 +1349,7 @@ class _AvailableBalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _BalanceMediumLine(
-            label: 'Por distribuir',
+            label: 'Libre por distribuir',
             amount: data.balanceBreakdown.unclassified,
           ),
           const SizedBox(height: 12),
@@ -1418,11 +1471,7 @@ class _DashboardMetric extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1691,11 +1740,7 @@ class _AdvicePanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceRaised,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1723,11 +1768,7 @@ class _DashboardPanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: child,
     );
   }

@@ -217,18 +217,77 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           _SummaryGrid(summary: summary),
                           const SizedBox(height: 28),
                           Text(
-                            'Gastos por categoría',
+                            'Estadísticas generales',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Todos los medios · base: ingresos del período.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
                           const SizedBox(height: 12),
-                          _CategoryChart(categories: summary.categories),
+                          _CategoryChart(
+                            key: const ValueKey('statistics-general-block'),
+                            categories: summary.categories,
+                            remaining: summary.generalRemaining,
+                            chartKey: const ValueKey('category-pie-chart'),
+                            showSpendingTotalKey: true,
+                            emptyMessage: 'Sin gastos en este período.',
+                          ),
+                          if (summary.unclassifiedExpenses > 0) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Movimientos sin medio: '
+                              '${_formatMoney(summary.unclassifiedExpenses)}. '
+                              'Se incluyen aquí, no en efectivo ni digital.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                           const SizedBox(height: 28),
                           Text(
-                            'Gastos por medio',
+                            'Estadísticas de efectivo',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Solo movimientos clasificados como efectivo.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
                           const SizedBox(height: 12),
-                          _SpendingMediumChart(summary: summary),
+                          _CategoryChart(
+                            key: const ValueKey('statistics-cash-block'),
+                            categories: summary.cashCategories,
+                            remaining: summary.cashRemaining,
+                            chartKey: const ValueKey('cash-category-pie-chart'),
+                            showSpendingTotalKey: false,
+                            emptyMessage:
+                                'Sin movimientos de efectivo clasificados '
+                                'en este período.',
+                          ),
+                          const SizedBox(height: 28),
+                          Text(
+                            'Estadísticas digitales',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Solo movimientos clasificados como digitales.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 12),
+                          _CategoryChart(
+                            key: const ValueKey('statistics-digital-block'),
+                            categories: summary.digitalCategories,
+                            remaining: summary.digitalRemaining,
+                            chartKey: const ValueKey(
+                              'digital-category-pie-chart',
+                            ),
+                            showSpendingTotalKey: false,
+                            emptyMessage:
+                                'Sin movimientos digitales clasificados '
+                                'en este período.',
+                          ),
+                          const SizedBox(height: 16),
                           const SizedBox(height: 28),
                           Text(
                             'Evolución del dinero',
@@ -241,7 +300,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               periodIncomes,
                               periodExpenses,
                               periodDebtPayments,
-                              periodFutureExpenses,
                             ),
                           ),
                           const SizedBox(height: 28),
@@ -397,10 +455,14 @@ class _StatisticsSummary {
     required this.availableBalance,
     required this.savingsContributions,
     required this.savingsWithdrawals,
+    required this.reservedTotal,
     required this.categories,
-    required this.cashExpenses,
-    required this.digitalExpenses,
+    required this.cashCategories,
+    required this.digitalCategories,
     required this.unclassifiedExpenses,
+    required this.generalRemaining,
+    required this.cashRemaining,
+    required this.digitalRemaining,
   });
 
   factory _StatisticsSummary.fromRecords({
@@ -412,60 +474,81 @@ class _StatisticsSummary {
     required double availableBalance,
   }) {
     final categoryAmounts = <String, double>{};
-    var expenseTotal = expenses.fold<double>(0, (sum, expense) {
+    final cashCategoryAmounts = <String, double>{};
+    final digitalCategoryAmounts = <String, double>{};
+    var cashExpenses = 0.0;
+    var digitalExpenses = 0.0;
+    var unclassifiedExpenses = 0.0;
+
+    void addCategory(
+      Map<String, double> totals,
+      String category,
+      double amount,
+    ) {
+      totals.update(
+        category,
+        (previous) => previous + amount,
+        ifAbsent: () => amount,
+      );
+    }
+
+    for (final expense in expenses) {
       categoryAmounts.update(
         expense.categoria,
         (amount) => amount + expense.monto,
         ifAbsent: () => expense.monto,
       );
-      return sum + expense.monto;
-    });
-    final debtPaymentTotal = debtPayments.fold<double>(0, (sum, payment) {
-      categoryAmounts.update(
-        'Pagos de deudas',
-        (amount) => amount + payment.monto,
-        ifAbsent: () => payment.monto,
-      );
-      return sum + payment.monto;
-    });
-    expenseTotal += debtPaymentTotal;
-    for (final expense in futureExpenses) {
-      categoryAmounts.update(
-        'Gastos futuros',
-        (amount) => amount + expense.amount,
-        ifAbsent: () => expense.amount,
-      );
-      expenseTotal += expense.amount;
-    }
-    final expenseCount =
-        expenses.length + debtPayments.length + futureExpenses.length;
-    var cashExpenses = 0.0;
-    var digitalExpenses = 0.0;
-    var unclassifiedExpenses = 0.0;
-    for (final expense in expenses) {
       switch (MoneyMedium.fromStorage(expense.medio)) {
         case MoneyMedium.cash:
           cashExpenses += expense.monto;
+          addCategory(cashCategoryAmounts, expense.categoria, expense.monto);
         case MoneyMedium.digital:
           digitalExpenses += expense.monto;
+          addCategory(digitalCategoryAmounts, expense.categoria, expense.monto);
         case null:
           unclassifiedExpenses += expense.monto;
       }
     }
     for (final payment in debtPayments) {
+      categoryAmounts.update(
+        'Pagos de deudas',
+        (amount) => amount + payment.monto,
+        ifAbsent: () => payment.monto,
+      );
       switch (MoneyMedium.fromStorage(payment.medio)) {
         case MoneyMedium.cash:
           cashExpenses += payment.monto;
+          addCategory(cashCategoryAmounts, 'Pagos de deudas', payment.monto);
         case MoneyMedium.digital:
           digitalExpenses += payment.monto;
+          addCategory(digitalCategoryAmounts, 'Pagos de deudas', payment.monto);
         case null:
           unclassifiedExpenses += payment.monto;
       }
     }
+    final expenseTotal =
+        expenses.fold<double>(0, (sum, expense) => sum + expense.monto) +
+        debtPayments.fold<double>(0, (sum, payment) => sum + payment.monto);
+    final reservedTotal = futureExpenses.fold<double>(
+      0,
+      (sum, reservation) => sum + reservation.amount,
+    );
     final incomeTotal = incomes.fold<double>(
       0,
       (sum, income) => sum + income.monto,
     );
+    var cashIncomeTotal = 0.0;
+    var digitalIncomeTotal = 0.0;
+    for (final income in incomes) {
+      switch (MoneyMedium.fromStorage(income.medio)) {
+        case MoneyMedium.cash:
+          cashIncomeTotal += income.monto;
+        case MoneyMedium.digital:
+          digitalIncomeTotal += income.monto;
+        case null:
+          break;
+      }
+    }
     final savingsContributions = savingsMovements
         .where((movement) => movement.tipo == DatabaseService.aporteAhorro)
         .fold<double>(0, (sum, movement) => sum + movement.monto);
@@ -476,23 +559,51 @@ class _StatisticsSummary {
         categoryAmounts.entries
             .map((entry) => _CategoryTotal(entry.key, entry.value))
             .toList()
-          ..sort((a, b) {
-            final amountOrder = b.amount.compareTo(a.amount);
-            return amountOrder != 0 ? amountOrder : a.name.compareTo(b.name);
-          });
+          ..sort(_compareCategoryTotals);
+    final cashCategories =
+        cashCategoryAmounts.entries
+            .map((entry) => _CategoryTotal(entry.key, entry.value))
+            .toList()
+          ..sort(_compareCategoryTotals);
+    final digitalCategories =
+        digitalCategoryAmounts.entries
+            .map((entry) => _CategoryTotal(entry.key, entry.value))
+            .toList()
+          ..sort(_compareCategoryTotals);
+    final generalRemaining = incomeTotal > 0 && incomeTotal >= expenseTotal
+        ? incomeTotal - expenseTotal
+        : null;
+    final cashRemaining =
+        unclassifiedExpenses == 0 &&
+            cashIncomeTotal > 0 &&
+            cashIncomeTotal >= cashExpenses
+        ? cashIncomeTotal - cashExpenses
+        : null;
+    final digitalRemaining =
+        unclassifiedExpenses == 0 &&
+            digitalIncomeTotal > 0 &&
+            digitalIncomeTotal >= digitalExpenses
+        ? digitalIncomeTotal - digitalExpenses
+        : null;
 
     return _StatisticsSummary(
       incomeTotal: incomeTotal,
       expenseTotal: expenseTotal,
-      expenseCount: expenseCount,
-      expenseAverage: expenseCount == 0 ? 0 : expenseTotal / expenseCount,
+      expenseCount: expenses.length + debtPayments.length,
+      expenseAverage: expenses.isEmpty && debtPayments.isEmpty
+          ? 0
+          : expenseTotal / (expenses.length + debtPayments.length),
       availableBalance: availableBalance,
       savingsContributions: savingsContributions,
       savingsWithdrawals: savingsWithdrawals,
+      reservedTotal: reservedTotal,
       categories: categories,
-      cashExpenses: cashExpenses,
-      digitalExpenses: digitalExpenses,
+      cashCategories: cashCategories,
+      digitalCategories: digitalCategories,
       unclassifiedExpenses: unclassifiedExpenses,
+      generalRemaining: generalRemaining,
+      cashRemaining: cashRemaining,
+      digitalRemaining: digitalRemaining,
     );
   }
 
@@ -503,10 +614,19 @@ class _StatisticsSummary {
   final double availableBalance;
   final double savingsContributions;
   final double savingsWithdrawals;
+  final double reservedTotal;
   final List<_CategoryTotal> categories;
-  final double cashExpenses;
-  final double digitalExpenses;
+  final List<_CategoryTotal> cashCategories;
+  final List<_CategoryTotal> digitalCategories;
   final double unclassifiedExpenses;
+  final double? generalRemaining;
+  final double? cashRemaining;
+  final double? digitalRemaining;
+}
+
+int _compareCategoryTotals(_CategoryTotal first, _CategoryTotal second) {
+  final amountOrder = second.amount.compareTo(first.amount);
+  return amountOrder != 0 ? amountOrder : first.name.compareTo(second.name);
 }
 
 class _DailyTotal {
@@ -522,7 +642,6 @@ List<_DailyTotal> _dailyTotals(
   List<Ingreso> incomes,
   List<Gasto> expenses,
   List<PagosDeudaData> debtPayments,
-  List<_FutureExpenseReservation> futureExpenses,
 ) {
   final incomeByDay = <DateTime, double>{};
   final expenseByDay = <DateTime, double>{};
@@ -562,19 +681,6 @@ List<_DailyTotal> _dailyTotals(
       ifAbsent: () => payment.monto,
     );
   }
-  for (final expense in futureExpenses) {
-    final day = DateTime(
-      expense.date.year,
-      expense.date.month,
-      expense.date.day,
-    );
-    expenseByDay.update(
-      day,
-      (amount) => amount + expense.amount,
-      ifAbsent: () => expense.amount,
-    );
-  }
-
   return List.generate(range.dayCount, (index) {
     final day = range.start.add(Duration(days: index));
     return _DailyTotal(day, incomeByDay[day] ?? 0, expenseByDay[day] ?? 0);
@@ -650,8 +756,17 @@ class _SummaryGrid extends StatelessWidget {
               child: _SummaryCard(
                 key: const ValueKey('statistics-available-balance'),
                 icon: Icons.account_balance_wallet_outlined,
-                label: 'Saldo disponible',
+                label: 'Saldo actual · no filtrado',
                 value: _formatMoney(summary.availableBalance),
+              ),
+            ),
+            SizedBox(
+              width: cardWidth,
+              child: _SummaryCard(
+                key: const ValueKey('statistics-reserved-total'),
+                icon: Icons.lock_clock_outlined,
+                label: 'Reservado · no gastado',
+                value: _formatMoney(summary.reservedTotal),
               ),
             ),
             SizedBox(
@@ -754,11 +869,7 @@ class _SummaryCard extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minHeight: 126),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -784,164 +895,126 @@ class _SummaryCard extends StatelessWidget {
 
 const _chartColors = [
   AppColors.primary,
-  Color(0xFF74C8B0),
-  Color(0xFFFFB86B),
-  Color(0xFF86A7F5),
-  Color(0xFFE98D9B),
-  Color(0xFFC9C46C),
-  Color(0xFF9F8AD8),
-  Color(0xFF64B5CD),
+  AppColors.primaryDeep,
+  Color(0xFF8C70B5),
+  Color(0xFF70558F),
+  Color(0xFFD7C2F5),
+  Color(0xFF5C4677),
+  Color(0xFFAB91D0),
+  Color(0xFF8066A4),
 ];
 
 class _CategoryChart extends StatelessWidget {
-  const _CategoryChart({required this.categories});
+  const _CategoryChart({
+    required this.categories,
+    required this.remaining,
+    required this.chartKey,
+    required this.showSpendingTotalKey,
+    required this.emptyMessage,
+    super.key,
+  });
 
   final List<_CategoryTotal> categories;
+  final double? remaining;
+  final Key chartKey;
+  final bool showSpendingTotalKey;
+  final String emptyMessage;
 
   @override
   Widget build(BuildContext context) {
-    return _ChartPanel(
-      child: categories.isEmpty
-          ? const _ChartEmpty('Sin gastos en este período.')
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final chart = SizedBox(
-                  key: const ValueKey('category-pie-chart'),
-                  width: 220,
-                  height: 210,
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 55,
-                      sections: [
-                        for (var index = 0; index < categories.length; index++)
-                          PieChartSectionData(
-                            value: categories[index].amount,
-                            color: _chartColors[index % _chartColors.length],
-                            radius: 48,
-                            showTitle: false,
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-                final legend = Column(
-                  children: [
-                    for (var index = 0; index < categories.length; index++)
-                      _CategoryLegendRow(
-                        key: ValueKey(
-                          'statistics-category-${categories[index].name}',
-                        ),
-                        category: categories[index],
-                        color: _chartColors[index % _chartColors.length],
-                        total: categories.fold<double>(
-                          0,
-                          (sum, category) => sum + category.amount,
-                        ),
-                      ),
-                  ],
-                );
-
-                if (constraints.maxWidth >= 620) {
-                  return Row(
-                    children: [
-                      chart,
-                      const SizedBox(width: 24),
-                      Expanded(child: legend),
-                    ],
-                  );
-                }
-                return Column(
-                  children: [chart, const SizedBox(height: 12), legend],
-                );
-              },
-            ),
+    final spending = categories.fold<double>(
+      0,
+      (total, category) => total + category.amount,
     );
-  }
-}
-
-class _SpendingMediumChart extends StatelessWidget {
-  const _SpendingMediumChart({required this.summary});
-
-  final _StatisticsSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    const cashColor = Color(0xFFFFB86B);
-    const digitalColor = Color(0xFF74C8B0);
-    final classifiedTotal = summary.cashExpenses + summary.digitalExpenses;
-    final maximum = math.max(
-      summary.cashExpenses,
-      math.max(summary.digitalExpenses, summary.unclassifiedExpenses),
-    );
-
+    final base = spending + (remaining ?? 0);
+    if (categories.isEmpty && remaining == null) {
+      return _ChartPanel(child: _ChartEmpty(emptyMessage));
+    }
     return _ChartPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (classifiedTotal <= 0)
-            const _ChartEmpty('Aún no hay gastos clasificados por medio.')
-          else
-            Row(
-              children: [
-                SizedBox(
-                  key: const ValueKey('spending-medium-donut'),
-                  width: 150,
-                  height: 150,
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 42,
-                      sections: [
-                        if (summary.cashExpenses > 0)
-                          PieChartSectionData(
-                            value: summary.cashExpenses,
-                            color: cashColor,
-                            radius: 36,
-                            showTitle: false,
-                          ),
-                        if (summary.digitalExpenses > 0)
-                          PieChartSectionData(
-                            value: summary.digitalExpenses,
-                            color: digitalColor,
-                            radius: 36,
-                            showTitle: false,
-                          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final chart = SizedBox(
+                key: chartKey,
+                width: 220,
+                height: 210,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PieChart(
+                      PieChartData(
+                        sectionsSpace: 3,
+                        centerSpaceRadius: 55,
+                        sections: [
+                          for (
+                            var index = 0;
+                            index < categories.length;
+                            index++
+                          )
+                            PieChartSectionData(
+                              value: categories[index].amount,
+                              color: _chartColors[index % _chartColors.length],
+                              radius: 48,
+                              showTitle: false,
+                            ),
+                          if ((remaining ?? 0) > 0)
+                            PieChartSectionData(
+                              value: remaining!,
+                              color: AppColors.outline,
+                              radius: 48,
+                              showTitle: false,
+                            ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Gastado',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Text(
+                          _formatMoney(spending),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Text(
-                    'Total clasificado\n${_formatMoney(classifiedTotal)}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-          const SizedBox(height: 14),
-          _MediumSpendingBar(
-            label: 'Efectivo',
-            amount: summary.cashExpenses,
-            maximum: maximum,
-            classifiedTotal: classifiedTotal,
-            color: cashColor,
-          ),
-          _MediumSpendingBar(
-            label: 'Digital',
-            amount: summary.digitalExpenses,
-            maximum: maximum,
-            classifiedTotal: classifiedTotal,
-            color: digitalColor,
-          ),
-          _MediumSpendingBar(
-            label: 'Sin clasificar',
-            amount: summary.unclassifiedExpenses,
-            maximum: maximum,
-            classifiedTotal: classifiedTotal,
-            color: AppColors.outline,
-            includeShare: false,
+              );
+              final legend = Column(
+                children: [
+                  for (var index = 0; index < categories.length; index++)
+                    _CategoryLegendRow(
+                      key: ValueKey(
+                        'statistics-category-${categories[index].name}',
+                      ),
+                      category: categories[index],
+                      color: _chartColors[index % _chartColors.length],
+                      total: base,
+                    ),
+                  if (remaining != null)
+                    _RemainingLegendRow(amount: remaining!, total: base),
+                ],
+              );
+
+              if (constraints.maxWidth >= 620) {
+                return Row(
+                  children: [
+                    chart,
+                    const SizedBox(width: 24),
+                    Expanded(child: legend),
+                  ],
+                );
+              }
+              return Column(
+                children: [chart, const SizedBox(height: 12), legend],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(
@@ -953,20 +1026,35 @@ class _SpendingMediumChart extends StatelessWidget {
                 ),
               ),
               Text(
-                _formatMoney(
-                  summary.cashExpenses +
-                      summary.digitalExpenses +
-                      summary.unclassifiedExpenses,
-                ),
-                key: const ValueKey('statistics-recorded-spending-total'),
+                _formatMoney(spending),
+                key: showSpendingTotalKey
+                    ? const ValueKey('statistics-recorded-spending-total')
+                    : null,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
           ),
+          if (remaining != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Dinero restante de la base',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Text(_formatMoney(remaining!)),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           Text(
-            'El porcentaje compara solo los movimientos con medio conocido. '
-            'Los gastos y abonos antiguos sin medio se muestran aparte.',
+            remaining == null
+                ? 'No se muestra un restante cuando no puede calcularse con '
+                      'movimientos clasificados de este período.'
+                : 'El restante se calcula con ingresos del período menos '
+                      'gastos y pagos de deuda registrados.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -975,50 +1063,36 @@ class _SpendingMediumChart extends StatelessWidget {
   }
 }
 
-class _MediumSpendingBar extends StatelessWidget {
-  const _MediumSpendingBar({
-    required this.label,
-    required this.amount,
-    required this.maximum,
-    required this.classifiedTotal,
-    required this.color,
-    this.includeShare = true,
-  });
+class _RemainingLegendRow extends StatelessWidget {
+  const _RemainingLegendRow({required this.amount, required this.total});
 
-  final String label;
   final double amount;
-  final double maximum;
-  final double classifiedTotal;
-  final Color color;
-  final bool includeShare;
+  final double total;
 
   @override
   Widget build(BuildContext context) {
-    final share = classifiedTotal <= 0 ? 0 : amount / classifiedTotal * 100;
+    final share = total <= 0 ? 0 : amount / total * 100;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          SizedBox(width: 118, child: Text(label)),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: maximum <= 0 ? 0 : amount / maximum,
-                minHeight: 10,
-                color: color,
-                backgroundColor: AppColors.outline.withValues(alpha: 0.35),
-              ),
+          Container(
+            width: 9,
+            height: 9,
+            decoration: const BoxDecoration(
+              color: AppColors.outline,
+              shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 9),
+          const Expanded(child: Text('Dinero restante')),
+          Text(_formatMoney(amount)),
+          const SizedBox(width: 8),
           SizedBox(
-            width: 124,
+            width: 42,
             child: Text(
-              '${_formatMoney(amount)}'
-              '${includeShare ? ' (${share.toStringAsFixed(0)} %)' : ''}',
+              '${share.toStringAsFixed(0)}%',
               textAlign: TextAlign.end,
-              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
         ],
@@ -1272,11 +1346,7 @@ class _ChartPanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: AppCardDecorations.surface,
       child: child,
     );
   }

@@ -176,6 +176,21 @@ class AsignacionesDinero extends Table {
   IntColumn get origenId => integer().nullable()();
 }
 
+@DataClassName('Suscripcion')
+class Suscripciones extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get nombre => text()();
+
+  RealColumn get precio => real()();
+
+  DateTimeColumn get proximoPago => dateTime()();
+
+  TextColumn get frecuencia => text()();
+
+  TextColumn get medio => text().nullable()();
+}
+
 @DriftDatabase(
   tables: [
     Ingresos,
@@ -188,13 +203,14 @@ class AsignacionesDinero extends Table {
     GastosFuturos,
     MovimientosReservaGastoFuturo,
     AsignacionesDinero,
+    Suscripciones,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -281,6 +297,9 @@ class AppDatabase extends _$AppDatabase {
           'ON asignaciones_dinero (origen, origen_id) '
           'WHERE origen IS NOT NULL AND origen_id IS NOT NULL',
         );
+      }
+      if (from < 11) {
+        await migrator.createTable(suscripciones);
       }
     },
     beforeOpen: (details) async {

@@ -10,25 +10,6 @@ Su objetivo es ofrecer una herramienta práctica para llevar el control financie
 
 ---
 
-## Tabla de contenido
-
-- [Características principales](#-características-principales)
-- [Módulos de la aplicación](#-módulos-de-la-aplicación)
-- [Tecnologías utilizadas](#-tecnologías-utilizadas)
-- [Almacenamiento de la información](#-almacenamiento-de-la-información)
-- [Cómo funciona la aplicación](#-cómo-funciona-la-aplicación)
-- [Estructura del proyecto](#-estructura-del-proyecto)
-- [Requisitos para ejecutar el proyecto](#-requisitos-para-ejecutar-el-proyecto)
-- [Instalación para desarrolladores](#-instalación-para-desarrolladores)
-- [Cómo ejecutar la aplicación](#-cómo-ejecutar-la-aplicación)
-- [Compilar para Android](#-compilar-para-android)
-- [Pruebas y validaciones](#-pruebas-y-validaciones)
-- [Privacidad y limitaciones](#-privacidad-y-limitaciones)
-- [Estado del proyecto](#-estado-del-proyecto)
-- [Autor y licencia](#-autor-y-licencia)
-
----
-
 ##  Características principales
 
 MichiFinanzas reúne diferentes herramientas para administrar las finanzas personales desde una sola aplicación.
@@ -39,7 +20,9 @@ MichiFinanzas reúne diferentes herramientas para administrar las finanzas perso
 - **Gastos futuros:** permite organizar gastos previstos y confirmar o cancelar las reservas de dinero correspondientes.
 - **Estadísticas financieras:** presenta información visual para comprender cómo se distribuyen los gastos y cómo se utiliza el dinero.
 - **Seguimiento del ahorro:** ofrece herramientas para visualizar y organizar el dinero disponible para ahorrar.
+- **Suscripciones:** registra cobros recurrentes y calcula su equivalente mensual sin crear gastos automáticamente.
 - **Configuración:** permite gestionar las opciones disponibles de la aplicación.
+- **Navegación lateral:** permite acceder desde un solo menú a todas las secciones de la aplicación.
 - **Formato de dinero:** utiliza puntos como separadores de miles para facilitar la lectura de cantidades grandes, por ejemplo, `$ 50.000`.
 - **Interfaz adaptable:** está desarrollada con Flutter para ofrecer una experiencia de uso en dispositivos compatibles.
 - **Persistencia local:** conserva los registros en el almacenamiento local del dispositivo.
@@ -48,7 +31,7 @@ MichiFinanzas reúne diferentes herramientas para administrar las finanzas perso
 
 ### 1. Inicio
 
-Es la pantalla principal de MichiFinanzas. Desde allí se puede consultar un resumen de la situación financiera y acceder a las diferentes secciones.
+Es la pantalla principal de MichiFinanzas. Desde allí se puede consultar un resumen de la situación financiera y abrir el menú lateral para acceder a las diferentes secciones.
 
 Su propósito es ofrecer una visión general del dinero registrado y facilitar el acceso a las funciones más utilizadas.
 
@@ -103,11 +86,11 @@ La aplicación busca evitar que una misma reserva descuente dinero más de una v
 
 El módulo de estadísticas presenta información visual sobre los movimientos financieros registrados.
 
-Incluye gráficos para analizar la distribución de los gastos por categoría y visualizar información relacionada con los movimientos a lo largo del tiempo.
+Incluye análisis generales, de efectivo y digitales por categoría, además de la evolución de los gastos pagados. Los pagos de deuda se cuentan una sola vez y las reservas futuras se muestran aparte, no como gastos realizados.
 
 Entre sus componentes se encuentran:
 
-- Gráfico circular para comparar categorías de gastos.
+- Gráficos de dona con gastos por categoría y dinero restante solo cuando existe una base comparable.
 - Gráficos de barras para visualizar los gastos diarios.
 - Filtros para consultar diferentes períodos.
 - Estados de carga, errores y ausencia de información.
@@ -120,7 +103,13 @@ La aplicación incluye una sección dedicada al seguimiento del ahorro, como par
 
 Su finalidad es facilitar la revisión del dinero destinado a objetivos de ahorro y complementar el control de ingresos y gastos.
 
-### 8. Configuración
+### 8. Suscripciones
+
+Permite registrar y administrar servicios recurrentes con precio, frecuencia, próxima fecha de cobro y medio de pago habitual opcional. Muestra el costo mensual equivalente y el compromiso anual estimado; los cobros no se registran automáticamente como gastos.
+
+Los datos de suscripciones se almacenan en SQLite local y se conservan al reiniciar la aplicación.
+
+### 9. Configuración
 
 Contiene las opciones de configuración disponibles en la aplicación. Su implementación está separada de los módulos financieros para facilitar el mantenimiento del código.
 
@@ -218,7 +207,8 @@ finanzas_app/
 │   │   └── app_database.g.dart
 │   ├── models/
 │   │   ├── future_expense.dart
-│   │   └── income_type.dart
+│   │   ├── income_type.dart
+│   │   └── subscription.dart
 │   ├── screens/
 │   │   ├── debts/
 │   │   ├── expenses/
@@ -227,6 +217,7 @@ finanzas_app/
 │   │   ├── savings/
 │   │   ├── settings/
 │   │   ├── statistics/
+│   │   ├── subscriptions/
 │   │   └── main_navigation_screen.dart
 │   ├── services/
 │   │   ├── app_settings_service.dart
