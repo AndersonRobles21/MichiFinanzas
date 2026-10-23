@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
+import 'package:finanzas_app/models/money_medium.dart';
 import 'package:finanzas_app/models/subscription.dart';
 import 'package:finanzas_app/screens/settings/settings_screen.dart';
 import 'package:finanzas_app/services/app_settings_service.dart';
@@ -95,7 +96,7 @@ void main() {
     expect(AppSettingsService.isValidUserName('Ürsula Peña'), isTrue);
     expect(AppSettingsService.isValidUserName('   '), isFalse);
     expect(AppSettingsService.isValidUserName('Ana2'), isFalse);
-    expect(AppSettingsService.isValidUserName('Ana-Marie'), isFalse);
+    expect(AppSettingsService.isValidUserName('Ana-Marie'), isTrue);
     expect(AppSettingsService.isValidUserName('Ana!'), isFalse);
 
     await tester.runAsync(() async {
@@ -241,6 +242,7 @@ void main() {
         precio: 25,
         proximoPago: DateTime.now().add(const Duration(days: 10)),
         frecuencia: SubscriptionFrequency.monthly,
+        medio: MoneyMedium.cash,
       );
     });
     _setMobileSize(tester);

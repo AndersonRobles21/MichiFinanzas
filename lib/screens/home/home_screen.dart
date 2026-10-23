@@ -13,7 +13,6 @@ import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/cat_illustration.dart';
-import '../../widgets/money_medium_selector.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -21,13 +20,19 @@ class HomeScreen extends StatefulWidget {
     this.databaseService,
     this.isActive = true,
     this.onViewFutureExpenses,
-    this.focusIncomes = false,
+    this.onViewExpenses,
+    this.onViewIncomes,
+    this.onViewSubscriptions,
+    this.onViewSettings,
   });
 
   final DatabaseService? databaseService;
   final bool isActive;
   final VoidCallback? onViewFutureExpenses;
-  final bool focusIncomes;
+  final VoidCallback? onViewExpenses;
+  final VoidCallback? onViewIncomes;
+  final VoidCallback? onViewSubscriptions;
+  final VoidCallback? onViewSettings;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -38,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late final bool _ownsDatabaseService;
   late Future<_DashboardData> _dashboardFuture;
   late final StreamSubscription<void> _financialChanges;
-  final _incomePanelKey = GlobalKey();
   bool _isSavingIncome = false;
   bool _isSavingDistribution = false;
 
@@ -66,20 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _dashboardFuture = _loadDashboard(_databaseService);
       });
     }
-    if (widget.focusIncomes && !oldWidget.focusIncomes) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final target = _incomePanelKey.currentContext;
-        if (target != null && mounted) {
-          unawaited(
-            Scrollable.ensureVisible(
-              target,
-              duration: const Duration(milliseconds: 250),
-              alignment: 0.12,
-            ),
-          );
-        }
-      });
-    }
   }
 
   void _retry() {
@@ -90,12 +80,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _addIncome() async {
     if (_isSavingIncome) return;
+    final dashboard = await _dashboardFuture;
+    if (!mounted) return;
     final draft = await showModalBottomSheet<_IncomeDraft>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
       backgroundColor: AppColors.surface,
-      builder: (context) => const _IncomeFormSheet(),
+      builder: (context) => _IncomeFormSheet(
+        accounts: dashboard.digitalAccounts
+            .map((item) => item.account)
+            .toList(),
+      ),
     );
     if (draft == null || !mounted || _isSavingIncome) return;
 
@@ -108,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
           fechaRecepcion: draft.fecha,
           cuotasTotales: draft.cuotasTotales!,
           fechaPrimerPago: draft.fechaPrimerPago!,
-          medio: draft.medium,
+          destinos: draft.destinos,
         );
       } else {
         await _databaseService.agregarIngreso(
@@ -116,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
           fecha: draft.fecha,
           descripcion: draft.descripcion,
           tipo: draft.type.storageValue,
-          medio: draft.medium,
+          destinos: draft.destinos,
         );
       }
       if (!mounted) return;
@@ -143,80 +142,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSavingIncome = false);
-    }
-  }
-
-  Future<void> _editIncome(Ingreso income) async {
-    final draft = await showModalBottomSheet<_IncomeDraft>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => _IncomeFormSheet(income: income),
-    );
-    if (draft == null || !mounted) return;
-    try {
-      await _databaseService.actualizarIngreso(
-        id: income.id,
-        monto: draft.monto,
-        fecha: draft.fecha,
-        descripcion: draft.descripcion,
-        tipo: draft.type.storageValue,
-        medio: draft.medium,
-      );
-      if (!mounted) return;
-      setState(() => _dashboardFuture = _loadDashboard(_databaseService));
-      _showMessage('Ingreso actualizado.', isSuccess: true);
-    } catch (error, stackTrace) {
-      logOperationFailure(
-        error,
-        stackTrace,
-        operation: 'actualizar un ingreso',
-      );
-      if (mounted) {
-        _showMessage(
-          friendlyOperationError(error, action: 'actualizar el ingreso'),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteIncome(Ingreso income) async {
-    final linkedDebt = IncomeType.fromStorage(income.tipo) == IncomeType.loan;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Eliminar este ingreso?'),
-        content: Text(
-          linkedDebt
-              ? 'También se eliminarán la deuda vinculada y su historial de abonos. Esta acción no se puede deshacer.'
-              : 'El registro se eliminará y el saldo se recalculará. Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Conservar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar ingreso'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await _databaseService.eliminarIngreso(income.id);
-      if (!mounted) return;
-      setState(() => _dashboardFuture = _loadDashboard(_databaseService));
-      _showMessage('Ingreso eliminado.', isSuccess: true);
-    } catch (error, stackTrace) {
-      logOperationFailure(error, stackTrace, operation: 'eliminar un ingreso');
-      if (mounted) {
-        _showMessage(
-          friendlyOperationError(error, action: 'eliminar el ingreso'),
-        );
-      }
     }
   }
 
@@ -356,12 +281,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           data: snapshot.data!,
                           onAddIncome: _addIncome,
                           isSavingIncome: _isSavingIncome,
-                          onEditIncome: _editIncome,
-                          onDeleteIncome: _deleteIncome,
                           onDistributeBalance: _editDistribution,
                           isSavingDistribution: _isSavingDistribution,
                           onViewFutureExpenses: widget.onViewFutureExpenses,
-                          incomePanelKey: _incomePanelKey,
+                          onViewExpenses: widget.onViewExpenses,
+                          onViewIncomes: widget.onViewIncomes,
+                          onViewSubscriptions: widget.onViewSubscriptions,
+                          onViewSettings: widget.onViewSettings,
                         );
                       },
                     ),
@@ -371,6 +297,429 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class IncomesScreen extends StatefulWidget {
+  const IncomesScreen({super.key, this.databaseService, this.isActive = true});
+
+  final DatabaseService? databaseService;
+  final bool isActive;
+
+  @override
+  State<IncomesScreen> createState() => _IncomesScreenState();
+}
+
+class _IncomesScreenState extends State<IncomesScreen> {
+  late final DatabaseService _databaseService;
+  late final bool _ownsDatabaseService;
+  late Future<_IncomeHistoryData> _historyFuture;
+  late final StreamSubscription<void> _changes;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsDatabaseService = widget.databaseService == null;
+    _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
+    _historyFuture = _load();
+    _changes = _databaseService.observarCambiosFinancieros().listen((_) {
+      if (mounted) {
+        setState(() {
+          _historyFuture = _load();
+        });
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant IncomesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      setState(() {
+        _historyFuture = _load();
+      });
+    }
+  }
+
+  Future<_IncomeHistoryData> _load() async {
+    final values = await Future.wait<Object>([
+      _databaseService.obtenerIngresos(),
+      _databaseService.obtenerCuentasDigitales(),
+      _databaseService.obtenerTodosLosDestinosIngreso(),
+    ]);
+    final incomes = values[0] as List<Ingreso>;
+    incomes.sort((a, b) => b.fecha.compareTo(a.fecha));
+    return _IncomeHistoryData(
+      incomes: incomes,
+      accounts: (values[1] as List<DigitalAccountBalance>)
+          .map((item) => item.account)
+          .toList(),
+      destinations:
+          values[2] as List<({int ingresoId, IncomeDestination destino})>,
+    );
+  }
+
+  @override
+  void dispose() {
+    unawaited(_changes.cancel());
+    if (_ownsDatabaseService) unawaited(_databaseService.close());
+    super.dispose();
+  }
+
+  Future<void> _addIncome(List<CuentasDigitale> accounts) async {
+    if (_saving) return;
+    final draft = await showModalBottomSheet<_IncomeDraft>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
+      backgroundColor: AppColors.surface,
+      builder: (context) => _IncomeFormSheet(accounts: accounts),
+    );
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      if (draft.type == IncomeType.loan) {
+        await _databaseService.registrarPrestamo(
+          nombre: draft.descripcion,
+          monto: draft.monto,
+          fechaRecepcion: draft.fecha,
+          cuotasTotales: draft.cuotasTotales!,
+          fechaPrimerPago: draft.fechaPrimerPago!,
+          destinos: draft.destinos,
+        );
+      } else {
+        await _databaseService.agregarIngreso(
+          monto: draft.monto,
+          fecha: draft.fecha,
+          descripcion: draft.descripcion,
+          tipo: draft.type.storageValue,
+          destinos: draft.destinos,
+        );
+      }
+      if (mounted) _showMessage('Ingreso guardado.', isSuccess: true);
+    } catch (error, stackTrace) {
+      logOperationFailure(error, stackTrace, operation: 'registrar un ingreso');
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'guardar el ingreso'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _editIncome(
+    Ingreso income,
+    List<CuentasDigitale> accounts,
+  ) async {
+    if (_saving) return;
+    late final List<IncomeDestination> destinations;
+    try {
+      destinations = await _databaseService.obtenerDestinosIngreso(income.id);
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'cargar destinos del ingreso',
+      );
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'cargar el ingreso'),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    final draft = await showModalBottomSheet<_IncomeDraft>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
+      backgroundColor: AppColors.surface,
+      builder: (context) => _IncomeFormSheet(
+        income: income,
+        accounts: accounts,
+        initialDestinations: destinations,
+      ),
+    );
+    if (draft == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _databaseService.actualizarIngreso(
+        id: income.id,
+        monto: draft.monto,
+        fecha: draft.fecha,
+        descripcion: draft.descripcion,
+        tipo: draft.type.storageValue,
+        destinos: draft.destinos,
+      );
+      if (mounted) _showMessage('Ingreso actualizado.', isSuccess: true);
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'actualizar un ingreso',
+      );
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'actualizar el ingreso'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _deleteIncome(Ingreso income) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar este ingreso?'),
+        content: const Text(
+          'El saldo asociado se revertirá. Si es un préstamo recibido, también se eliminará su deuda vinculada.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Conservar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar ingreso'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await _databaseService.eliminarIngreso(income.id);
+      if (mounted) _showMessage('Ingreso eliminado.', isSuccess: true);
+    } catch (error, stackTrace) {
+      logOperationFailure(error, stackTrace, operation: 'eliminar un ingreso');
+      if (mounted) {
+        _showMessage(
+          friendlyOperationError(error, action: 'eliminar el ingreso'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showMessage(String message, {bool isSuccess = false}) {
+    showCatMessage(context, message, isSuccess: isSuccess);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: FutureBuilder<_IncomeHistoryData>(
+        future: _historyFuture,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('No pudimos cargar tus ingresos.'),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _historyFuture = _load();
+                    }),
+                    child: const Text('Intentar de nuevo'),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data!;
+          final total = data.incomes.fold<double>(
+            0,
+            (sum, income) => sum + income.monto,
+          );
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final padding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+              return ListView(
+                padding: EdgeInsets.fromLTRB(padding, 26, padding, 100),
+                children: [
+                  Text(
+                    'Ingresos',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Aquí tienes el historial de todo el dinero que has recibido.',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: AppCardDecorations.featured,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ingresos registrados',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          formatMoney(total),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        Text('${data.incomes.length} movimientos'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (data.incomes.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: AppCardDecorations.surface,
+                      child: const Text(
+                        'Todavía no hay ingresos por aquí. Registra tu sueldo, un extra o un préstamo recibido.',
+                      ),
+                    )
+                  else
+                    for (final income in data.incomes)
+                      _IncomeHistoryTile(
+                        income: income,
+                        destinations: data.destinationLabel(income),
+                        saving: _saving,
+                        onEdit: () => _editIncome(income, data.accounts),
+                        onDelete: () => _deleteIncome(income),
+                      ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : () => _addIncome(data.accounts),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Registrar ingreso'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _IncomeHistoryData {
+  const _IncomeHistoryData({
+    required this.incomes,
+    required this.accounts,
+    required this.destinations,
+  });
+
+  final List<Ingreso> incomes;
+  final List<CuentasDigitale> accounts;
+  final List<({int ingresoId, IncomeDestination destino})> destinations;
+
+  String destinationLabel(Ingreso income) {
+    final entries = destinations
+        .where((entry) => entry.ingresoId == income.id)
+        .map((entry) {
+          final destination = entry.destino;
+          final accountName = _accountName(destination.cuentaDigitalId);
+          return [
+            destination.medio.label,
+            ?accountName,
+            formatMoney(destination.monto),
+          ].join(' · ');
+        })
+        .toList();
+    if (entries.isNotEmpty) return entries.join('  /  ');
+    final medium = MoneyMedium.fromStorage(income.medio);
+    final accountName = _accountName(income.cuentaDigitalId);
+    return [medium?.label ?? 'Medio sin clasificar', ?accountName].join(' · ');
+  }
+
+  String? _accountName(int? id) {
+    if (id == null) return null;
+    for (final account in accounts) {
+      if (account.id == id) return account.nombre;
+    }
+    return null;
+  }
+}
+
+class _IncomeHistoryTile extends StatelessWidget {
+  const _IncomeHistoryTile({
+    required this.income,
+    required this.destinations,
+    required this.saving,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Ingreso income;
+  final String destinations;
+  final bool saving;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = IncomeType.fromStorage(income.tipo);
+    final medium = MoneyMedium.fromStorage(income.medio);
+    return Container(
+      key: ValueKey('income-history-${income.id}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      decoration: AppCardDecorations.surface,
+      child: Row(
+        children: [
+          const Icon(Icons.south_west_rounded, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  income.descripcion?.trim().isNotEmpty == true
+                      ? income.descripcion!
+                      : type.label,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  '${type.label} · ${_shortDate(income.fecha)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  destinations.isEmpty
+                      ? medium?.label ?? 'Medio sin clasificar'
+                      : destinations,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          Text(formatMoney(income.monto)),
+          PopupMenuButton<String>(
+            enabled: !saving,
+            tooltip: 'Acciones del ingreso',
+            onSelected: (value) => value == 'edit' ? onEdit() : onDelete(),
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'edit', child: Text('Editar')),
+              PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -395,6 +744,8 @@ Future<_DashboardData> _loadDashboard(DatabaseService service) async {
       service.obtenerDeudas(),
       service.obtenerTodosLosPagosDeuda(),
       service.obtenerPlanesGastosFuturos(),
+      service.obtenerCuentasDigitales(),
+      service.obtenerSuscripciones(),
     ]);
 
     return _DashboardData.fromRecords(
@@ -405,6 +756,8 @@ Future<_DashboardData> _loadDashboard(DatabaseService service) async {
       futureExpenses: results[4] as List<FutureExpenseSummary>,
       balanceBreakdown: balanceBreakdown,
       userName: userName,
+      digitalAccounts: results[5] as List<DigitalAccountBalance>,
+      subscriptions: results[6] as List<Suscripcion>,
     );
   });
 }
@@ -417,14 +770,18 @@ class _DashboardData {
     required this.totalGanadoDelMes,
     required this.totalPrestamosDelMes,
     required this.totalGastos,
+    required this.totalGastosDelMes,
     required this.totalPagosDeuda,
     required this.dineroDisponible,
     required this.balanceBreakdown,
     required this.userName,
-    required this.allIncomes,
+    required this.digitalAccounts,
+    required this.subscriptions,
+    required this.recentExpenses,
     required this.porcentajeGastado,
     required this.cantidadIngresos,
     required this.cantidadGastos,
+    required this.cantidadGastosDelMes,
     required this.cantidadPagosDeuda,
     required this.cantidadDeudas,
     required this.deudasPendientes,
@@ -441,14 +798,14 @@ class _DashboardData {
     required List<FutureExpenseSummary> futureExpenses,
     required AvailableBalanceBreakdown balanceBreakdown,
     required String userName,
+    required List<DigitalAccountBalance> digitalAccounts,
+    required List<Suscripcion> subscriptions,
   }) {
     final totalIngresos = ingresos.fold<double>(
       0,
       (total, ingreso) => total + ingreso.monto,
     );
     final now = DateTime.now();
-    final allIncomes = [...ingresos]
-      ..sort((first, second) => second.fecha.compareTo(first.fecha));
     final ingresosDelMes =
         ingresos
             .where(
@@ -469,6 +826,22 @@ class _DashboardData {
         .fold<double>(0, (total, ingreso) => total + ingreso.monto);
     final totalGanadoDelMes = totalRecibidoDelMes - totalPrestamosDelMes;
     final totalGastos = gastos.fold<double>(
+      0,
+      (total, gasto) => total + gasto.monto,
+    );
+    final recentExpenses = [...gastos]
+      ..sort((first, second) => second.fecha.compareTo(first.fecha));
+    final upcomingSubscriptions =
+        subscriptions.where((item) => item.activa).toList()..sort(
+          (first, second) => first.proximoPago.compareTo(second.proximoPago),
+        );
+    final gastosDelMes = gastos
+        .where(
+          (gasto) =>
+              gasto.fecha.year == now.year && gasto.fecha.month == now.month,
+        )
+        .toList();
+    final totalGastosDelMes = gastosDelMes.fold<double>(
       0,
       (total, gasto) => total + gasto.monto,
     );
@@ -519,14 +892,18 @@ class _DashboardData {
       totalGanadoDelMes: totalGanadoDelMes,
       totalPrestamosDelMes: totalPrestamosDelMes,
       totalGastos: totalGastos,
+      totalGastosDelMes: totalGastosDelMes,
       totalPagosDeuda: totalPagosDeuda,
       dineroDisponible: balanceBreakdown.total,
       balanceBreakdown: balanceBreakdown,
       userName: userName,
-      allIncomes: allIncomes,
+      digitalAccounts: digitalAccounts,
+      subscriptions: upcomingSubscriptions,
+      recentExpenses: recentExpenses.take(3).toList(),
       porcentajeGastado: porcentajeGastado,
       cantidadIngresos: ingresos.length,
       cantidadGastos: gastos.length,
+      cantidadGastosDelMes: gastosDelMes.length,
       cantidadPagosDeuda: pagos.length,
       cantidadDeudas: deudas.length,
       deudasPendientes: pagosProximos.length,
@@ -545,14 +922,18 @@ class _DashboardData {
   final double totalGanadoDelMes;
   final double totalPrestamosDelMes;
   final double totalGastos;
+  final double totalGastosDelMes;
   final double totalPagosDeuda;
   final double dineroDisponible;
   final AvailableBalanceBreakdown balanceBreakdown;
   final String userName;
-  final List<Ingreso> allIncomes;
+  final List<DigitalAccountBalance> digitalAccounts;
+  final List<Suscripcion> subscriptions;
+  final List<Gasto> recentExpenses;
   final double? porcentajeGastado;
   final int cantidadIngresos;
   final int cantidadGastos;
+  final int cantidadGastosDelMes;
   final int cantidadPagosDeuda;
   final int cantidadDeudas;
   final int deudasPendientes;
@@ -605,7 +986,7 @@ class _IncomeDraft {
     required this.fecha,
     this.cuotasTotales,
     this.fechaPrimerPago,
-    required this.medium,
+    required this.destinos,
   });
 
   final IncomeType type;
@@ -614,13 +995,19 @@ class _IncomeDraft {
   final DateTime fecha;
   final int? cuotasTotales;
   final DateTime? fechaPrimerPago;
-  final MoneyMedium? medium;
+  final List<IncomeDestination> destinos;
 }
 
 class _IncomeFormSheet extends StatefulWidget {
-  const _IncomeFormSheet({this.income});
+  const _IncomeFormSheet({
+    required this.accounts,
+    this.income,
+    this.initialDestinations = const [],
+  });
 
   final Ingreso? income;
+  final List<CuentasDigitale> accounts;
+  final List<IncomeDestination> initialDestinations;
 
   @override
   State<_IncomeFormSheet> createState() => _IncomeFormSheetState();
@@ -631,10 +1018,10 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   final _installmentsController = TextEditingController(text: '1');
+  final List<_IncomeDestinationEditor> _destinations = [];
   late IncomeType _type;
   late DateTime _receivedDate;
   late DateTime _firstPaymentDate;
-  MoneyMedium? _medium;
 
   @override
   void initState() {
@@ -648,7 +1035,29 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
     _amountController.text = income == null ? '' : formatAmount(income.monto);
     _receivedDate = income?.fecha ?? now;
     _firstPaymentDate = DateTime(now.year, now.month, now.day + 30);
-    _medium = MoneyMedium.fromStorage(income?.medio);
+    if (widget.initialDestinations.isNotEmpty) {
+      _destinations.addAll(
+        widget.initialDestinations.map(
+          (destination) => _IncomeDestinationEditor(
+            medio: destination.medio,
+            monto: formatAmount(destination.monto),
+            cuentaDigitalId: destination.cuentaDigitalId,
+          ),
+        ),
+      );
+    } else {
+      final legacyMedium = MoneyMedium.fromStorage(income?.medio);
+      _destinations.add(
+        _IncomeDestinationEditor(
+          medio: legacyMedium ?? MoneyMedium.cash,
+          monto: legacyMedium == null || income == null
+              ? ''
+              : formatAmount(income.monto),
+          cuentaDigitalId: income?.cuentaDigitalId,
+        ),
+      );
+    }
+    _amountController.addListener(_updateDistribution);
   }
 
   @override
@@ -656,7 +1065,33 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
     _descriptionController.dispose();
     _amountController.dispose();
     _installmentsController.dispose();
+    for (final destination in _destinations) {
+      destination.dispose();
+    }
     super.dispose();
+  }
+
+  void _updateDistribution() {
+    if (mounted) setState(() {});
+  }
+
+  void _addDestination() {
+    final hasCash = _destinations.any(
+      (destination) => destination.medio == MoneyMedium.cash,
+    );
+    setState(() {
+      _destinations.add(
+        _IncomeDestinationEditor(
+          medio: hasCash ? MoneyMedium.digital : MoneyMedium.cash,
+        ),
+      );
+    });
+  }
+
+  void _removeDestination(int index) {
+    setState(() {
+      _destinations.removeAt(index).dispose();
+    });
   }
 
   Future<void> _selectDate({required bool isFirstPayment}) async {
@@ -678,18 +1113,143 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
+    if (!_distributionIsValid) return;
+    final description = _descriptionController.text.trim();
     Navigator.pop(
       context,
       _IncomeDraft(
         type: _type,
-        descripcion: _descriptionController.text.trim(),
+        descripcion: description,
         monto: parseMoney(_amountController.text),
         fecha: _receivedDate,
         cuotasTotales: _type == IncomeType.loan
             ? int.parse(_installmentsController.text.trim())
             : null,
         fechaPrimerPago: _type == IncomeType.loan ? _firstPaymentDate : null,
-        medium: _medium,
+        destinos: [
+          for (final destination in _destinations)
+            IncomeDestination(
+              medio: destination.medio,
+              monto: parseMoney(destination.controller.text),
+              cuentaDigitalId: destination.cuentaDigitalId,
+            ),
+        ],
+      ),
+    );
+  }
+
+  double get _incomeAmount => tryParseMoney(_amountController.text) ?? 0;
+
+  double get _distributionTotal => _destinations.fold<double>(
+    0,
+    (total, destination) =>
+        total + (tryParseMoney(destination.controller.text) ?? 0),
+  );
+
+  bool get _distributionIsValid {
+    if (_incomeAmount <= 0 || _destinations.isEmpty) return false;
+    final selected = <String>{};
+    for (final destination in _destinations) {
+      final amount = tryParseMoney(destination.controller.text);
+      if (amount == null || amount <= 0) return false;
+      if (destination.medio == MoneyMedium.digital &&
+          (destination.cuentaDigitalId == null ||
+              !widget.accounts.any(
+                (account) => account.id == destination.cuentaDigitalId,
+              ))) {
+        return false;
+      }
+      final key =
+          '${destination.medio.storageValue}:'
+          '${destination.cuentaDigitalId ?? 'cash'}';
+      if (!selected.add(key)) return false;
+    }
+    return (_distributionTotal - _incomeAmount).abs() <= 1e-8;
+  }
+
+  Widget _buildDestination(int index) {
+    final destination = _destinations[index];
+    return Container(
+      key: ValueKey('income-destination-$index'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: AppCardDecorations.surface,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<MoneyMedium>(
+                  initialValue: destination.medio,
+                  decoration: const InputDecoration(labelText: 'Destino'),
+                  items: [
+                    for (final medium in MoneyMedium.values)
+                      DropdownMenuItem(
+                        value: medium,
+                        child: Text(medium.label),
+                      ),
+                  ],
+                  onChanged: (medium) {
+                    if (medium == null) return;
+                    setState(() {
+                      destination.medio = medium;
+                      if (medium != MoneyMedium.digital) {
+                        destination.cuentaDigitalId = null;
+                      }
+                    });
+                  },
+                ),
+              ),
+              if (_destinations.length > 1)
+                IconButton(
+                  tooltip: 'Quitar destino',
+                  onPressed: () => _removeDestination(index),
+                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                ),
+            ],
+          ),
+          if (destination.medio == MoneyMedium.digital) ...[
+            const SizedBox(height: 10),
+            if (widget.accounts.isEmpty)
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Agrega una cuenta digital en Configuración.'),
+              )
+            else
+              DropdownButtonFormField<int>(
+                key: ValueKey('income-destination-account-$index'),
+                initialValue: destination.cuentaDigitalId,
+                decoration: const InputDecoration(labelText: 'Cuenta digital'),
+                items: [
+                  for (final account in widget.accounts)
+                    DropdownMenuItem(
+                      value: account.id,
+                      child: Text(account.nombre),
+                    ),
+                ],
+                onChanged: (accountId) =>
+                    setState(() => destination.cuentaDigitalId = accountId),
+              ),
+          ],
+          const SizedBox(height: 10),
+          TextFormField(
+            key: ValueKey('income-destination-amount-$index'),
+            controller: destination.controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: const [ThousandsInputFormatter()],
+            decoration: const InputDecoration(
+              labelText: 'Importe para este destino',
+              prefixText: r'$ ',
+            ),
+            onChanged: (_) => _updateDistribution(),
+            validator: (value) {
+              final amount = tryParseMoney(value);
+              return amount == null || amount <= 0
+                  ? 'Escribe un importe mayor que cero.'
+                  : null;
+            },
+          ),
+        ],
       ),
     );
   }
@@ -697,174 +1257,223 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(22, 22, 22, 24 + bottomInset),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.income == null
-                            ? 'Agregar dinero'
-                            : 'Editar ingreso',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    const AnimatedCat(
-                      asset: CatAssets.ingresos,
-                      label: 'Gato acompañando tus ingresos',
-                      width: 82,
-                      height: 68,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<IncomeType>(
-                  key: const ValueKey('income-type'),
-                  isExpanded: true,
-                  initialValue: _type,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo de ingreso',
-                    prefixIcon: Icon(Icons.south_west_rounded),
-                  ),
-                  items: [
-                    for (final type in [
-                      IncomeType.salary,
-                      IncomeType.extra,
-                      if (widget.income == null) IncomeType.loan,
-                      if (widget.income != null) IncomeType.legacy,
-                    ])
-                      DropdownMenuItem(value: type, child: Text(type.label)),
-                  ],
-                  onChanged: widget.income == null || _type != IncomeType.loan
-                      ? (type) {
-                          if (type != null) setState(() => _type = type);
-                        }
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('income-description'),
-                  controller: _descriptionController,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: _type == IncomeType.loan
-                        ? 'Nombre o concepto del préstamo'
-                        : 'Descripción o concepto',
-                    prefixIcon: const Icon(Icons.edit_outlined),
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Cuéntanos de dónde viene este dinero.'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('income-amount'),
-                  controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: const [ThousandsInputFormatter()],
-                  decoration: const InputDecoration(
-                    labelText: 'Valor recibido',
-                    prefixText: r'$ ',
-                  ),
-                  validator: (value) {
-                    final amount = tryParseMoney(value);
-                    return amount == null || amount <= 0
-                        ? 'Escribe un valor mayor que cero.'
-                        : null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                MoneyMediumSelector(
-                  selected: _medium,
-                  onChanged: (value) => setState(() => _medium = value),
-                  title: 'Medio donde recibiste el dinero',
-                  allowUnclassified: true,
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => _selectDate(isFirstPayment: false),
-                  child: Row(
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(22, 22, 22, 24 + bottomInset),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.calendar_today_outlined),
-                      const SizedBox(width: 10),
                       Expanded(
-                        child: Text('Recibido · ${_shortDate(_receivedDate)}'),
+                        child: Text(
+                          widget.income == null
+                              ? 'Agregar dinero'
+                              : 'Editar ingreso',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      const AnimatedCat(
+                        asset: CatAssets.ingresos,
+                        label: 'Gato acompañando tus ingresos',
+                        width: 82,
+                        height: 68,
                       ),
                     ],
                   ),
-                ),
-                if (_type == IncomeType.loan && widget.income == null) ...[
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    key: const ValueKey('income-installments'),
-                    controller: _installmentsController,
-                    keyboardType: TextInputType.number,
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<IncomeType>(
+                    key: const ValueKey('income-type'),
+                    isExpanded: true,
+                    initialValue: _type,
                     decoration: const InputDecoration(
-                      labelText: 'Número de cuotas',
-                      prefixIcon: Icon(Icons.format_list_numbered_rounded),
+                      labelText: 'Tipo de ingreso',
+                      prefixIcon: Icon(Icons.south_west_rounded),
+                    ),
+                    items: [
+                      for (final type in [
+                        IncomeType.salary,
+                        IncomeType.extra,
+                        if (widget.income == null || _type == IncomeType.loan)
+                          IncomeType.loan,
+                        if (widget.income != null) IncomeType.legacy,
+                      ])
+                        DropdownMenuItem(value: type, child: Text(type.label)),
+                    ],
+                    onChanged: widget.income == null || _type != IncomeType.loan
+                        ? (type) {
+                            if (type != null) setState(() => _type = type);
+                          }
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('income-description'),
+                    controller: _descriptionController,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: InputDecoration(
+                      labelText: _type == IncomeType.loan
+                          ? 'Nombre o concepto del préstamo'
+                          : 'Descripción o concepto',
+                      prefixIcon: const Icon(Icons.edit_outlined),
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? _type == IncomeType.loan
+                              ? 'Escribe el nombre del préstamo.'
+                              : null
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('income-amount'),
+                    controller: _amountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: const [ThousandsInputFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Valor recibido',
+                      prefixText: r'$ ',
                     ),
                     validator: (value) {
-                      if (_type != IncomeType.loan) return null;
-                      final installments = int.tryParse((value ?? '').trim());
-                      return installments == null || installments <= 0
-                          ? 'Indica cuántas cuotas tendrá.'
+                      final amount = tryParseMoney(value);
+                      return amount == null || amount <= 0
+                          ? 'Escribe un valor mayor que cero.'
                           : null;
                     },
                   ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Distribuye el importe entre tus destinos',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 10),
+                  for (var index = 0; index < _destinations.length; index++)
+                    _buildDestination(index),
+                  TextButton.icon(
+                    onPressed: _addDestination,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Agregar otro destino'),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Total distribuido: ${formatMoney(_distributionTotal)}',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  if (_incomeAmount > 0)
+                    Text(
+                      (_incomeAmount - _distributionTotal).abs() <= 1e-8
+                          ? '¡Todo listo! La distribución coincide con el ingreso.'
+                          : _distributionTotal < _incomeAmount
+                          ? 'Te faltan ${formatMoney(_incomeAmount - _distributionTotal)} por distribuir.'
+                          : 'Sobran ${formatMoney(_distributionTotal - _incomeAmount)} en la distribución.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: _distributionTotal > _incomeAmount
+                            ? Theme.of(context).colorScheme.error
+                            : AppColors.primary,
+                      ),
+                    ),
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed: () => _selectDate(isFirstPayment: true),
+                    onPressed: () => _selectDate(isFirstPayment: false),
                     child: Row(
                       children: [
-                        const Icon(Icons.event_outlined),
+                        const Icon(Icons.calendar_today_outlined),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Primer pago · ${_shortDate(_firstPaymentDate)}',
+                            'Recibido · ${_shortDate(_receivedDate)}',
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    'Se creará una deuda vinculada. La cuota inicial será el '
-                    'valor recibido dividido entre las cuotas.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.add_rounded),
-                    label: Text(
-                      widget.income != null
-                          ? 'Guardar cambios'
-                          : _type == IncomeType.loan
-                          ? 'Registrar préstamo'
-                          : 'Guardar ingreso',
+                  if (_type == IncomeType.loan && widget.income == null) ...[
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      key: const ValueKey('income-installments'),
+                      controller: _installmentsController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Número de cuotas',
+                        prefixIcon: Icon(Icons.format_list_numbered_rounded),
+                      ),
+                      validator: (value) {
+                        if (_type != IncomeType.loan) return null;
+                        final installments = int.tryParse((value ?? '').trim());
+                        return installments == null || installments <= 0
+                            ? 'Indica cuántas cuotas tendrá.'
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => _selectDate(isFirstPayment: true),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event_outlined),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Primer pago · ${_shortDate(_firstPaymentDate)}',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      'Se creará una deuda vinculada. La cuota inicial será el '
+                      'valor recibido dividido entre las cuotas.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _distributionIsValid ? _save : null,
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text(
+                        widget.income != null
+                            ? 'Guardar cambios'
+                            : _type == IncomeType.loan
+                            ? 'Registrar préstamo'
+                            : 'Guardar ingreso',
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _IncomeDestinationEditor {
+  _IncomeDestinationEditor({
+    required this.medio,
+    String monto = '',
+    this.cuentaDigitalId,
+  }) : controller = TextEditingController(text: monto);
+
+  final TextEditingController controller;
+  MoneyMedium medio;
+  int? cuentaDigitalId;
+
+  void dispose() => controller.dispose();
 }
 
 class _DistributionDraft {
@@ -922,9 +1531,11 @@ class _DistributionFormSheetState extends State<_DistributionFormSheet> {
     if (!_formKey.currentState!.validate()) return;
     final cash = parseMoney(_cashController.text);
     final digital = parseMoney(_digitalController.text);
-    if (cash + digital > widget.total + 1e-8) {
+    if ((cash + digital - widget.total).abs() > 1e-8) {
       setState(() {
-        _error = 'La suma no puede superar el total disponible.';
+        _error = cash + digital < widget.total
+            ? 'Te faltan ${_formatMoney(widget.total - cash - digital)} por distribuir.'
+            : 'Sobran ${_formatMoney(cash + digital - widget.total)} en la distribución.';
       });
       return;
     }
@@ -956,7 +1567,7 @@ class _DistributionFormSheetState extends State<_DistributionFormSheet> {
                   const SizedBox(height: 8),
                   Text(
                     'Total disponible: ${_formatMoney(widget.total)}. '
-                    'Puedes dejar una parte por distribuir y asignarla después.',
+                    'La suma de efectivo y digital debe coincidir con el total.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),
@@ -989,6 +1600,29 @@ class _DistributionFormSheetState extends State<_DistributionFormSheet> {
                     validator: _validateAmount,
                     onChanged: (_) => setState(() => _error = null),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Total distribuido: '
+                    '${_formatMoney((tryParseMoney(_cashController.text) ?? 0) + (tryParseMoney(_digitalController.text) ?? 0))} '
+                    'de ${_formatMoney(widget.total)}',
+                  ),
+                  if (widget.total -
+                          (tryParseMoney(_cashController.text) ?? 0) -
+                          (tryParseMoney(_digitalController.text) ?? 0) >
+                      1e-8)
+                    Text(
+                      'Te faltan ${_formatMoney(widget.total - (tryParseMoney(_cashController.text) ?? 0) - (tryParseMoney(_digitalController.text) ?? 0))} por distribuir.',
+                    )
+                  else if ((tryParseMoney(_cashController.text) ?? 0) +
+                          (tryParseMoney(_digitalController.text) ?? 0) -
+                          widget.total >
+                      1e-8)
+                    Text(
+                      'Sobran ${_formatMoney((tryParseMoney(_cashController.text) ?? 0) + (tryParseMoney(_digitalController.text) ?? 0) - widget.total)} en la distribución.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -1002,7 +1636,15 @@ class _DistributionFormSheetState extends State<_DistributionFormSheet> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _save,
+                      onPressed:
+                          ((tryParseMoney(_cashController.text) ?? 0) +
+                                      (tryParseMoney(_digitalController.text) ??
+                                          0) -
+                                      widget.total)
+                                  .abs() <=
+                              1e-8
+                          ? _save
+                          : null,
                       icon: const Icon(Icons.account_balance_wallet_outlined),
                       label: const Text('Guardar distribución'),
                     ),
@@ -1022,23 +1664,25 @@ class _DashboardContent extends StatelessWidget {
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
-    required this.onEditIncome,
-    required this.onDeleteIncome,
     required this.onDistributeBalance,
     required this.isSavingDistribution,
     required this.onViewFutureExpenses,
-    required this.incomePanelKey,
+    required this.onViewExpenses,
+    required this.onViewIncomes,
+    required this.onViewSubscriptions,
+    required this.onViewSettings,
   });
 
   final _DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
-  final ValueChanged<Ingreso> onEditIncome;
-  final ValueChanged<Ingreso> onDeleteIncome;
   final VoidCallback onDistributeBalance;
   final bool isSavingDistribution;
   final VoidCallback? onViewFutureExpenses;
-  final GlobalKey incomePanelKey;
+  final VoidCallback? onViewExpenses;
+  final VoidCallback? onViewIncomes;
+  final VoidCallback? onViewSubscriptions;
+  final VoidCallback? onViewSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -1050,17 +1694,32 @@ class _DashboardContent extends StatelessWidget {
           onDistributeBalance: onDistributeBalance,
           isSavingDistribution: isSavingDistribution,
         ),
+        const SizedBox(height: 12),
+        _BalanceBreakdownCards(data: data),
         const SizedBox(height: 18),
         _IncomeSummaryPanel(
-          key: incomePanelKey,
           data: data,
           onAddIncome: onAddIncome,
           isSavingIncome: isSavingIncome,
-          onEditIncome: onEditIncome,
-          onDeleteIncome: onDeleteIncome,
+          onViewExpenses: onViewExpenses,
+          onViewIncomes: onViewIncomes,
         ),
         const SizedBox(height: 18),
-        _MetricsGrid(data: data),
+        _RecentExpensesPanel(expenses: data.recentExpenses),
+        const SizedBox(height: 18),
+        _UpcomingSubscriptionsPanel(
+          subscriptions: data.subscriptions.take(3).toList(),
+          onViewAll: onViewSubscriptions,
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: TextButton.icon(
+            onPressed: onViewSettings,
+            icon: const Icon(Icons.swap_horiz_rounded),
+            label: const Text('Ver todas las cuentas · mover dinero'),
+          ),
+        ),
         const SizedBox(height: 28),
         const _SectionHeading('Deudas pendientes'),
         const SizedBox(height: 12),
@@ -1085,19 +1744,18 @@ class _DashboardContent extends StatelessWidget {
 
 class _IncomeSummaryPanel extends StatelessWidget {
   const _IncomeSummaryPanel({
-    super.key,
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
-    required this.onEditIncome,
-    required this.onDeleteIncome,
+    required this.onViewExpenses,
+    required this.onViewIncomes,
   });
 
   final _DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
-  final ValueChanged<Ingreso> onEditIncome;
-  final ValueChanged<Ingreso> onDeleteIncome;
+  final VoidCallback? onViewExpenses;
+  final VoidCallback? onViewIncomes;
 
   @override
   Widget build(BuildContext context) {
@@ -1130,16 +1788,31 @@ class _IncomeSummaryPanel extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Agregar dinero'),
               );
+              final addExpenseButton = OutlinedButton.icon(
+                onPressed: onViewExpenses,
+                icon: const Icon(Icons.add_shopping_cart_outlined),
+                label: const Text('Registrar gasto'),
+              );
               if (constraints.maxWidth < 420) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [total, const SizedBox(height: 12), addButton],
+                  children: [
+                    total,
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [addButton, addExpenseButton],
+                    ),
+                  ],
                 );
               }
               return Row(
                 children: [
                   Expanded(child: total),
                   addButton,
+                  const SizedBox(width: 8),
+                  addExpenseButton,
                 ],
               );
             },
@@ -1159,75 +1832,29 @@ class _IncomeSummaryPanel extends StatelessWidget {
               ),
             ],
           ),
-          if (data.allIncomes.isNotEmpty) ...[
-            const Divider(height: 24),
-            Text(
-              'Historial de ingresos',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            for (final income in data.allIncomes)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7),
-                child: Row(
-                  children: [
-                    Icon(
-                      IncomeType.fromStorage(income.tipo) == IncomeType.loan
-                          ? Icons.account_balance_outlined
-                          : Icons.south_west_rounded,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            income.descripcion?.trim().isNotEmpty == true
-                                ? income.descripcion!
-                                : IncomeType.fromStorage(income.tipo).label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '${IncomeType.fromStorage(income.tipo).label} · '
-                            '${_shortDate(income.fecha)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      formatMoney(income.monto),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    PopupMenuButton<_IncomeAction>(
-                      tooltip: 'Acciones del ingreso',
-                      onSelected: (action) {
-                        if (action == _IncomeAction.edit) {
-                          onEditIncome(income);
-                        } else {
-                          onDeleteIncome(income);
-                        }
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(
-                          value: _IncomeAction.edit,
-                          child: Text('Editar'),
-                        ),
-                        PopupMenuItem(
-                          value: _IncomeAction.delete,
-                          child: Text('Eliminar'),
-                        ),
-                      ],
-                    ),
-                  ],
+          if (data.porcentajeGastado != null) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 5,
+              children: [
+                Text(
+                  '${_formatPercent(data.porcentajeGastado!)}%',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-              ),
+                Text(
+                  'de tus ingresos se han usado en gastos y pagos de deuda.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
           ],
+          const SizedBox(height: 8),
+          TextButton.icon(
+            key: const ValueKey('home-view-incomes'),
+            onPressed: onViewIncomes,
+            icon: const Icon(Icons.history_rounded),
+            label: const Text('Ver historial de ingresos'),
+          ),
         ],
       ),
     );
@@ -1256,7 +1883,108 @@ class _IncomeBreakdown extends StatelessWidget {
   }
 }
 
-enum _IncomeAction { edit, delete }
+class _BalanceBreakdownCards extends StatelessWidget {
+  const _BalanceBreakdownCards({required this.data});
+
+  final _DashboardData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleAccounts = data.digitalAccounts.take(2).toList();
+    final remainingAccounts =
+        data.digitalAccounts.length - visibleAccounts.length;
+    final digitalDetail = visibleAccounts.isEmpty
+        ? 'Sin cuentas agregadas'
+        : visibleAccounts
+              .map(
+                (account) =>
+                    '${account.account.nombre}: ${formatMoney(account.balance)}',
+              )
+              .followedBy(
+                remainingAccounts > 0
+                    ? ['+$remainingAccounts cuentas más']
+                    : const <String>[],
+              )
+              .join(' · ');
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cashCard = _BalanceMediumCard(
+          label: 'Dinero en efectivo',
+          amount: data.balanceBreakdown.cash,
+          detail: 'Movimientos en efectivo',
+          icon: Icons.payments_outlined,
+        );
+        final digitalCard = _BalanceMediumCard(
+          label: 'Dinero digital',
+          amount: data.balanceBreakdown.digital,
+          detail: digitalDetail,
+          icon: Icons.account_balance_wallet_outlined,
+        );
+        if (constraints.maxWidth < 440) {
+          return Column(
+            children: [cashCard, const SizedBox(height: 10), digitalCard],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: cashCard),
+            const SizedBox(width: 12),
+            Expanded(child: digitalCard),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BalanceMediumCard extends StatelessWidget {
+  const _BalanceMediumCard({
+    required this.label,
+    required this.amount,
+    required this.detail,
+    required this.icon,
+  });
+
+  final String label;
+  final double amount;
+  final String detail;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: AppCardDecorations.surface,
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 5),
+                Text(
+                  formatMoney(amount),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _AvailableBalanceCard extends StatelessWidget {
   const _AvailableBalanceCard({
@@ -1321,7 +2049,7 @@ class _AvailableBalanceCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Dinero separado',
+                  'Efectivo + digital',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
@@ -1349,7 +2077,7 @@ class _AvailableBalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _BalanceMediumLine(
-            label: 'Libre por distribuir',
+            label: 'Pendiente de asignación',
             amount: data.balanceBreakdown.unclassified,
           ),
           const SizedBox(height: 12),
@@ -1391,111 +2119,115 @@ class _BalanceMediumLine extends StatelessWidget {
   }
 }
 
-class _MetricsGrid extends StatelessWidget {
-  const _MetricsGrid({required this.data});
+class _RecentExpensesPanel extends StatelessWidget {
+  const _RecentExpensesPanel({required this.expenses});
 
-  final _DashboardData data;
+  final List<Gasto> expenses;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = constraints.maxWidth >= 680
-            ? (constraints.maxWidth - 24) / 3
-            : constraints.maxWidth;
-
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            SizedBox(
-              width: cardWidth,
-              child: _DashboardMetric(
-                icon: Icons.south_west_rounded,
-                title: 'Total de ingresos',
-                value: data.cantidadIngresos > 0
-                    ? _formatMoney(data.totalIngresos)
-                    : '—',
-                detail: data.cantidadIngresos > 0
-                    ? _recordCount(data.cantidadIngresos, 'ingreso', 'ingresos')
-                    : 'Todavía no hay ingresos por aquí.',
-              ),
-            ),
-            SizedBox(
-              width: cardWidth,
-              child: _DashboardMetric(
-                icon: Icons.north_east_rounded,
-                title: 'Total de gastos',
-                value: data.cantidadGastos > 0
-                    ? _formatMoney(data.totalGastos)
-                    : '—',
-                detail: data.cantidadGastos > 0
-                    ? _recordCount(data.cantidadGastos, 'gasto', 'gastos')
-                    : 'Todavía no hay gastos por aquí. ¡Ojalá siga así un buen rato!',
-              ),
-            ),
-            SizedBox(
-              width: cardWidth,
-              child: _DashboardMetric(
-                icon: Icons.pie_chart_outline_rounded,
-                title: 'Gastado de ingresos',
-                value: data.porcentajeGastado == null
-                    ? '—'
-                    : '${_formatPercent(data.porcentajeGastado!)}%',
-                detail: data.porcentajeGastado == null
-                    ? 'Agrega ingresos para ver este porcentaje.'
-                    : 'Incluye gastos y pagos de deuda.',
-              ),
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeading('Gastos recientes'),
+          const SizedBox(height: 10),
+          if (expenses.isEmpty)
+            const _EmptyMessage('Todavía no hay gastos registrados.'),
+          for (var index = 0; index < expenses.length; index++) ...[
+            if (index > 0) const Divider(height: 18),
+            Row(
+              children: [
+                const Icon(
+                  Icons.north_east_rounded,
+                  color: AppColors.primary,
+                  size: 19,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        expenses[index].nombre,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        '${expenses[index].categoria} · '
+                        '${MoneyMedium.fromStorage(expenses[index].medio)?.label ?? 'Medio sin clasificar'}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(formatMoney(expenses[index].monto)),
+              ],
             ),
           ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
-class _DashboardMetric extends StatelessWidget {
-  const _DashboardMetric({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.detail,
+class _UpcomingSubscriptionsPanel extends StatelessWidget {
+  const _UpcomingSubscriptionsPanel({
+    required this.subscriptions,
+    required this.onViewAll,
   });
 
-  final IconData icon;
-  final String title;
-  final String value;
-  final String detail;
+  final List<Suscripcion> subscriptions;
+  final VoidCallback? onViewAll;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppCardDecorations.surface,
+    return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: AppColors.primary, size: 19),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
+          const _SectionHeading('Próximos pagos de suscripciones'),
+          const SizedBox(height: 10),
+          if (subscriptions.isEmpty)
+            const _EmptyMessage('No tienes pagos de suscripción próximos.'),
+          for (var index = 0; index < subscriptions.length; index++) ...[
+            if (index > 0) const Divider(height: 18),
+            Row(
+              children: [
+                const Icon(
+                  Icons.autorenew_rounded,
+                  color: AppColors.primary,
+                  size: 19,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subscriptions[index].nombre,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        _shortDate(subscriptions[index].proximoPago),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(formatMoney(subscriptions[index].precio)),
+              ],
+            ),
+          ],
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton(
+              onPressed: onViewAll,
+              child: const Text('Ver suscripciones'),
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontSize: 21),
-          ),
-          const SizedBox(height: 6),
-          Text(detail, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );

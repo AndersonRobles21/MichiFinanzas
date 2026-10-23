@@ -14,13 +14,15 @@ Su objetivo es ofrecer una herramienta práctica para llevar el control financie
 
 MichiFinanzas reúne diferentes herramientas para administrar las finanzas personales desde una sola aplicación.
 
-- **Registro de ingresos:** permite registrar el dinero que entra y mantener un control de los ingresos acumulados.
+- **Registro de ingresos:** permite repartir cada ingreso entre efectivo y una o varias cuentas digitales; no se guarda hasta que la suma coincida con el valor recibido.
+- **Cuentas y saldos:** organiza el saldo entre efectivo y cuentas digitales personalizadas, con movimientos asociados a cada cuenta.
+- **Transferencias internas:** mueve dinero entre medios o cuentas sin contarlo dos veces como ingreso o gasto.
 - **Control de gastos:** permite registrar los gastos realizados, clasificarlos por categoría y editar los registros cuando sea necesario.
 - **Administración de deudas:** facilita el seguimiento de obligaciones económicas, cuotas, abonos y saldos pendientes.
 - **Gastos futuros:** permite organizar gastos previstos y confirmar o cancelar las reservas de dinero correspondientes.
 - **Estadísticas financieras:** presenta información visual para comprender cómo se distribuyen los gastos y cómo se utiliza el dinero.
 - **Seguimiento del ahorro:** ofrece herramientas para visualizar y organizar el dinero disponible para ahorrar.
-- **Suscripciones:** registra cobros recurrentes y calcula su equivalente mensual sin crear gastos automáticamente.
+- **Suscripciones:** administra servicios recurrentes y permite confirmar pagos reales. Cada pago se guarda como gasto en la categoría protegida “Suscripción”, descuenta el medio elegido y actualiza el próximo vencimiento en una operación atómica.
 - **Configuración:** permite gestionar las opciones disponibles de la aplicación.
 - **Navegación lateral:** permite acceder desde un solo menú a todas las secciones de la aplicación.
 - **Formato de dinero:** utiliza puntos como separadores de miles para facilitar la lectura de cantidades grandes, por ejemplo, `$ 50.000`.
@@ -31,13 +33,13 @@ MichiFinanzas reúne diferentes herramientas para administrar las finanzas perso
 
 ### 1. Inicio
 
-Es la pantalla principal de MichiFinanzas. Desde allí se puede consultar un resumen de la situación financiera y abrir el menú lateral para acceder a las diferentes secciones.
+Es la pantalla principal de MichiFinanzas. Presenta el total junto con efectivo y digital, resume las primeras cuentas digitales, y muestra ingresos del mes, gastos recientes, próximas suscripciones y gastos futuros. También ofrece accesos a registrar ingresos y gastos, consultar el historial, distribuir fondos y administrar las cuentas.
 
 Su propósito es ofrecer una visión general del dinero registrado y facilitar el acceso a las funciones más utilizadas.
 
 ### 2. Ingresos
 
-Este módulo permite agregar dinero a las finanzas personales mediante tres tipos de ingreso:
+Este módulo independiente muestra el historial de ingresos y permite agregar, editar o eliminar registros. Cada nuevo ingreso debe distribuirse completamente entre efectivo y cuentas digitales; se pueden combinar varios destinos en una sola operación. Admite tres tipos de ingreso:
 
 - **Sueldo:** dinero recibido por el trabajo.
 - **Extra:** ingresos adicionales.
@@ -60,6 +62,8 @@ Entre sus funcionalidades se encuentran:
 - Visualizar las cantidades utilizando separadores de miles.
 
 La clasificación de los gastos permite identificar en qué se utiliza el dinero y facilita el análisis posterior.
+
+Las categorías se pueden crear y renombrar desde Configuración. Una categoría con gastos asociados no se puede eliminar para proteger el historial.
 
 ### 4. Deudas
 
@@ -105,13 +109,13 @@ Su finalidad es facilitar la revisión del dinero destinado a objetivos de ahorr
 
 ### 8. Suscripciones
 
-Permite registrar y administrar servicios recurrentes con precio, frecuencia, próxima fecha de cobro y medio de pago habitual opcional. Muestra el costo mensual equivalente y el compromiso anual estimado; los cobros no se registran automáticamente como gastos.
+Permite crear, editar, cancelar y reactivar servicios recurrentes con precio, frecuencia, próxima fecha de cobro y medio de pago habitual. La acción **Pagar** solicita confirmación y el origen (efectivo o una cuenta digital concreta), valida el saldo, registra el gasto asociado a la categoría protegida “Suscripción” y avanza el vencimiento dentro de una transacción. El historial de pagos se conserva incluso al cancelar una suscripción; no se realizan cobros automáticos.
 
-Los datos de suscripciones se almacenan en SQLite local y se conservan al reiniciar la aplicación.
+Los datos de suscripciones y pagos se almacenan en SQLite local y se conservan al reiniciar la aplicación. La migración de esquema v15 agrega el estado de suscripción, la cuenta digital habitual y los vínculos únicos de período entre pagos y suscripciones; v16 agrega destinos persistentes para ingresos distribuidos. Ambas migraciones son aditivas.
 
 ### 9. Configuración
 
-Contiene las opciones de configuración disponibles en la aplicación. Su implementación está separada de los módulos financieros para facilitar el mantenimiento del código.
+Permite guardar o cambiar el nombre local del usuario, administrar las categorías de gastos y crear o renombrar cuentas digitales. Las cuentas con historial no se eliminan; las transferencias internas se pueden consultar, editar o revertir desde esta sección.
 
 ---
 

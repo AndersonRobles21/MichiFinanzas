@@ -28,6 +28,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Future<_ExpensesData>? _expensesFuture;
   AppSettings _settings = AppSettings.defaults();
   List<Gasto>? _loadedExpenses;
+  List<CuentasDigitale> _loadedAccounts = const [];
 
   @override
   void initState() {
@@ -73,16 +74,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final results = await Future.wait<Object>([
       _databaseService.obtenerTodosLosPagosDeuda(),
       _databaseService.obtenerDeudas(),
+      _databaseService.obtenerCuentasDigitales(),
     ]);
     final data = _ExpensesData(
       expenses: sortedExpenses,
       debtPayments: results[0] as List<PagosDeudaData>,
       debts: results[1] as List<Deuda>,
+      accounts: (results[2] as List<DigitalAccountBalance>)
+          .map((item) => item.account)
+          .toList(),
     );
     if (mounted) {
-      setState(() => _loadedExpenses = sortedExpenses);
+      setState(() {
+        _loadedExpenses = sortedExpenses;
+        _loadedAccounts = data.accounts;
+      });
     } else {
       _loadedExpenses = sortedExpenses;
+      _loadedAccounts = data.accounts;
     }
     return data;
   }
@@ -101,7 +110,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.surface,
-      builder: (context) => _ExpenseFormSheet(categories: categories),
+      builder: (context) =>
+          _ExpenseFormSheet(categories: categories, accounts: _loadedAccounts),
     );
     if (draft == null || !mounted) return;
 
@@ -113,6 +123,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         fecha: draft.fecha,
         nota: draft.nota,
         medio: draft.medio,
+        cuentaDigitalId: draft.digitalAccountId,
       );
       final expenses = _sortExpenses(await _databaseService.obtenerGastos());
       if (!mounted) return;
@@ -141,8 +152,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.surface,
-      builder: (context) =>
-          _ExpenseFormSheet(categories: categories, expense: expense),
+      builder: (context) => _ExpenseFormSheet(
+        categories: categories,
+        accounts: _loadedAccounts,
+        expense: expense,
+      ),
     );
     if (draft == null || !mounted) return;
 
@@ -155,6 +169,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         fecha: draft.fecha,
         nota: draft.nota,
         medio: draft.medio,
+        cuentaDigitalId: draft.digitalAccountId,
       );
       final expenses = _sortExpenses(await _databaseService.obtenerGastos());
       if (!mounted) return;
@@ -362,6 +377,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 child: entry.expense != null
                                     ? _ExpenseTile(
                                         expense: entry.expense!,
+                                        mediumLabel: _moneyMediumLabel(
+                                          entry.expense!.medio,
+                                          entry.expense!.cuentaDigitalId,
+                                          _loadedAccounts,
+                                        ),
                                         onEdit: () =>
                                             _editExpense(entry.expense!),
                                         onDelete: () =>
@@ -395,6 +415,7 @@ class _ExpenseDraft {
     required this.fecha,
     required this.nota,
     required this.medio,
+    required this.digitalAccountId,
   });
 
   final String nombre;
@@ -403,6 +424,7 @@ class _ExpenseDraft {
   final DateTime fecha;
   final String? nota;
   final MoneyMedium? medio;
+  final int? digitalAccountId;
 }
 
 class _ExpensesData {
@@ -410,11 +432,13 @@ class _ExpensesData {
     required this.expenses,
     required this.debtPayments,
     required this.debts,
+    required this.accounts,
   });
 
   final List<Gasto> expenses;
   final List<PagosDeudaData> debtPayments;
   final List<Deuda> debts;
+  final List<CuentasDigitale> accounts;
 }
 
 class _ExpenseHistoryEntry {
@@ -444,9 +468,14 @@ class _ExpenseHistoryEntry {
 }
 
 class _ExpenseFormSheet extends StatefulWidget {
-  const _ExpenseFormSheet({required this.categories, this.expense});
+  const _ExpenseFormSheet({
+    required this.categories,
+    required this.accounts,
+    this.expense,
+  });
 
   final List<String> categories;
+  final List<CuentasDigitale> accounts;
   final Gasto? expense;
 
   @override
@@ -460,6 +489,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
   late final TextEditingController _noteController;
   String? _category;
   late MoneyMedium? _medium;
+  int? _digitalAccountId;
   late DateTime _date;
 
   @override
@@ -474,6 +504,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
     _medium = expense == null
         ? MoneyMedium.cash
         : MoneyMedium.fromStorage(expense.medio);
+    _digitalAccountId = expense?.cuentaDigitalId;
     _category = expense == null
         ? null
         : AppSettingsService.normalizeCategory(expense.categoria);
@@ -511,6 +542,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
         nota: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
+        digitalAccountId: _digitalAccountId,
       ),
     );
   }
@@ -553,8 +585,29 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                   selected: _medium,
                   title: 'Medio de pago',
                   allowUnclassified: widget.expense != null,
-                  onChanged: (medium) => setState(() => _medium = medium),
+                  onChanged: (medium) => setState(() {
+                    _medium = medium;
+                    if (medium != MoneyMedium.digital) {
+                      _digitalAccountId = null;
+                    }
+                  }),
                 ),
+                if (_medium == MoneyMedium.digital) ...[
+                  const SizedBox(height: 12),
+                  DigitalAccountSelector(
+                    accounts: widget.accounts,
+                    selectedId: _digitalAccountId,
+                    onChanged: (value) =>
+                        setState(() => _digitalAccountId = value),
+                  ),
+                  if (widget.accounts.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Agrega una cuenta digital en Configuración antes de elegir ese medio.',
+                      ),
+                    ),
+                ],
                 const SizedBox(height: 14),
                 TextFormField(
                   key: const ValueKey('expense-amount'),
@@ -686,7 +739,13 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: _save,
+                        onPressed:
+                            _medium == MoneyMedium.digital &&
+                                !widget.accounts.any(
+                                  (account) => account.id == _digitalAccountId,
+                                )
+                            ? null
+                            : _save,
                         icon: const Icon(Icons.save_outlined),
                         label: Text(
                           widget.expense == null
@@ -785,11 +844,13 @@ class _SummaryValue extends StatelessWidget {
 class _ExpenseTile extends StatelessWidget {
   const _ExpenseTile({
     required this.expense,
+    required this.mediumLabel,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Gasto expense;
+  final String mediumLabel;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -831,6 +892,10 @@ class _ExpenseTile extends StatelessWidget {
                     Text(
                       _formatDate(expense.fecha),
                       style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Text(
+                      mediumLabel,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
@@ -934,6 +999,20 @@ class _CategoryTag extends StatelessWidget {
       ),
     );
   }
+}
+
+String _moneyMediumLabel(
+  String? storageValue,
+  int? accountId,
+  List<CuentasDigitale> accounts,
+) {
+  final medium = MoneyMedium.fromStorage(storageValue);
+  if (accountId != null) {
+    for (final account in accounts) {
+      if (account.id == accountId) return account.nombre;
+    }
+  }
+  return medium?.label ?? 'Medio sin clasificar';
 }
 
 class _ExpensesMessage extends StatelessWidget {

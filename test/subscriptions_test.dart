@@ -27,12 +27,12 @@ void main() {
         precio: 100,
         proximoPago: date,
         frecuencia: SubscriptionFrequency.monthly,
-        medio: MoneyMedium.digital,
+        medio: MoneyMedium.cash,
       );
       var subscription = (await service.obtenerSuscripciones()).single;
       expect(subscription.id, id);
       expect(subscription.nombre, 'Spotify');
-      expect(subscription.medio, MoneyMedium.digital.storageValue);
+      expect(subscription.medio, MoneyMedium.cash.storageValue);
 
       await service.actualizarSuscripcion(
         id: id,
@@ -40,6 +40,7 @@ void main() {
         precio: 1200,
         proximoPago: date.add(const Duration(days: 2)),
         frecuencia: SubscriptionFrequency.yearly,
+        medio: MoneyMedium.cash,
       );
       subscription = (await service.obtenerSuscripciones()).single;
       expect(subscription.nombre, 'Música');
@@ -48,10 +49,10 @@ void main() {
         subscription.frecuencia,
         SubscriptionFrequency.yearly.storageValue,
       );
-      expect(subscription.medio, isNull);
+      expect(subscription.medio, MoneyMedium.cash.storageValue);
 
       await service.eliminarSuscripcion(id);
-      expect(await service.obtenerSuscripciones(), isEmpty);
+      expect((await service.obtenerSuscripciones()).single.activa, isFalse);
     } finally {
       await service.close();
     }
@@ -87,6 +88,7 @@ void main() {
         precio: 1200,
         proximoPago: DateTime(2027, 10, 15),
         frecuencia: SubscriptionFrequency.yearly,
+        medio: MoneyMedium.cash,
       );
       expect(await service.obtenerSuscripciones(), hasLength(1));
       expect(
@@ -97,6 +99,123 @@ void main() {
       await service.close();
     }
   });
+
+  test(
+    'distribuye un ingreso entre efectivo y cuentas y valida el total',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final service = DatabaseService(database);
+      try {
+        final accountId = await service.crearCuentaDigital('Nequi');
+        await expectLater(
+          service.agregarIngreso(
+            monto: 100,
+            fecha: DateTime(2026, 10, 20),
+            destinos: [
+              const IncomeDestination(medio: MoneyMedium.cash, monto: 40),
+              IncomeDestination(
+                medio: MoneyMedium.digital,
+                monto: 60,
+                cuentaDigitalId: accountId,
+              ),
+            ],
+          ),
+          completes,
+        );
+        final balance = await service.obtenerSaldosPorMedio();
+        expect(balance.total, 100);
+        expect(balance.cash, 40);
+        expect(balance.digital, 60);
+        expect((await service.obtenerCuentasDigitales()).single.balance, 60);
+
+        await expectLater(
+          service.agregarIngreso(
+            monto: 100,
+            fecha: DateTime(2026, 10, 21),
+            destinos: const [
+              IncomeDestination(medio: MoneyMedium.cash, monto: 90),
+            ],
+          ),
+          throwsA(isA<DatabaseServiceException>()),
+        );
+        expect(await service.obtenerIngresos(), hasLength(1));
+      } finally {
+        await service.close();
+      }
+    },
+  );
+
+  test(
+    'paga suscripción una vez y conserva gasto y vencimiento atómicos',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final service = DatabaseService(database);
+      final date = DateTime(2026, 10, 20);
+      try {
+        final accountId = await service.crearCuentaDigital('Nequi');
+        await service.agregarIngreso(
+          monto: 500,
+          fecha: date,
+          medio: MoneyMedium.digital,
+          cuentaDigitalId: accountId,
+        );
+        final subscriptionId = await service.agregarSuscripcion(
+          nombre: 'Spotify',
+          precio: 120,
+          proximoPago: date,
+          frecuencia: SubscriptionFrequency.monthly,
+          medio: MoneyMedium.digital,
+          cuentaDigitalId: accountId,
+        );
+        await service.pagarSuscripcion(
+          suscripcionId: subscriptionId,
+          periodoEsperado: date,
+          medio: MoneyMedium.digital,
+          cuentaDigitalId: accountId,
+          fecha: date,
+        );
+
+        final balance = await service.obtenerSaldosPorMedio();
+        expect(balance.total, 380);
+        expect(balance.digital, 380);
+        expect((await service.obtenerCuentasDigitales()).single.balance, 380);
+        final payment = (await service.obtenerPagosSuscripcion(
+          subscriptionId,
+        )).single;
+        expect(payment.nombre, 'Spotify');
+        expect(payment.categoria, DatabaseService.subscriptionCategory);
+        expect(payment.monto, 120);
+        expect(
+          (await service.obtenerSuscripciones()).single.proximoPago,
+          DateTime(2026, 11, 20),
+        );
+
+        await expectLater(
+          service.pagarSuscripcion(
+            suscripcionId: subscriptionId,
+            periodoEsperado: date,
+            medio: MoneyMedium.digital,
+            cuentaDigitalId: accountId,
+            fecha: date,
+          ),
+          throwsA(isA<DatabaseServiceException>()),
+        );
+        expect(
+          await service.obtenerPagosSuscripcion(subscriptionId),
+          hasLength(1),
+        );
+        expect((await service.obtenerSaldosPorMedio()).total, 380);
+        await service.cancelarSuscripcion(subscriptionId);
+        expect((await service.obtenerSuscripciones()).single.activa, isFalse);
+        expect(
+          await service.obtenerPagosSuscripcion(subscriptionId),
+          hasLength(1),
+        );
+      } finally {
+        await service.close();
+      }
+    },
+  );
 
   testWidgets('permite crear, editar y eliminar desde Suscripciones', (
     tester,
@@ -129,7 +248,6 @@ void main() {
     await tester.tap(find.text('Guardar'));
     await tester.pumpAndSettle();
     await _pumpUntilFound(tester, find.text('Spotify'));
-    expect(find.textContaining(r'$ 120 por cobro'), findsOneWidget);
     expect(find.textContaining(r'$ 120 / mes'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Acciones de Spotify'));
@@ -154,17 +272,14 @@ void main() {
 
     await tester.tap(find.byTooltip('Acciones de Spotify'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Eliminar'));
+    await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Eliminar').last);
+    await tester.tap(find.text('Cancelar suscripción').last);
     await tester.pumpAndSettle();
     await tester.runAsync(() async {
-      expect(await service.obtenerSuscripciones(), isEmpty);
+      expect((await service.obtenerSuscripciones()).single.activa, isFalse);
     });
-    await _pumpUntilFound(
-      tester,
-      find.text('Todavía no tienes suscripciones.'),
-    );
+    expect(find.text('Spotify'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../database/app_database.dart';
 import '../models/money_medium.dart';
 
 class MoneyMediumSelector extends StatelessWidget {
@@ -53,6 +54,50 @@ class MoneyMediumSelector extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+class DigitalAccountSelector extends StatelessWidget {
+  const DigitalAccountSelector({
+    super.key,
+    required this.accounts,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  final List<CuentasDigitale> accounts;
+  final int? selectedId;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (accounts.isEmpty) {
+      return Text(
+        'Puedes crear una cuenta digital desde Configuración.',
+        style: Theme.of(context).textTheme.bodySmall,
+      );
+    }
+    return DropdownButtonFormField<int?>(
+      key: const ValueKey('digital-account-selector'),
+      initialValue: selectedId,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Cuenta digital',
+        prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+      ),
+      items: [
+        const DropdownMenuItem<int?>(
+          value: null,
+          child: Text('Sin cuenta asignada'),
+        ),
+        for (final account in accounts)
+          DropdownMenuItem<int?>(
+            value: account.id,
+            child: Text(account.nombre),
+          ),
+      ],
+      onChanged: onChanged,
     );
   }
 }

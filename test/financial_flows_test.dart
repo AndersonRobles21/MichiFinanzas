@@ -3,7 +3,15 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show ValueKey;
 import 'package:flutter/material.dart'
-    show MaterialApp, Scaffold, Size, SizedBox, Text;
+    show
+        DropdownButtonFormField,
+        FilledButton,
+        ListView,
+        MaterialApp,
+        Scaffold,
+        Size,
+        SizedBox,
+        Text;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
@@ -328,9 +336,9 @@ void main() {
         );
         expect(await service.obtenerSaldoDisponible(), 1500);
         var balances = await service.obtenerSaldosPorMedio();
-        expect(balances.cash, 0);
-        expect(balances.digital, 0);
-        expect(balances.unclassified, 1500);
+        expect(balances.cash, 1000);
+        expect(balances.digital, 500);
+        expect(balances.unclassified, 0);
         await service.distribuirSaldoDisponible(efectivo: 1000, digital: 500);
 
         await service.actualizarIngreso(
@@ -352,16 +360,11 @@ void main() {
           MoneyMedium.digital.storageValue,
         );
         balances = await service.obtenerSaldosPorMedio();
-        expect(balances.cash, 1000);
-        expect(balances.digital, 500);
-        expect(balances.unclassified, 200);
+        expect(balances.cash, 0);
+        expect(balances.digital, 1700);
+        expect(balances.unclassified, 0);
         expect(balances.total, 1700);
 
-        await expectLater(
-          service.eliminarIngreso(extraId),
-          throwsA(isA<DatabaseServiceException>()),
-        );
-        await service.distribuirSaldoDisponible(efectivo: 1000, digital: 200);
         await service.eliminarIngreso(extraId);
         incomes = await service.obtenerIngresos();
         expect(incomes, hasLength(1));
@@ -381,7 +384,7 @@ void main() {
           monto: 100,
           fecha: date,
           operationId: 'income-edit-payment',
-          medio: MoneyMedium.cash,
+          medio: MoneyMedium.digital,
         );
         await service.actualizarIngreso(
           id: loan.ingresoId,
@@ -428,7 +431,7 @@ void main() {
     },
   );
 
-  testWidgets('crea, edita y elimina ingresos desde el historial de Inicio', (
+  testWidgets('crea, edita y elimina ingresos desde el módulo Ingresos', (
     tester,
   ) async {
     await _prepareTemporaryStorage(tester);
@@ -439,41 +442,60 @@ void main() {
 
     final database = AppDatabase(NativeDatabase.memory());
     final service = DatabaseService(database);
+    await tester.runAsync(() => service.crearCuentaDigital('Nequi'));
     await tester.runAsync(
       () => tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: HomeScreen(databaseService: service)),
+          home: Scaffold(body: IncomesScreen(databaseService: service)),
         ),
       ),
     );
-    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+    await _pumpUntilFound(tester, find.text('Ingresos registrados'));
 
-    await _recordIncome(tester, 'Sueldo', 'Quincena', '600');
-    await _pumpUntilMonthlyReceived(tester, 600);
+    await _recordIncomeInHistory(tester, 'Quincena', '600');
     final incomeActions = find.byTooltip('Acciones del ingreso');
+    await _pumpUntilFound(tester, incomeActions);
     await tester.ensureVisible(incomeActions);
     await tester.tap(incomeActions);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Editar'));
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('income-description')),
+    );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('income-description')),
+    );
     await tester.enterText(
       find.byKey(const ValueKey('income-description')),
       'Sueldo corregido',
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('income-amount')));
     await tester.enterText(find.byKey(const ValueKey('income-amount')), '800');
+    await tester.enterText(
+      find.byKey(const ValueKey('income-destination-amount-0')),
+      '800',
+    );
     await tester.tap(find.byKey(const ValueKey('income-type')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(IncomeType.extra.label).last);
     await tester.pumpAndSettle();
-    final digitalMedium = find.text('Digital').last;
-    await tester.ensureVisible(digitalMedium);
-    await tester.tap(digitalMedium);
+    await tester.tap(find.byType(DropdownButtonFormField<MoneyMedium>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Digital').last);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('income-destination-account-0')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nequi').last);
     await tester.pumpAndSettle();
     final saveChanges = find.text('Guardar cambios');
     await tester.ensureVisible(saveChanges);
     await tester.tap(saveChanges);
     await tester.pumpAndSettle();
-    await _pumpUntilMonthlyReceived(tester, 800);
+    await _pumpUntilFound(tester, find.text('Sueldo corregido'));
 
     await tester.runAsync(() async {
       final incomes = await service.obtenerIngresos();
@@ -493,7 +515,12 @@ void main() {
     expect(find.text('¿Eliminar este ingreso?'), findsOneWidget);
     await tester.tap(find.text('Eliminar ingreso'));
     await tester.pumpAndSettle();
-    await _pumpUntilMonthlyReceived(tester, 0);
+    await _pumpUntilFound(
+      tester,
+      find.text(
+        'Todavía no hay ingresos por aquí. Registra tu sueldo, un extra o un préstamo recibido.',
+      ),
+    );
     await tester.runAsync(() async {
       expect(await service.obtenerIngresos(), isEmpty);
       expect(await service.obtenerSaldoDisponible(), 0);
@@ -545,9 +572,17 @@ void main() {
     await tester.tap(find.text('Guardar distribución'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('Sobran'), findsOneWidget);
     expect(
-      find.text('La suma no puede superar el total disponible.'),
-      findsOneWidget,
+      tester
+          .widget<FilledButton>(
+            find.ancestor(
+              of: find.text('Guardar distribución'),
+              matching: find.byType(FilledButton),
+            ),
+          )
+          .onPressed,
+      isNull,
     );
 
     await tester.enterText(
@@ -558,7 +593,19 @@ void main() {
       find.byKey(const ValueKey('distribution-digital')),
       '200',
     );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Guardar distribución'));
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.ancestor(
+              of: find.text('Guardar distribución'),
+              matching: find.byType(FilledButton),
+            ),
+          )
+          .onPressed,
+      isNotNull,
+    );
     await tester.tap(find.text('Guardar distribución'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -823,11 +870,11 @@ void main() {
         await service.distribuirSaldoDisponible(efectivo: 600, digital: 200);
         expect(await service.obtenerSaldoDisponible(), 800);
 
-        await service.distribuirSaldoDisponible(efectivo: 350, digital: 250);
+        await service.distribuirSaldoDisponible(efectivo: 550, digital: 250);
         final balances = await service.obtenerSaldosPorMedio();
-        expect(balances.cash, 350);
+        expect(balances.cash, 550);
         expect(balances.digital, 250);
-        expect(balances.unclassified, 200);
+        expect(balances.unclassified, 0);
         expect(balances.total, 800);
         expect(await service.obtenerSaldoDisponible(), 800);
       } finally {
@@ -1245,9 +1292,10 @@ void main() {
           'Aceo Personal',
           'Resivos xd',
           'Otros',
+          AppSettingsService.subscriptionCategory,
         ]),
       );
-      expect(defaults, hasLength(8));
+      expect(defaults, hasLength(9));
 
       final legacySettingsWithoutCategories = AppSettings.fromJson({
         'currencyCode': 'COP',
@@ -1274,6 +1322,7 @@ void main() {
         'Comida para bichos',
         'Transporte personalizado',
         'Mascotas',
+        AppSettingsService.subscriptionCategory,
       ];
       late AppSettings settings;
       late Map<String, dynamic> persisted;
@@ -1593,6 +1642,10 @@ Future<void> _recordIncome(
 ) async {
   await tester.ensureVisible(find.text('Agregar dinero'));
   await tester.tap(find.text('Agregar dinero'));
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('income-description')),
+  );
   await tester.pumpAndSettle();
   if (type != 'Sueldo') {
     await tester.tap(find.byKey(const ValueKey('income-type')));
@@ -1605,17 +1658,54 @@ Future<void> _recordIncome(
     description,
   );
   await tester.enterText(find.byKey(const ValueKey('income-amount')), amount);
+  await tester.enterText(
+    find.byKey(const ValueKey('income-destination-amount-0')),
+    amount,
+  );
   if (type == 'Préstamo recibido') {
     await tester.enterText(
       find.byKey(const ValueKey('income-installments')),
       '5',
     );
   }
-  await tester.tap(
-    find.text(
-      type == 'Préstamo recibido' ? 'Registrar préstamo' : 'Guardar ingreso',
-    ),
+  final saveButton = find.text(
+    type == 'Préstamo recibido' ? 'Registrar préstamo' : 'Guardar ingreso',
   );
+  await tester.ensureVisible(saveButton);
+  await tester.pumpAndSettle();
+  await tester.tap(saveButton);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _recordIncomeInHistory(
+  WidgetTester tester,
+  String description,
+  String amount,
+) async {
+  final addButton = find.text('Registrar ingreso');
+  await tester.drag(find.byType(ListView), const Offset(0, -600));
+  await tester.pumpAndSettle();
+  await _pumpUntilFound(tester, addButton);
+  await tester.ensureVisible(addButton);
+  await tester.tap(addButton);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('income-description')),
+  );
+  await tester.pumpAndSettle();
+  await tester.enterText(
+    find.byKey(const ValueKey('income-description')),
+    description,
+  );
+  await tester.enterText(find.byKey(const ValueKey('income-amount')), amount);
+  await tester.enterText(
+    find.byKey(const ValueKey('income-destination-amount-0')),
+    amount,
+  );
+  final save = find.text('Guardar ingreso');
+  await tester.ensureVisible(save);
+  await tester.pumpAndSettle();
+  await tester.tap(save);
   await tester.pumpAndSettle();
 }
 

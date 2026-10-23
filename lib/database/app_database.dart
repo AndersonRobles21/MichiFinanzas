@@ -15,6 +15,12 @@ class Ingresos extends Table {
   TextColumn get descripcion => text().nullable()();
 
   TextColumn get medio => text().nullable()();
+
+  IntColumn get cuentaDigitalId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 }
 
 class Gastos extends Table {
@@ -31,6 +37,20 @@ class Gastos extends Table {
   TextColumn get nota => text().nullable()();
 
   TextColumn get medio => text().nullable()();
+
+  IntColumn get cuentaDigitalId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
+  IntColumn get suscripcionId => integer().nullable().references(
+    Suscripciones,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
+  DateTimeColumn get suscripcionPeriodo => dateTime().nullable()();
 }
 
 class Deudas extends Table {
@@ -171,9 +191,66 @@ class AsignacionesDinero extends Table {
 
   RealColumn get monto => real()();
 
+  IntColumn get cuentaDigitalId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
   TextColumn get origen => text().nullable()();
 
   IntColumn get origenId => integer().nullable()();
+}
+
+class CuentasDigitales extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get nombre => text()();
+}
+
+class IngresoDistribuciones extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get ingresoId =>
+      integer().references(Ingresos, #id, onDelete: KeyAction.cascade)();
+
+  TextColumn get medio => text()();
+
+  RealColumn get monto => real()();
+
+  IntColumn get cuentaDigitalId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+}
+
+class TransferenciasDinero extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get medioOrigen => text()();
+
+  @ReferenceName('sourceTransfers')
+  IntColumn get cuentaOrigenId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
+  TextColumn get medioDestino => text()();
+
+  @ReferenceName('destinationTransfers')
+  IntColumn get cuentaDestinoId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
+  RealColumn get monto => real()();
+
+  DateTimeColumn get fecha => dateTime()();
+
+  TextColumn get nota => text().nullable()();
 }
 
 @DataClassName('Suscripcion')
@@ -189,6 +266,14 @@ class Suscripciones extends Table {
   TextColumn get frecuencia => text()();
 
   TextColumn get medio => text().nullable()();
+
+  IntColumn get cuentaDigitalId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
+  BoolColumn get activa => boolean().withDefault(const Constant(true))();
 }
 
 @DriftDatabase(
@@ -203,6 +288,9 @@ class Suscripciones extends Table {
     GastosFuturos,
     MovimientosReservaGastoFuturo,
     AsignacionesDinero,
+    CuentasDigitales,
+    IngresoDistribuciones,
+    TransferenciasDinero,
     Suscripciones,
   ],
 )
@@ -210,7 +298,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -224,6 +312,15 @@ class AppDatabase extends _$AppDatabase {
         'CREATE UNIQUE INDEX asignaciones_dinero_origen_unique '
         'ON asignaciones_dinero (origen, origen_id) '
         'WHERE origen IS NOT NULL AND origen_id IS NOT NULL',
+      );
+      await customStatement(
+        'CREATE UNIQUE INDEX gastos_suscripcion_periodo_unique '
+        'ON gastos (suscripcion_id, suscripcion_periodo) '
+        'WHERE suscripcion_id IS NOT NULL AND suscripcion_periodo IS NOT NULL',
+      );
+      await customStatement(
+        'CREATE INDEX ingreso_distribuciones_ingreso_id '
+        'ON ingreso_distribuciones (ingreso_id)',
       );
     },
     onUpgrade: (migrator, from, to) async {
@@ -300,6 +397,100 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 11) {
         await migrator.createTable(suscripciones);
+      }
+      if (from < 12) {
+        await migrator.createTable(cuentasDigitales);
+        if (from >= 10) {
+          final assignmentTable = await customSelect(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'asignaciones_dinero'",
+          ).getSingleOrNull();
+          if (assignmentTable == null) {
+            await migrator.createTable(asignacionesDinero);
+            await customStatement(
+              'CREATE UNIQUE INDEX asignaciones_dinero_origen_unique '
+              'ON asignaciones_dinero (origen, origen_id) '
+              'WHERE origen IS NOT NULL AND origen_id IS NOT NULL',
+            );
+          } else {
+            await migrator.addColumn(
+              asignacionesDinero,
+              asignacionesDinero.cuentaDigitalId,
+            );
+          }
+        }
+      }
+      if (from < 13) {
+        await migrator.createTable(transferenciasDinero);
+      }
+      if (from < 14) {
+        final incomeTable = await customSelect(
+          "SELECT name FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'ingresos'",
+        ).getSingleOrNull();
+        if (incomeTable != null) {
+          await migrator.addColumn(ingresos, ingresos.cuentaDigitalId);
+        }
+        final expenseTable = await customSelect(
+          "SELECT name FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'gastos'",
+        ).getSingleOrNull();
+        if (expenseTable != null) {
+          await migrator.addColumn(gastos, gastos.cuentaDigitalId);
+        }
+      }
+      if (from < 15) {
+        final expensesTable = await customSelect(
+          "SELECT name FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'gastos'",
+        ).getSingleOrNull();
+        if (expensesTable != null) {
+          final expenseColumns = await customSelect(
+            "PRAGMA table_info('gastos')",
+          ).get();
+          final expenseColumnNames = expenseColumns
+              .map((row) => row.read<String>('name'))
+              .toSet();
+          if (!expenseColumnNames.contains('suscripcion_id')) {
+            await migrator.addColumn(gastos, gastos.suscripcionId);
+          }
+          if (!expenseColumnNames.contains('suscripcion_periodo')) {
+            await migrator.addColumn(gastos, gastos.suscripcionPeriodo);
+          }
+          await customStatement(
+            'CREATE UNIQUE INDEX gastos_suscripcion_periodo_unique '
+            'ON gastos (suscripcion_id, suscripcion_periodo) '
+            'WHERE suscripcion_id IS NOT NULL AND suscripcion_periodo IS NOT NULL',
+          );
+        }
+        final subscriptionsTable = await customSelect(
+          "SELECT name FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'suscripciones'",
+        ).getSingleOrNull();
+        if (subscriptionsTable != null) {
+          final subscriptionColumns = await customSelect(
+            "PRAGMA table_info('suscripciones')",
+          ).get();
+          final subscriptionColumnNames = subscriptionColumns
+              .map((row) => row.read<String>('name'))
+              .toSet();
+          if (!subscriptionColumnNames.contains('cuenta_digital_id')) {
+            await migrator.addColumn(
+              suscripciones,
+              suscripciones.cuentaDigitalId,
+            );
+          }
+          if (!subscriptionColumnNames.contains('activa')) {
+            await migrator.addColumn(suscripciones, suscripciones.activa);
+          }
+        }
+      }
+      if (from < 16) {
+        await migrator.createTable(ingresoDistribuciones);
+        await customStatement(
+          'CREATE INDEX ingreso_distribuciones_ingreso_id '
+          'ON ingreso_distribuciones (ingreso_id)',
+        );
       }
     },
     beforeOpen: (details) async {

@@ -76,14 +76,18 @@ class AppSettingsService {
     'Aceo Personal',
     'Resivos xd',
     'Otros',
+    subscriptionCategory,
   ];
 
+  static const subscriptionCategory = 'Suscripción';
+
   static final _userNamePattern = RegExp(
-    r'^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*$',
+    r'^\p{L}+(?:[ -]\p{L}+)*$',
+    unicode: true,
   );
 
   static String normalizeUserName(String userName) {
-    return userName.trim().replaceAll(RegExp(r' +'), ' ');
+    return userName.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   static bool isValidUserName(String userName) {
@@ -127,7 +131,10 @@ class AppSettingsService {
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('El archivo de ajustes no es válido.');
     }
-    final settings = AppSettings.fromJson(decoded);
+    final parsed = AppSettings.fromJson(decoded);
+    final settings = parsed.copyWith(
+      expenseCategories: _withRequiredCategories(parsed.expenseCategories),
+    );
     final rawCategories = decoded['expenseCategories'];
     if (rawCategories is List) {
       final savedCategories = rawCategories.whereType<String>().toList();
@@ -148,7 +155,7 @@ class AppSettingsService {
       );
     }
     final normalizedSettings = settings.copyWith(
-      expenseCategories: normalizeCategories(settings.expenseCategories),
+      expenseCategories: _withRequiredCategories(settings.expenseCategories),
       userName: userName,
     );
     await settings_storage.writeSettings(
@@ -178,5 +185,16 @@ class AppSettingsService {
       if (first[index] != second[index]) return false;
     }
     return true;
+  }
+
+  List<String> _withRequiredCategories(Iterable<String> categories) {
+    final normalized = normalizeCategories(categories);
+    if (!normalized.any(
+      (category) =>
+          category.trim().toLowerCase() == subscriptionCategory.toLowerCase(),
+    )) {
+      normalized.add(subscriptionCategory);
+    }
+    return normalized;
   }
 }

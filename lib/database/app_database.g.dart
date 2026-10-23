@@ -3,6 +3,198 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class $CuentasDigitalesTable extends CuentasDigitales
+    with TableInfo<$CuentasDigitalesTable, CuentasDigitale> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CuentasDigitalesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nombreMeta = const VerificationMeta('nombre');
+  @override
+  late final GeneratedColumn<String> nombre = GeneratedColumn<String>(
+    'nombre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, nombre];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cuentas_digitales';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CuentasDigitale> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('nombre')) {
+      context.handle(
+        _nombreMeta,
+        nombre.isAcceptableOrUnknown(data['nombre']!, _nombreMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nombreMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CuentasDigitale map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CuentasDigitale(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      nombre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nombre'],
+      )!,
+    );
+  }
+
+  @override
+  $CuentasDigitalesTable createAlias(String alias) {
+    return $CuentasDigitalesTable(attachedDatabase, alias);
+  }
+}
+
+class CuentasDigitale extends DataClass implements Insertable<CuentasDigitale> {
+  final int id;
+  final String nombre;
+  const CuentasDigitale({required this.id, required this.nombre});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['nombre'] = Variable<String>(nombre);
+    return map;
+  }
+
+  CuentasDigitalesCompanion toCompanion(bool nullToAbsent) {
+    return CuentasDigitalesCompanion(id: Value(id), nombre: Value(nombre));
+  }
+
+  factory CuentasDigitale.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CuentasDigitale(
+      id: serializer.fromJson<int>(json['id']),
+      nombre: serializer.fromJson<String>(json['nombre']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'nombre': serializer.toJson<String>(nombre),
+    };
+  }
+
+  CuentasDigitale copyWith({int? id, String? nombre}) =>
+      CuentasDigitale(id: id ?? this.id, nombre: nombre ?? this.nombre);
+  CuentasDigitale copyWithCompanion(CuentasDigitalesCompanion data) {
+    return CuentasDigitale(
+      id: data.id.present ? data.id.value : this.id,
+      nombre: data.nombre.present ? data.nombre.value : this.nombre,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CuentasDigitale(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, nombre);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CuentasDigitale &&
+          other.id == this.id &&
+          other.nombre == this.nombre);
+}
+
+class CuentasDigitalesCompanion extends UpdateCompanion<CuentasDigitale> {
+  final Value<int> id;
+  final Value<String> nombre;
+  const CuentasDigitalesCompanion({
+    this.id = const Value.absent(),
+    this.nombre = const Value.absent(),
+  });
+  CuentasDigitalesCompanion.insert({
+    this.id = const Value.absent(),
+    required String nombre,
+  }) : nombre = Value(nombre);
+  static Insertable<CuentasDigitale> custom({
+    Expression<int>? id,
+    Expression<String>? nombre,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (nombre != null) 'nombre': nombre,
+    });
+  }
+
+  CuentasDigitalesCompanion copyWith({Value<int>? id, Value<String>? nombre}) {
+    return CuentasDigitalesCompanion(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (nombre.present) {
+      map['nombre'] = Variable<String>(nombre.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CuentasDigitalesCompanion(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -69,6 +261,20 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _cuentaDigitalIdMeta = const VerificationMeta(
+    'cuentaDigitalId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaDigitalId = GeneratedColumn<int>(
+    'cuenta_digital_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -77,6 +283,7 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
     fecha,
     descripcion,
     medio,
+    cuentaDigitalId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -130,6 +337,15 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
         medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
       );
     }
+    if (data.containsKey('cuenta_digital_id')) {
+      context.handle(
+        _cuentaDigitalIdMeta,
+        cuentaDigitalId.isAcceptableOrUnknown(
+          data['cuenta_digital_id']!,
+          _cuentaDigitalIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -163,6 +379,10 @@ class $IngresosTable extends Ingresos with TableInfo<$IngresosTable, Ingreso> {
         DriftSqlType.string,
         data['${effectivePrefix}medio'],
       ),
+      cuentaDigitalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_digital_id'],
+      ),
     );
   }
 
@@ -179,6 +399,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
   final DateTime fecha;
   final String? descripcion;
   final String? medio;
+  final int? cuentaDigitalId;
   const Ingreso({
     required this.id,
     required this.monto,
@@ -186,6 +407,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
     required this.fecha,
     this.descripcion,
     this.medio,
+    this.cuentaDigitalId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -199,6 +421,9 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
     }
     if (!nullToAbsent || medio != null) {
       map['medio'] = Variable<String>(medio);
+    }
+    if (!nullToAbsent || cuentaDigitalId != null) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId);
     }
     return map;
   }
@@ -215,6 +440,9 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       medio: medio == null && nullToAbsent
           ? const Value.absent()
           : Value(medio),
+      cuentaDigitalId: cuentaDigitalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cuentaDigitalId),
     );
   }
 
@@ -230,6 +458,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       descripcion: serializer.fromJson<String?>(json['descripcion']),
       medio: serializer.fromJson<String?>(json['medio']),
+      cuentaDigitalId: serializer.fromJson<int?>(json['cuentaDigitalId']),
     );
   }
   @override
@@ -242,6 +471,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
       'fecha': serializer.toJson<DateTime>(fecha),
       'descripcion': serializer.toJson<String?>(descripcion),
       'medio': serializer.toJson<String?>(medio),
+      'cuentaDigitalId': serializer.toJson<int?>(cuentaDigitalId),
     };
   }
 
@@ -252,6 +482,7 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
     DateTime? fecha,
     Value<String?> descripcion = const Value.absent(),
     Value<String?> medio = const Value.absent(),
+    Value<int?> cuentaDigitalId = const Value.absent(),
   }) => Ingreso(
     id: id ?? this.id,
     monto: monto ?? this.monto,
@@ -259,6 +490,9 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
     fecha: fecha ?? this.fecha,
     descripcion: descripcion.present ? descripcion.value : this.descripcion,
     medio: medio.present ? medio.value : this.medio,
+    cuentaDigitalId: cuentaDigitalId.present
+        ? cuentaDigitalId.value
+        : this.cuentaDigitalId,
   );
   Ingreso copyWithCompanion(IngresosCompanion data) {
     return Ingreso(
@@ -270,6 +504,9 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
           ? data.descripcion.value
           : this.descripcion,
       medio: data.medio.present ? data.medio.value : this.medio,
+      cuentaDigitalId: data.cuentaDigitalId.present
+          ? data.cuentaDigitalId.value
+          : this.cuentaDigitalId,
     );
   }
 
@@ -281,13 +518,15 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
           ..write('tipo: $tipo, ')
           ..write('fecha: $fecha, ')
           ..write('descripcion: $descripcion, ')
-          ..write('medio: $medio')
+          ..write('medio: $medio, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, monto, tipo, fecha, descripcion, medio);
+  int get hashCode =>
+      Object.hash(id, monto, tipo, fecha, descripcion, medio, cuentaDigitalId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -297,7 +536,8 @@ class Ingreso extends DataClass implements Insertable<Ingreso> {
           other.tipo == this.tipo &&
           other.fecha == this.fecha &&
           other.descripcion == this.descripcion &&
-          other.medio == this.medio);
+          other.medio == this.medio &&
+          other.cuentaDigitalId == this.cuentaDigitalId);
 }
 
 class IngresosCompanion extends UpdateCompanion<Ingreso> {
@@ -307,6 +547,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
   final Value<DateTime> fecha;
   final Value<String?> descripcion;
   final Value<String?> medio;
+  final Value<int?> cuentaDigitalId;
   const IngresosCompanion({
     this.id = const Value.absent(),
     this.monto = const Value.absent(),
@@ -314,6 +555,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     this.fecha = const Value.absent(),
     this.descripcion = const Value.absent(),
     this.medio = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
   });
   IngresosCompanion.insert({
     this.id = const Value.absent(),
@@ -322,6 +564,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     required DateTime fecha,
     this.descripcion = const Value.absent(),
     this.medio = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
   }) : monto = Value(monto),
        fecha = Value(fecha);
   static Insertable<Ingreso> custom({
@@ -331,6 +574,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     Expression<DateTime>? fecha,
     Expression<String>? descripcion,
     Expression<String>? medio,
+    Expression<int>? cuentaDigitalId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -339,6 +583,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
       if (fecha != null) 'fecha': fecha,
       if (descripcion != null) 'descripcion': descripcion,
       if (medio != null) 'medio': medio,
+      if (cuentaDigitalId != null) 'cuenta_digital_id': cuentaDigitalId,
     });
   }
 
@@ -349,6 +594,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     Value<DateTime>? fecha,
     Value<String?>? descripcion,
     Value<String?>? medio,
+    Value<int?>? cuentaDigitalId,
   }) {
     return IngresosCompanion(
       id: id ?? this.id,
@@ -357,6 +603,7 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
       fecha: fecha ?? this.fecha,
       descripcion: descripcion ?? this.descripcion,
       medio: medio ?? this.medio,
+      cuentaDigitalId: cuentaDigitalId ?? this.cuentaDigitalId,
     );
   }
 
@@ -381,6 +628,9 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
     if (medio.present) {
       map['medio'] = Variable<String>(medio.value);
     }
+    if (cuentaDigitalId.present) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId.value);
+    }
     return map;
   }
 
@@ -392,7 +642,522 @@ class IngresosCompanion extends UpdateCompanion<Ingreso> {
           ..write('tipo: $tipo, ')
           ..write('fecha: $fecha, ')
           ..write('descripcion: $descripcion, ')
-          ..write('medio: $medio')
+          ..write('medio: $medio, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SuscripcionesTable extends Suscripciones
+    with TableInfo<$SuscripcionesTable, Suscripcion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SuscripcionesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nombreMeta = const VerificationMeta('nombre');
+  @override
+  late final GeneratedColumn<String> nombre = GeneratedColumn<String>(
+    'nombre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _precioMeta = const VerificationMeta('precio');
+  @override
+  late final GeneratedColumn<double> precio = GeneratedColumn<double>(
+    'precio',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _proximoPagoMeta = const VerificationMeta(
+    'proximoPago',
+  );
+  @override
+  late final GeneratedColumn<DateTime> proximoPago = GeneratedColumn<DateTime>(
+    'proximo_pago',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _frecuenciaMeta = const VerificationMeta(
+    'frecuencia',
+  );
+  @override
+  late final GeneratedColumn<String> frecuencia = GeneratedColumn<String>(
+    'frecuencia',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _medioMeta = const VerificationMeta('medio');
+  @override
+  late final GeneratedColumn<String> medio = GeneratedColumn<String>(
+    'medio',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cuentaDigitalIdMeta = const VerificationMeta(
+    'cuentaDigitalId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaDigitalId = GeneratedColumn<int>(
+    'cuenta_digital_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _activaMeta = const VerificationMeta('activa');
+  @override
+  late final GeneratedColumn<bool> activa = GeneratedColumn<bool>(
+    'activa',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("activa" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    nombre,
+    precio,
+    proximoPago,
+    frecuencia,
+    medio,
+    cuentaDigitalId,
+    activa,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'suscripciones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Suscripcion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('nombre')) {
+      context.handle(
+        _nombreMeta,
+        nombre.isAcceptableOrUnknown(data['nombre']!, _nombreMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nombreMeta);
+    }
+    if (data.containsKey('precio')) {
+      context.handle(
+        _precioMeta,
+        precio.isAcceptableOrUnknown(data['precio']!, _precioMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_precioMeta);
+    }
+    if (data.containsKey('proximo_pago')) {
+      context.handle(
+        _proximoPagoMeta,
+        proximoPago.isAcceptableOrUnknown(
+          data['proximo_pago']!,
+          _proximoPagoMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_proximoPagoMeta);
+    }
+    if (data.containsKey('frecuencia')) {
+      context.handle(
+        _frecuenciaMeta,
+        frecuencia.isAcceptableOrUnknown(data['frecuencia']!, _frecuenciaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_frecuenciaMeta);
+    }
+    if (data.containsKey('medio')) {
+      context.handle(
+        _medioMeta,
+        medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    }
+    if (data.containsKey('cuenta_digital_id')) {
+      context.handle(
+        _cuentaDigitalIdMeta,
+        cuentaDigitalId.isAcceptableOrUnknown(
+          data['cuenta_digital_id']!,
+          _cuentaDigitalIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('activa')) {
+      context.handle(
+        _activaMeta,
+        activa.isAcceptableOrUnknown(data['activa']!, _activaMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Suscripcion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Suscripcion(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      nombre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nombre'],
+      )!,
+      precio: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}precio'],
+      )!,
+      proximoPago: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}proximo_pago'],
+      )!,
+      frecuencia: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}frecuencia'],
+      )!,
+      medio: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio'],
+      ),
+      cuentaDigitalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_digital_id'],
+      ),
+      activa: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}activa'],
+      )!,
+    );
+  }
+
+  @override
+  $SuscripcionesTable createAlias(String alias) {
+    return $SuscripcionesTable(attachedDatabase, alias);
+  }
+}
+
+class Suscripcion extends DataClass implements Insertable<Suscripcion> {
+  final int id;
+  final String nombre;
+  final double precio;
+  final DateTime proximoPago;
+  final String frecuencia;
+  final String? medio;
+  final int? cuentaDigitalId;
+  final bool activa;
+  const Suscripcion({
+    required this.id,
+    required this.nombre,
+    required this.precio,
+    required this.proximoPago,
+    required this.frecuencia,
+    this.medio,
+    this.cuentaDigitalId,
+    required this.activa,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['nombre'] = Variable<String>(nombre);
+    map['precio'] = Variable<double>(precio);
+    map['proximo_pago'] = Variable<DateTime>(proximoPago);
+    map['frecuencia'] = Variable<String>(frecuencia);
+    if (!nullToAbsent || medio != null) {
+      map['medio'] = Variable<String>(medio);
+    }
+    if (!nullToAbsent || cuentaDigitalId != null) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId);
+    }
+    map['activa'] = Variable<bool>(activa);
+    return map;
+  }
+
+  SuscripcionesCompanion toCompanion(bool nullToAbsent) {
+    return SuscripcionesCompanion(
+      id: Value(id),
+      nombre: Value(nombre),
+      precio: Value(precio),
+      proximoPago: Value(proximoPago),
+      frecuencia: Value(frecuencia),
+      medio: medio == null && nullToAbsent
+          ? const Value.absent()
+          : Value(medio),
+      cuentaDigitalId: cuentaDigitalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cuentaDigitalId),
+      activa: Value(activa),
+    );
+  }
+
+  factory Suscripcion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Suscripcion(
+      id: serializer.fromJson<int>(json['id']),
+      nombre: serializer.fromJson<String>(json['nombre']),
+      precio: serializer.fromJson<double>(json['precio']),
+      proximoPago: serializer.fromJson<DateTime>(json['proximoPago']),
+      frecuencia: serializer.fromJson<String>(json['frecuencia']),
+      medio: serializer.fromJson<String?>(json['medio']),
+      cuentaDigitalId: serializer.fromJson<int?>(json['cuentaDigitalId']),
+      activa: serializer.fromJson<bool>(json['activa']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'nombre': serializer.toJson<String>(nombre),
+      'precio': serializer.toJson<double>(precio),
+      'proximoPago': serializer.toJson<DateTime>(proximoPago),
+      'frecuencia': serializer.toJson<String>(frecuencia),
+      'medio': serializer.toJson<String?>(medio),
+      'cuentaDigitalId': serializer.toJson<int?>(cuentaDigitalId),
+      'activa': serializer.toJson<bool>(activa),
+    };
+  }
+
+  Suscripcion copyWith({
+    int? id,
+    String? nombre,
+    double? precio,
+    DateTime? proximoPago,
+    String? frecuencia,
+    Value<String?> medio = const Value.absent(),
+    Value<int?> cuentaDigitalId = const Value.absent(),
+    bool? activa,
+  }) => Suscripcion(
+    id: id ?? this.id,
+    nombre: nombre ?? this.nombre,
+    precio: precio ?? this.precio,
+    proximoPago: proximoPago ?? this.proximoPago,
+    frecuencia: frecuencia ?? this.frecuencia,
+    medio: medio.present ? medio.value : this.medio,
+    cuentaDigitalId: cuentaDigitalId.present
+        ? cuentaDigitalId.value
+        : this.cuentaDigitalId,
+    activa: activa ?? this.activa,
+  );
+  Suscripcion copyWithCompanion(SuscripcionesCompanion data) {
+    return Suscripcion(
+      id: data.id.present ? data.id.value : this.id,
+      nombre: data.nombre.present ? data.nombre.value : this.nombre,
+      precio: data.precio.present ? data.precio.value : this.precio,
+      proximoPago: data.proximoPago.present
+          ? data.proximoPago.value
+          : this.proximoPago,
+      frecuencia: data.frecuencia.present
+          ? data.frecuencia.value
+          : this.frecuencia,
+      medio: data.medio.present ? data.medio.value : this.medio,
+      cuentaDigitalId: data.cuentaDigitalId.present
+          ? data.cuentaDigitalId.value
+          : this.cuentaDigitalId,
+      activa: data.activa.present ? data.activa.value : this.activa,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Suscripcion(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre, ')
+          ..write('precio: $precio, ')
+          ..write('proximoPago: $proximoPago, ')
+          ..write('frecuencia: $frecuencia, ')
+          ..write('medio: $medio, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId, ')
+          ..write('activa: $activa')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    nombre,
+    precio,
+    proximoPago,
+    frecuencia,
+    medio,
+    cuentaDigitalId,
+    activa,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Suscripcion &&
+          other.id == this.id &&
+          other.nombre == this.nombre &&
+          other.precio == this.precio &&
+          other.proximoPago == this.proximoPago &&
+          other.frecuencia == this.frecuencia &&
+          other.medio == this.medio &&
+          other.cuentaDigitalId == this.cuentaDigitalId &&
+          other.activa == this.activa);
+}
+
+class SuscripcionesCompanion extends UpdateCompanion<Suscripcion> {
+  final Value<int> id;
+  final Value<String> nombre;
+  final Value<double> precio;
+  final Value<DateTime> proximoPago;
+  final Value<String> frecuencia;
+  final Value<String?> medio;
+  final Value<int?> cuentaDigitalId;
+  final Value<bool> activa;
+  const SuscripcionesCompanion({
+    this.id = const Value.absent(),
+    this.nombre = const Value.absent(),
+    this.precio = const Value.absent(),
+    this.proximoPago = const Value.absent(),
+    this.frecuencia = const Value.absent(),
+    this.medio = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
+    this.activa = const Value.absent(),
+  });
+  SuscripcionesCompanion.insert({
+    this.id = const Value.absent(),
+    required String nombre,
+    required double precio,
+    required DateTime proximoPago,
+    required String frecuencia,
+    this.medio = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
+    this.activa = const Value.absent(),
+  }) : nombre = Value(nombre),
+       precio = Value(precio),
+       proximoPago = Value(proximoPago),
+       frecuencia = Value(frecuencia);
+  static Insertable<Suscripcion> custom({
+    Expression<int>? id,
+    Expression<String>? nombre,
+    Expression<double>? precio,
+    Expression<DateTime>? proximoPago,
+    Expression<String>? frecuencia,
+    Expression<String>? medio,
+    Expression<int>? cuentaDigitalId,
+    Expression<bool>? activa,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (nombre != null) 'nombre': nombre,
+      if (precio != null) 'precio': precio,
+      if (proximoPago != null) 'proximo_pago': proximoPago,
+      if (frecuencia != null) 'frecuencia': frecuencia,
+      if (medio != null) 'medio': medio,
+      if (cuentaDigitalId != null) 'cuenta_digital_id': cuentaDigitalId,
+      if (activa != null) 'activa': activa,
+    });
+  }
+
+  SuscripcionesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? nombre,
+    Value<double>? precio,
+    Value<DateTime>? proximoPago,
+    Value<String>? frecuencia,
+    Value<String?>? medio,
+    Value<int?>? cuentaDigitalId,
+    Value<bool>? activa,
+  }) {
+    return SuscripcionesCompanion(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      precio: precio ?? this.precio,
+      proximoPago: proximoPago ?? this.proximoPago,
+      frecuencia: frecuencia ?? this.frecuencia,
+      medio: medio ?? this.medio,
+      cuentaDigitalId: cuentaDigitalId ?? this.cuentaDigitalId,
+      activa: activa ?? this.activa,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (nombre.present) {
+      map['nombre'] = Variable<String>(nombre.value);
+    }
+    if (precio.present) {
+      map['precio'] = Variable<double>(precio.value);
+    }
+    if (proximoPago.present) {
+      map['proximo_pago'] = Variable<DateTime>(proximoPago.value);
+    }
+    if (frecuencia.present) {
+      map['frecuencia'] = Variable<String>(frecuencia.value);
+    }
+    if (medio.present) {
+      map['medio'] = Variable<String>(medio.value);
+    }
+    if (cuentaDigitalId.present) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId.value);
+    }
+    if (activa.present) {
+      map['activa'] = Variable<bool>(activa.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SuscripcionesCompanion(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre, ')
+          ..write('precio: $precio, ')
+          ..write('proximoPago: $proximoPago, ')
+          ..write('frecuencia: $frecuencia, ')
+          ..write('medio: $medio, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId, ')
+          ..write('activa: $activa')
           ..write(')'))
         .toString();
   }
@@ -472,6 +1237,45 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _cuentaDigitalIdMeta = const VerificationMeta(
+    'cuentaDigitalId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaDigitalId = GeneratedColumn<int>(
+    'cuenta_digital_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _suscripcionIdMeta = const VerificationMeta(
+    'suscripcionId',
+  );
+  @override
+  late final GeneratedColumn<int> suscripcionId = GeneratedColumn<int>(
+    'suscripcion_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES suscripciones (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _suscripcionPeriodoMeta =
+      const VerificationMeta('suscripcionPeriodo');
+  @override
+  late final GeneratedColumn<DateTime> suscripcionPeriodo =
+      GeneratedColumn<DateTime>(
+        'suscripcion_periodo',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -481,6 +1285,9 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
     fecha,
     nota,
     medio,
+    cuentaDigitalId,
+    suscripcionId,
+    suscripcionPeriodo,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -541,6 +1348,33 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
         medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
       );
     }
+    if (data.containsKey('cuenta_digital_id')) {
+      context.handle(
+        _cuentaDigitalIdMeta,
+        cuentaDigitalId.isAcceptableOrUnknown(
+          data['cuenta_digital_id']!,
+          _cuentaDigitalIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('suscripcion_id')) {
+      context.handle(
+        _suscripcionIdMeta,
+        suscripcionId.isAcceptableOrUnknown(
+          data['suscripcion_id']!,
+          _suscripcionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('suscripcion_periodo')) {
+      context.handle(
+        _suscripcionPeriodoMeta,
+        suscripcionPeriodo.isAcceptableOrUnknown(
+          data['suscripcion_periodo']!,
+          _suscripcionPeriodoMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -578,6 +1412,18 @@ class $GastosTable extends Gastos with TableInfo<$GastosTable, Gasto> {
         DriftSqlType.string,
         data['${effectivePrefix}medio'],
       ),
+      cuentaDigitalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_digital_id'],
+      ),
+      suscripcionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}suscripcion_id'],
+      ),
+      suscripcionPeriodo: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}suscripcion_periodo'],
+      ),
     );
   }
 
@@ -595,6 +1441,9 @@ class Gasto extends DataClass implements Insertable<Gasto> {
   final DateTime fecha;
   final String? nota;
   final String? medio;
+  final int? cuentaDigitalId;
+  final int? suscripcionId;
+  final DateTime? suscripcionPeriodo;
   const Gasto({
     required this.id,
     required this.nombre,
@@ -603,6 +1452,9 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     required this.fecha,
     this.nota,
     this.medio,
+    this.cuentaDigitalId,
+    this.suscripcionId,
+    this.suscripcionPeriodo,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -618,6 +1470,15 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     if (!nullToAbsent || medio != null) {
       map['medio'] = Variable<String>(medio);
     }
+    if (!nullToAbsent || cuentaDigitalId != null) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId);
+    }
+    if (!nullToAbsent || suscripcionId != null) {
+      map['suscripcion_id'] = Variable<int>(suscripcionId);
+    }
+    if (!nullToAbsent || suscripcionPeriodo != null) {
+      map['suscripcion_periodo'] = Variable<DateTime>(suscripcionPeriodo);
+    }
     return map;
   }
 
@@ -632,6 +1493,15 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       medio: medio == null && nullToAbsent
           ? const Value.absent()
           : Value(medio),
+      cuentaDigitalId: cuentaDigitalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cuentaDigitalId),
+      suscripcionId: suscripcionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suscripcionId),
+      suscripcionPeriodo: suscripcionPeriodo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suscripcionPeriodo),
     );
   }
 
@@ -648,6 +1518,11 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       nota: serializer.fromJson<String?>(json['nota']),
       medio: serializer.fromJson<String?>(json['medio']),
+      cuentaDigitalId: serializer.fromJson<int?>(json['cuentaDigitalId']),
+      suscripcionId: serializer.fromJson<int?>(json['suscripcionId']),
+      suscripcionPeriodo: serializer.fromJson<DateTime?>(
+        json['suscripcionPeriodo'],
+      ),
     );
   }
   @override
@@ -661,6 +1536,9 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       'fecha': serializer.toJson<DateTime>(fecha),
       'nota': serializer.toJson<String?>(nota),
       'medio': serializer.toJson<String?>(medio),
+      'cuentaDigitalId': serializer.toJson<int?>(cuentaDigitalId),
+      'suscripcionId': serializer.toJson<int?>(suscripcionId),
+      'suscripcionPeriodo': serializer.toJson<DateTime?>(suscripcionPeriodo),
     };
   }
 
@@ -672,6 +1550,9 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     DateTime? fecha,
     Value<String?> nota = const Value.absent(),
     Value<String?> medio = const Value.absent(),
+    Value<int?> cuentaDigitalId = const Value.absent(),
+    Value<int?> suscripcionId = const Value.absent(),
+    Value<DateTime?> suscripcionPeriodo = const Value.absent(),
   }) => Gasto(
     id: id ?? this.id,
     nombre: nombre ?? this.nombre,
@@ -680,6 +1561,15 @@ class Gasto extends DataClass implements Insertable<Gasto> {
     fecha: fecha ?? this.fecha,
     nota: nota.present ? nota.value : this.nota,
     medio: medio.present ? medio.value : this.medio,
+    cuentaDigitalId: cuentaDigitalId.present
+        ? cuentaDigitalId.value
+        : this.cuentaDigitalId,
+    suscripcionId: suscripcionId.present
+        ? suscripcionId.value
+        : this.suscripcionId,
+    suscripcionPeriodo: suscripcionPeriodo.present
+        ? suscripcionPeriodo.value
+        : this.suscripcionPeriodo,
   );
   Gasto copyWithCompanion(GastosCompanion data) {
     return Gasto(
@@ -690,6 +1580,15 @@ class Gasto extends DataClass implements Insertable<Gasto> {
       fecha: data.fecha.present ? data.fecha.value : this.fecha,
       nota: data.nota.present ? data.nota.value : this.nota,
       medio: data.medio.present ? data.medio.value : this.medio,
+      cuentaDigitalId: data.cuentaDigitalId.present
+          ? data.cuentaDigitalId.value
+          : this.cuentaDigitalId,
+      suscripcionId: data.suscripcionId.present
+          ? data.suscripcionId.value
+          : this.suscripcionId,
+      suscripcionPeriodo: data.suscripcionPeriodo.present
+          ? data.suscripcionPeriodo.value
+          : this.suscripcionPeriodo,
     );
   }
 
@@ -702,14 +1601,27 @@ class Gasto extends DataClass implements Insertable<Gasto> {
           ..write('categoria: $categoria, ')
           ..write('fecha: $fecha, ')
           ..write('nota: $nota, ')
-          ..write('medio: $medio')
+          ..write('medio: $medio, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId, ')
+          ..write('suscripcionId: $suscripcionId, ')
+          ..write('suscripcionPeriodo: $suscripcionPeriodo')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, nombre, monto, categoria, fecha, nota, medio);
+  int get hashCode => Object.hash(
+    id,
+    nombre,
+    monto,
+    categoria,
+    fecha,
+    nota,
+    medio,
+    cuentaDigitalId,
+    suscripcionId,
+    suscripcionPeriodo,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -720,7 +1632,10 @@ class Gasto extends DataClass implements Insertable<Gasto> {
           other.categoria == this.categoria &&
           other.fecha == this.fecha &&
           other.nota == this.nota &&
-          other.medio == this.medio);
+          other.medio == this.medio &&
+          other.cuentaDigitalId == this.cuentaDigitalId &&
+          other.suscripcionId == this.suscripcionId &&
+          other.suscripcionPeriodo == this.suscripcionPeriodo);
 }
 
 class GastosCompanion extends UpdateCompanion<Gasto> {
@@ -731,6 +1646,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
   final Value<DateTime> fecha;
   final Value<String?> nota;
   final Value<String?> medio;
+  final Value<int?> cuentaDigitalId;
+  final Value<int?> suscripcionId;
+  final Value<DateTime?> suscripcionPeriodo;
   const GastosCompanion({
     this.id = const Value.absent(),
     this.nombre = const Value.absent(),
@@ -739,6 +1657,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     this.fecha = const Value.absent(),
     this.nota = const Value.absent(),
     this.medio = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
+    this.suscripcionId = const Value.absent(),
+    this.suscripcionPeriodo = const Value.absent(),
   });
   GastosCompanion.insert({
     this.id = const Value.absent(),
@@ -748,6 +1669,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     required DateTime fecha,
     this.nota = const Value.absent(),
     this.medio = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
+    this.suscripcionId = const Value.absent(),
+    this.suscripcionPeriodo = const Value.absent(),
   }) : nombre = Value(nombre),
        monto = Value(monto),
        categoria = Value(categoria),
@@ -760,6 +1684,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     Expression<DateTime>? fecha,
     Expression<String>? nota,
     Expression<String>? medio,
+    Expression<int>? cuentaDigitalId,
+    Expression<int>? suscripcionId,
+    Expression<DateTime>? suscripcionPeriodo,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -769,6 +1696,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
       if (fecha != null) 'fecha': fecha,
       if (nota != null) 'nota': nota,
       if (medio != null) 'medio': medio,
+      if (cuentaDigitalId != null) 'cuenta_digital_id': cuentaDigitalId,
+      if (suscripcionId != null) 'suscripcion_id': suscripcionId,
+      if (suscripcionPeriodo != null) 'suscripcion_periodo': suscripcionPeriodo,
     });
   }
 
@@ -780,6 +1710,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     Value<DateTime>? fecha,
     Value<String?>? nota,
     Value<String?>? medio,
+    Value<int?>? cuentaDigitalId,
+    Value<int?>? suscripcionId,
+    Value<DateTime?>? suscripcionPeriodo,
   }) {
     return GastosCompanion(
       id: id ?? this.id,
@@ -789,6 +1722,9 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
       fecha: fecha ?? this.fecha,
       nota: nota ?? this.nota,
       medio: medio ?? this.medio,
+      cuentaDigitalId: cuentaDigitalId ?? this.cuentaDigitalId,
+      suscripcionId: suscripcionId ?? this.suscripcionId,
+      suscripcionPeriodo: suscripcionPeriodo ?? this.suscripcionPeriodo,
     );
   }
 
@@ -816,6 +1752,15 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
     if (medio.present) {
       map['medio'] = Variable<String>(medio.value);
     }
+    if (cuentaDigitalId.present) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId.value);
+    }
+    if (suscripcionId.present) {
+      map['suscripcion_id'] = Variable<int>(suscripcionId.value);
+    }
+    if (suscripcionPeriodo.present) {
+      map['suscripcion_periodo'] = Variable<DateTime>(suscripcionPeriodo.value);
+    }
     return map;
   }
 
@@ -828,7 +1773,10 @@ class GastosCompanion extends UpdateCompanion<Gasto> {
           ..write('categoria: $categoria, ')
           ..write('fecha: $fecha, ')
           ..write('nota: $nota, ')
-          ..write('medio: $medio')
+          ..write('medio: $medio, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId, ')
+          ..write('suscripcionId: $suscripcionId, ')
+          ..write('suscripcionPeriodo: $suscripcionPeriodo')
           ..write(')'))
         .toString();
   }
@@ -4243,6 +5191,20 @@ class $AsignacionesDineroTable extends AsignacionesDinero
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _cuentaDigitalIdMeta = const VerificationMeta(
+    'cuentaDigitalId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaDigitalId = GeneratedColumn<int>(
+    'cuenta_digital_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
+  );
   static const VerificationMeta _origenMeta = const VerificationMeta('origen');
   @override
   late final GeneratedColumn<String> origen = GeneratedColumn<String>(
@@ -4264,7 +5226,14 @@ class $AsignacionesDineroTable extends AsignacionesDinero
     requiredDuringInsert: false,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, medio, monto, origen, origenId];
+  List<GeneratedColumn> get $columns => [
+    id,
+    medio,
+    monto,
+    cuentaDigitalId,
+    origen,
+    origenId,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4295,6 +5264,15 @@ class $AsignacionesDineroTable extends AsignacionesDinero
       );
     } else if (isInserting) {
       context.missing(_montoMeta);
+    }
+    if (data.containsKey('cuenta_digital_id')) {
+      context.handle(
+        _cuentaDigitalIdMeta,
+        cuentaDigitalId.isAcceptableOrUnknown(
+          data['cuenta_digital_id']!,
+          _cuentaDigitalIdMeta,
+        ),
+      );
     }
     if (data.containsKey('origen')) {
       context.handle(
@@ -4329,6 +5307,10 @@ class $AsignacionesDineroTable extends AsignacionesDinero
         DriftSqlType.double,
         data['${effectivePrefix}monto'],
       )!,
+      cuentaDigitalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_digital_id'],
+      ),
       origen: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}origen'],
@@ -4351,12 +5333,14 @@ class AsignacionesDineroData extends DataClass
   final int id;
   final String medio;
   final double monto;
+  final int? cuentaDigitalId;
   final String? origen;
   final int? origenId;
   const AsignacionesDineroData({
     required this.id,
     required this.medio,
     required this.monto,
+    this.cuentaDigitalId,
     this.origen,
     this.origenId,
   });
@@ -4366,6 +5350,9 @@ class AsignacionesDineroData extends DataClass
     map['id'] = Variable<int>(id);
     map['medio'] = Variable<String>(medio);
     map['monto'] = Variable<double>(monto);
+    if (!nullToAbsent || cuentaDigitalId != null) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId);
+    }
     if (!nullToAbsent || origen != null) {
       map['origen'] = Variable<String>(origen);
     }
@@ -4380,6 +5367,9 @@ class AsignacionesDineroData extends DataClass
       id: Value(id),
       medio: Value(medio),
       monto: Value(monto),
+      cuentaDigitalId: cuentaDigitalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cuentaDigitalId),
       origen: origen == null && nullToAbsent
           ? const Value.absent()
           : Value(origen),
@@ -4398,6 +5388,7 @@ class AsignacionesDineroData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       medio: serializer.fromJson<String>(json['medio']),
       monto: serializer.fromJson<double>(json['monto']),
+      cuentaDigitalId: serializer.fromJson<int?>(json['cuentaDigitalId']),
       origen: serializer.fromJson<String?>(json['origen']),
       origenId: serializer.fromJson<int?>(json['origenId']),
     );
@@ -4409,6 +5400,7 @@ class AsignacionesDineroData extends DataClass
       'id': serializer.toJson<int>(id),
       'medio': serializer.toJson<String>(medio),
       'monto': serializer.toJson<double>(monto),
+      'cuentaDigitalId': serializer.toJson<int?>(cuentaDigitalId),
       'origen': serializer.toJson<String?>(origen),
       'origenId': serializer.toJson<int?>(origenId),
     };
@@ -4418,12 +5410,16 @@ class AsignacionesDineroData extends DataClass
     int? id,
     String? medio,
     double? monto,
+    Value<int?> cuentaDigitalId = const Value.absent(),
     Value<String?> origen = const Value.absent(),
     Value<int?> origenId = const Value.absent(),
   }) => AsignacionesDineroData(
     id: id ?? this.id,
     medio: medio ?? this.medio,
     monto: monto ?? this.monto,
+    cuentaDigitalId: cuentaDigitalId.present
+        ? cuentaDigitalId.value
+        : this.cuentaDigitalId,
     origen: origen.present ? origen.value : this.origen,
     origenId: origenId.present ? origenId.value : this.origenId,
   );
@@ -4432,6 +5428,9 @@ class AsignacionesDineroData extends DataClass
       id: data.id.present ? data.id.value : this.id,
       medio: data.medio.present ? data.medio.value : this.medio,
       monto: data.monto.present ? data.monto.value : this.monto,
+      cuentaDigitalId: data.cuentaDigitalId.present
+          ? data.cuentaDigitalId.value
+          : this.cuentaDigitalId,
       origen: data.origen.present ? data.origen.value : this.origen,
       origenId: data.origenId.present ? data.origenId.value : this.origenId,
     );
@@ -4443,6 +5442,7 @@ class AsignacionesDineroData extends DataClass
           ..write('id: $id, ')
           ..write('medio: $medio, ')
           ..write('monto: $monto, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId, ')
           ..write('origen: $origen, ')
           ..write('origenId: $origenId')
           ..write(')'))
@@ -4450,7 +5450,8 @@ class AsignacionesDineroData extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, medio, monto, origen, origenId);
+  int get hashCode =>
+      Object.hash(id, medio, monto, cuentaDigitalId, origen, origenId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4458,6 +5459,7 @@ class AsignacionesDineroData extends DataClass
           other.id == this.id &&
           other.medio == this.medio &&
           other.monto == this.monto &&
+          other.cuentaDigitalId == this.cuentaDigitalId &&
           other.origen == this.origen &&
           other.origenId == this.origenId);
 }
@@ -4467,12 +5469,14 @@ class AsignacionesDineroCompanion
   final Value<int> id;
   final Value<String> medio;
   final Value<double> monto;
+  final Value<int?> cuentaDigitalId;
   final Value<String?> origen;
   final Value<int?> origenId;
   const AsignacionesDineroCompanion({
     this.id = const Value.absent(),
     this.medio = const Value.absent(),
     this.monto = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
     this.origen = const Value.absent(),
     this.origenId = const Value.absent(),
   });
@@ -4480,6 +5484,7 @@ class AsignacionesDineroCompanion
     this.id = const Value.absent(),
     required String medio,
     required double monto,
+    this.cuentaDigitalId = const Value.absent(),
     this.origen = const Value.absent(),
     this.origenId = const Value.absent(),
   }) : medio = Value(medio),
@@ -4488,6 +5493,7 @@ class AsignacionesDineroCompanion
     Expression<int>? id,
     Expression<String>? medio,
     Expression<double>? monto,
+    Expression<int>? cuentaDigitalId,
     Expression<String>? origen,
     Expression<int>? origenId,
   }) {
@@ -4495,6 +5501,7 @@ class AsignacionesDineroCompanion
       if (id != null) 'id': id,
       if (medio != null) 'medio': medio,
       if (monto != null) 'monto': monto,
+      if (cuentaDigitalId != null) 'cuenta_digital_id': cuentaDigitalId,
       if (origen != null) 'origen': origen,
       if (origenId != null) 'origen_id': origenId,
     });
@@ -4504,6 +5511,7 @@ class AsignacionesDineroCompanion
     Value<int>? id,
     Value<String>? medio,
     Value<double>? monto,
+    Value<int?>? cuentaDigitalId,
     Value<String?>? origen,
     Value<int?>? origenId,
   }) {
@@ -4511,6 +5519,7 @@ class AsignacionesDineroCompanion
       id: id ?? this.id,
       medio: medio ?? this.medio,
       monto: monto ?? this.monto,
+      cuentaDigitalId: cuentaDigitalId ?? this.cuentaDigitalId,
       origen: origen ?? this.origen,
       origenId: origenId ?? this.origenId,
     );
@@ -4528,6 +5537,9 @@ class AsignacionesDineroCompanion
     if (monto.present) {
       map['monto'] = Variable<double>(monto.value);
     }
+    if (cuentaDigitalId.present) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId.value);
+    }
     if (origen.present) {
       map['origen'] = Variable<String>(origen.value);
     }
@@ -4543,6 +5555,7 @@ class AsignacionesDineroCompanion
           ..write('id: $id, ')
           ..write('medio: $medio, ')
           ..write('monto: $monto, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId, ')
           ..write('origen: $origen, ')
           ..write('origenId: $origenId')
           ..write(')'))
@@ -4550,12 +5563,12 @@ class AsignacionesDineroCompanion
   }
 }
 
-class $SuscripcionesTable extends Suscripciones
-    with TableInfo<$SuscripcionesTable, Suscripcion> {
+class $IngresoDistribucionesTable extends IngresoDistribuciones
+    with TableInfo<$IngresoDistribucionesTable, IngresoDistribucione> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $SuscripcionesTable(this.attachedDatabase, [this._alias]);
+  $IngresoDistribucionesTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -4569,72 +5582,68 @@ class $SuscripcionesTable extends Suscripciones
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
-  static const VerificationMeta _nombreMeta = const VerificationMeta('nombre');
-  @override
-  late final GeneratedColumn<String> nombre = GeneratedColumn<String>(
-    'nombre',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _precioMeta = const VerificationMeta('precio');
-  @override
-  late final GeneratedColumn<double> precio = GeneratedColumn<double>(
-    'precio',
-    aliasedName,
-    false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _proximoPagoMeta = const VerificationMeta(
-    'proximoPago',
+  static const VerificationMeta _ingresoIdMeta = const VerificationMeta(
+    'ingresoId',
   );
   @override
-  late final GeneratedColumn<DateTime> proximoPago = GeneratedColumn<DateTime>(
-    'proximo_pago',
+  late final GeneratedColumn<int> ingresoId = GeneratedColumn<int>(
+    'ingreso_id',
     aliasedName,
     false,
-    type: DriftSqlType.dateTime,
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
-  );
-  static const VerificationMeta _frecuenciaMeta = const VerificationMeta(
-    'frecuencia',
-  );
-  @override
-  late final GeneratedColumn<String> frecuencia = GeneratedColumn<String>(
-    'frecuencia',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES ingresos (id) ON DELETE CASCADE',
+    ),
   );
   static const VerificationMeta _medioMeta = const VerificationMeta('medio');
   @override
   late final GeneratedColumn<String> medio = GeneratedColumn<String>(
     'medio',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _montoMeta = const VerificationMeta('monto');
+  @override
+  late final GeneratedColumn<double> monto = GeneratedColumn<double>(
+    'monto',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cuentaDigitalIdMeta = const VerificationMeta(
+    'cuentaDigitalId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaDigitalId = GeneratedColumn<int>(
+    'cuenta_digital_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
     requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
   );
   @override
   List<GeneratedColumn> get $columns => [
     id,
-    nombre,
-    precio,
-    proximoPago,
-    frecuencia,
+    ingresoId,
     medio,
+    monto,
+    cuentaDigitalId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'suscripciones';
+  static const String $name = 'ingreso_distribuciones';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Suscripcion> instance, {
+    Insertable<IngresoDistribucione> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -4642,45 +5651,37 @@ class $SuscripcionesTable extends Suscripciones
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
-    if (data.containsKey('nombre')) {
+    if (data.containsKey('ingreso_id')) {
       context.handle(
-        _nombreMeta,
-        nombre.isAcceptableOrUnknown(data['nombre']!, _nombreMeta),
+        _ingresoIdMeta,
+        ingresoId.isAcceptableOrUnknown(data['ingreso_id']!, _ingresoIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_nombreMeta);
-    }
-    if (data.containsKey('precio')) {
-      context.handle(
-        _precioMeta,
-        precio.isAcceptableOrUnknown(data['precio']!, _precioMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_precioMeta);
-    }
-    if (data.containsKey('proximo_pago')) {
-      context.handle(
-        _proximoPagoMeta,
-        proximoPago.isAcceptableOrUnknown(
-          data['proximo_pago']!,
-          _proximoPagoMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_proximoPagoMeta);
-    }
-    if (data.containsKey('frecuencia')) {
-      context.handle(
-        _frecuenciaMeta,
-        frecuencia.isAcceptableOrUnknown(data['frecuencia']!, _frecuenciaMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_frecuenciaMeta);
+      context.missing(_ingresoIdMeta);
     }
     if (data.containsKey('medio')) {
       context.handle(
         _medioMeta,
         medio.isAcceptableOrUnknown(data['medio']!, _medioMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_medioMeta);
+    }
+    if (data.containsKey('monto')) {
+      context.handle(
+        _montoMeta,
+        monto.isAcceptableOrUnknown(data['monto']!, _montoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_montoMeta);
+    }
+    if (data.containsKey('cuenta_digital_id')) {
+      context.handle(
+        _cuentaDigitalIdMeta,
+        cuentaDigitalId.isAcceptableOrUnknown(
+          data['cuenta_digital_id']!,
+          _cuentaDigitalIdMeta,
+        ),
       );
     }
     return context;
@@ -4689,96 +5690,88 @@ class $SuscripcionesTable extends Suscripciones
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Suscripcion map(Map<String, dynamic> data, {String? tablePrefix}) {
+  IngresoDistribucione map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Suscripcion(
+    return IngresoDistribucione(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
-      nombre: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}nombre'],
-      )!,
-      precio: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}precio'],
-      )!,
-      proximoPago: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}proximo_pago'],
-      )!,
-      frecuencia: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}frecuencia'],
+      ingresoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ingreso_id'],
       )!,
       medio: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}medio'],
+      )!,
+      monto: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}monto'],
+      )!,
+      cuentaDigitalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_digital_id'],
       ),
     );
   }
 
   @override
-  $SuscripcionesTable createAlias(String alias) {
-    return $SuscripcionesTable(attachedDatabase, alias);
+  $IngresoDistribucionesTable createAlias(String alias) {
+    return $IngresoDistribucionesTable(attachedDatabase, alias);
   }
 }
 
-class Suscripcion extends DataClass implements Insertable<Suscripcion> {
+class IngresoDistribucione extends DataClass
+    implements Insertable<IngresoDistribucione> {
   final int id;
-  final String nombre;
-  final double precio;
-  final DateTime proximoPago;
-  final String frecuencia;
-  final String? medio;
-  const Suscripcion({
+  final int ingresoId;
+  final String medio;
+  final double monto;
+  final int? cuentaDigitalId;
+  const IngresoDistribucione({
     required this.id,
-    required this.nombre,
-    required this.precio,
-    required this.proximoPago,
-    required this.frecuencia,
-    this.medio,
+    required this.ingresoId,
+    required this.medio,
+    required this.monto,
+    this.cuentaDigitalId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['nombre'] = Variable<String>(nombre);
-    map['precio'] = Variable<double>(precio);
-    map['proximo_pago'] = Variable<DateTime>(proximoPago);
-    map['frecuencia'] = Variable<String>(frecuencia);
-    if (!nullToAbsent || medio != null) {
-      map['medio'] = Variable<String>(medio);
+    map['ingreso_id'] = Variable<int>(ingresoId);
+    map['medio'] = Variable<String>(medio);
+    map['monto'] = Variable<double>(monto);
+    if (!nullToAbsent || cuentaDigitalId != null) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId);
     }
     return map;
   }
 
-  SuscripcionesCompanion toCompanion(bool nullToAbsent) {
-    return SuscripcionesCompanion(
+  IngresoDistribucionesCompanion toCompanion(bool nullToAbsent) {
+    return IngresoDistribucionesCompanion(
       id: Value(id),
-      nombre: Value(nombre),
-      precio: Value(precio),
-      proximoPago: Value(proximoPago),
-      frecuencia: Value(frecuencia),
-      medio: medio == null && nullToAbsent
+      ingresoId: Value(ingresoId),
+      medio: Value(medio),
+      monto: Value(monto),
+      cuentaDigitalId: cuentaDigitalId == null && nullToAbsent
           ? const Value.absent()
-          : Value(medio),
+          : Value(cuentaDigitalId),
     );
   }
 
-  factory Suscripcion.fromJson(
+  factory IngresoDistribucione.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Suscripcion(
+    return IngresoDistribucione(
       id: serializer.fromJson<int>(json['id']),
-      nombre: serializer.fromJson<String>(json['nombre']),
-      precio: serializer.fromJson<double>(json['precio']),
-      proximoPago: serializer.fromJson<DateTime>(json['proximoPago']),
-      frecuencia: serializer.fromJson<String>(json['frecuencia']),
-      medio: serializer.fromJson<String?>(json['medio']),
+      ingresoId: serializer.fromJson<int>(json['ingresoId']),
+      medio: serializer.fromJson<String>(json['medio']),
+      monto: serializer.fromJson<double>(json['monto']),
+      cuentaDigitalId: serializer.fromJson<int?>(json['cuentaDigitalId']),
     );
   }
   @override
@@ -4786,131 +5779,117 @@ class Suscripcion extends DataClass implements Insertable<Suscripcion> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'nombre': serializer.toJson<String>(nombre),
-      'precio': serializer.toJson<double>(precio),
-      'proximoPago': serializer.toJson<DateTime>(proximoPago),
-      'frecuencia': serializer.toJson<String>(frecuencia),
-      'medio': serializer.toJson<String?>(medio),
+      'ingresoId': serializer.toJson<int>(ingresoId),
+      'medio': serializer.toJson<String>(medio),
+      'monto': serializer.toJson<double>(monto),
+      'cuentaDigitalId': serializer.toJson<int?>(cuentaDigitalId),
     };
   }
 
-  Suscripcion copyWith({
+  IngresoDistribucione copyWith({
     int? id,
-    String? nombre,
-    double? precio,
-    DateTime? proximoPago,
-    String? frecuencia,
-    Value<String?> medio = const Value.absent(),
-  }) => Suscripcion(
+    int? ingresoId,
+    String? medio,
+    double? monto,
+    Value<int?> cuentaDigitalId = const Value.absent(),
+  }) => IngresoDistribucione(
     id: id ?? this.id,
-    nombre: nombre ?? this.nombre,
-    precio: precio ?? this.precio,
-    proximoPago: proximoPago ?? this.proximoPago,
-    frecuencia: frecuencia ?? this.frecuencia,
-    medio: medio.present ? medio.value : this.medio,
+    ingresoId: ingresoId ?? this.ingresoId,
+    medio: medio ?? this.medio,
+    monto: monto ?? this.monto,
+    cuentaDigitalId: cuentaDigitalId.present
+        ? cuentaDigitalId.value
+        : this.cuentaDigitalId,
   );
-  Suscripcion copyWithCompanion(SuscripcionesCompanion data) {
-    return Suscripcion(
+  IngresoDistribucione copyWithCompanion(IngresoDistribucionesCompanion data) {
+    return IngresoDistribucione(
       id: data.id.present ? data.id.value : this.id,
-      nombre: data.nombre.present ? data.nombre.value : this.nombre,
-      precio: data.precio.present ? data.precio.value : this.precio,
-      proximoPago: data.proximoPago.present
-          ? data.proximoPago.value
-          : this.proximoPago,
-      frecuencia: data.frecuencia.present
-          ? data.frecuencia.value
-          : this.frecuencia,
+      ingresoId: data.ingresoId.present ? data.ingresoId.value : this.ingresoId,
       medio: data.medio.present ? data.medio.value : this.medio,
+      monto: data.monto.present ? data.monto.value : this.monto,
+      cuentaDigitalId: data.cuentaDigitalId.present
+          ? data.cuentaDigitalId.value
+          : this.cuentaDigitalId,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('Suscripcion(')
+    return (StringBuffer('IngresoDistribucione(')
           ..write('id: $id, ')
-          ..write('nombre: $nombre, ')
-          ..write('precio: $precio, ')
-          ..write('proximoPago: $proximoPago, ')
-          ..write('frecuencia: $frecuencia, ')
-          ..write('medio: $medio')
+          ..write('ingresoId: $ingresoId, ')
+          ..write('medio: $medio, ')
+          ..write('monto: $monto, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, nombre, precio, proximoPago, frecuencia, medio);
+  int get hashCode => Object.hash(id, ingresoId, medio, monto, cuentaDigitalId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Suscripcion &&
+      (other is IngresoDistribucione &&
           other.id == this.id &&
-          other.nombre == this.nombre &&
-          other.precio == this.precio &&
-          other.proximoPago == this.proximoPago &&
-          other.frecuencia == this.frecuencia &&
-          other.medio == this.medio);
+          other.ingresoId == this.ingresoId &&
+          other.medio == this.medio &&
+          other.monto == this.monto &&
+          other.cuentaDigitalId == this.cuentaDigitalId);
 }
 
-class SuscripcionesCompanion extends UpdateCompanion<Suscripcion> {
+class IngresoDistribucionesCompanion
+    extends UpdateCompanion<IngresoDistribucione> {
   final Value<int> id;
-  final Value<String> nombre;
-  final Value<double> precio;
-  final Value<DateTime> proximoPago;
-  final Value<String> frecuencia;
-  final Value<String?> medio;
-  const SuscripcionesCompanion({
+  final Value<int> ingresoId;
+  final Value<String> medio;
+  final Value<double> monto;
+  final Value<int?> cuentaDigitalId;
+  const IngresoDistribucionesCompanion({
     this.id = const Value.absent(),
-    this.nombre = const Value.absent(),
-    this.precio = const Value.absent(),
-    this.proximoPago = const Value.absent(),
-    this.frecuencia = const Value.absent(),
+    this.ingresoId = const Value.absent(),
     this.medio = const Value.absent(),
+    this.monto = const Value.absent(),
+    this.cuentaDigitalId = const Value.absent(),
   });
-  SuscripcionesCompanion.insert({
+  IngresoDistribucionesCompanion.insert({
     this.id = const Value.absent(),
-    required String nombre,
-    required double precio,
-    required DateTime proximoPago,
-    required String frecuencia,
-    this.medio = const Value.absent(),
-  }) : nombre = Value(nombre),
-       precio = Value(precio),
-       proximoPago = Value(proximoPago),
-       frecuencia = Value(frecuencia);
-  static Insertable<Suscripcion> custom({
+    required int ingresoId,
+    required String medio,
+    required double monto,
+    this.cuentaDigitalId = const Value.absent(),
+  }) : ingresoId = Value(ingresoId),
+       medio = Value(medio),
+       monto = Value(monto);
+  static Insertable<IngresoDistribucione> custom({
     Expression<int>? id,
-    Expression<String>? nombre,
-    Expression<double>? precio,
-    Expression<DateTime>? proximoPago,
-    Expression<String>? frecuencia,
+    Expression<int>? ingresoId,
     Expression<String>? medio,
+    Expression<double>? monto,
+    Expression<int>? cuentaDigitalId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (nombre != null) 'nombre': nombre,
-      if (precio != null) 'precio': precio,
-      if (proximoPago != null) 'proximo_pago': proximoPago,
-      if (frecuencia != null) 'frecuencia': frecuencia,
+      if (ingresoId != null) 'ingreso_id': ingresoId,
       if (medio != null) 'medio': medio,
+      if (monto != null) 'monto': monto,
+      if (cuentaDigitalId != null) 'cuenta_digital_id': cuentaDigitalId,
     });
   }
 
-  SuscripcionesCompanion copyWith({
+  IngresoDistribucionesCompanion copyWith({
     Value<int>? id,
-    Value<String>? nombre,
-    Value<double>? precio,
-    Value<DateTime>? proximoPago,
-    Value<String>? frecuencia,
-    Value<String?>? medio,
+    Value<int>? ingresoId,
+    Value<String>? medio,
+    Value<double>? monto,
+    Value<int?>? cuentaDigitalId,
   }) {
-    return SuscripcionesCompanion(
+    return IngresoDistribucionesCompanion(
       id: id ?? this.id,
-      nombre: nombre ?? this.nombre,
-      precio: precio ?? this.precio,
-      proximoPago: proximoPago ?? this.proximoPago,
-      frecuencia: frecuencia ?? this.frecuencia,
+      ingresoId: ingresoId ?? this.ingresoId,
       medio: medio ?? this.medio,
+      monto: monto ?? this.monto,
+      cuentaDigitalId: cuentaDigitalId ?? this.cuentaDigitalId,
     );
   }
 
@@ -4920,33 +5899,563 @@ class SuscripcionesCompanion extends UpdateCompanion<Suscripcion> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
-    if (nombre.present) {
-      map['nombre'] = Variable<String>(nombre.value);
-    }
-    if (precio.present) {
-      map['precio'] = Variable<double>(precio.value);
-    }
-    if (proximoPago.present) {
-      map['proximo_pago'] = Variable<DateTime>(proximoPago.value);
-    }
-    if (frecuencia.present) {
-      map['frecuencia'] = Variable<String>(frecuencia.value);
+    if (ingresoId.present) {
+      map['ingreso_id'] = Variable<int>(ingresoId.value);
     }
     if (medio.present) {
       map['medio'] = Variable<String>(medio.value);
+    }
+    if (monto.present) {
+      map['monto'] = Variable<double>(monto.value);
+    }
+    if (cuentaDigitalId.present) {
+      map['cuenta_digital_id'] = Variable<int>(cuentaDigitalId.value);
     }
     return map;
   }
 
   @override
   String toString() {
-    return (StringBuffer('SuscripcionesCompanion(')
+    return (StringBuffer('IngresoDistribucionesCompanion(')
           ..write('id: $id, ')
-          ..write('nombre: $nombre, ')
-          ..write('precio: $precio, ')
-          ..write('proximoPago: $proximoPago, ')
-          ..write('frecuencia: $frecuencia, ')
-          ..write('medio: $medio')
+          ..write('ingresoId: $ingresoId, ')
+          ..write('medio: $medio, ')
+          ..write('monto: $monto, ')
+          ..write('cuentaDigitalId: $cuentaDigitalId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TransferenciasDineroTable extends TransferenciasDinero
+    with TableInfo<$TransferenciasDineroTable, TransferenciasDineroData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransferenciasDineroTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _medioOrigenMeta = const VerificationMeta(
+    'medioOrigen',
+  );
+  @override
+  late final GeneratedColumn<String> medioOrigen = GeneratedColumn<String>(
+    'medio_origen',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cuentaOrigenIdMeta = const VerificationMeta(
+    'cuentaOrigenId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaOrigenId = GeneratedColumn<int>(
+    'cuenta_origen_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _medioDestinoMeta = const VerificationMeta(
+    'medioDestino',
+  );
+  @override
+  late final GeneratedColumn<String> medioDestino = GeneratedColumn<String>(
+    'medio_destino',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cuentaDestinoIdMeta = const VerificationMeta(
+    'cuentaDestinoId',
+  );
+  @override
+  late final GeneratedColumn<int> cuentaDestinoId = GeneratedColumn<int>(
+    'cuenta_destino_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES cuentas_digitales (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _montoMeta = const VerificationMeta('monto');
+  @override
+  late final GeneratedColumn<double> monto = GeneratedColumn<double>(
+    'monto',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fechaMeta = const VerificationMeta('fecha');
+  @override
+  late final GeneratedColumn<DateTime> fecha = GeneratedColumn<DateTime>(
+    'fecha',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notaMeta = const VerificationMeta('nota');
+  @override
+  late final GeneratedColumn<String> nota = GeneratedColumn<String>(
+    'nota',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    medioOrigen,
+    cuentaOrigenId,
+    medioDestino,
+    cuentaDestinoId,
+    monto,
+    fecha,
+    nota,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transferencias_dinero';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransferenciasDineroData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('medio_origen')) {
+      context.handle(
+        _medioOrigenMeta,
+        medioOrigen.isAcceptableOrUnknown(
+          data['medio_origen']!,
+          _medioOrigenMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_medioOrigenMeta);
+    }
+    if (data.containsKey('cuenta_origen_id')) {
+      context.handle(
+        _cuentaOrigenIdMeta,
+        cuentaOrigenId.isAcceptableOrUnknown(
+          data['cuenta_origen_id']!,
+          _cuentaOrigenIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('medio_destino')) {
+      context.handle(
+        _medioDestinoMeta,
+        medioDestino.isAcceptableOrUnknown(
+          data['medio_destino']!,
+          _medioDestinoMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_medioDestinoMeta);
+    }
+    if (data.containsKey('cuenta_destino_id')) {
+      context.handle(
+        _cuentaDestinoIdMeta,
+        cuentaDestinoId.isAcceptableOrUnknown(
+          data['cuenta_destino_id']!,
+          _cuentaDestinoIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('monto')) {
+      context.handle(
+        _montoMeta,
+        monto.isAcceptableOrUnknown(data['monto']!, _montoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_montoMeta);
+    }
+    if (data.containsKey('fecha')) {
+      context.handle(
+        _fechaMeta,
+        fecha.isAcceptableOrUnknown(data['fecha']!, _fechaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fechaMeta);
+    }
+    if (data.containsKey('nota')) {
+      context.handle(
+        _notaMeta,
+        nota.isAcceptableOrUnknown(data['nota']!, _notaMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TransferenciasDineroData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransferenciasDineroData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      medioOrigen: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio_origen'],
+      )!,
+      cuentaOrigenId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_origen_id'],
+      ),
+      medioDestino: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}medio_destino'],
+      )!,
+      cuentaDestinoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cuenta_destino_id'],
+      ),
+      monto: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}monto'],
+      )!,
+      fecha: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fecha'],
+      )!,
+      nota: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nota'],
+      ),
+    );
+  }
+
+  @override
+  $TransferenciasDineroTable createAlias(String alias) {
+    return $TransferenciasDineroTable(attachedDatabase, alias);
+  }
+}
+
+class TransferenciasDineroData extends DataClass
+    implements Insertable<TransferenciasDineroData> {
+  final int id;
+  final String medioOrigen;
+  final int? cuentaOrigenId;
+  final String medioDestino;
+  final int? cuentaDestinoId;
+  final double monto;
+  final DateTime fecha;
+  final String? nota;
+  const TransferenciasDineroData({
+    required this.id,
+    required this.medioOrigen,
+    this.cuentaOrigenId,
+    required this.medioDestino,
+    this.cuentaDestinoId,
+    required this.monto,
+    required this.fecha,
+    this.nota,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['medio_origen'] = Variable<String>(medioOrigen);
+    if (!nullToAbsent || cuentaOrigenId != null) {
+      map['cuenta_origen_id'] = Variable<int>(cuentaOrigenId);
+    }
+    map['medio_destino'] = Variable<String>(medioDestino);
+    if (!nullToAbsent || cuentaDestinoId != null) {
+      map['cuenta_destino_id'] = Variable<int>(cuentaDestinoId);
+    }
+    map['monto'] = Variable<double>(monto);
+    map['fecha'] = Variable<DateTime>(fecha);
+    if (!nullToAbsent || nota != null) {
+      map['nota'] = Variable<String>(nota);
+    }
+    return map;
+  }
+
+  TransferenciasDineroCompanion toCompanion(bool nullToAbsent) {
+    return TransferenciasDineroCompanion(
+      id: Value(id),
+      medioOrigen: Value(medioOrigen),
+      cuentaOrigenId: cuentaOrigenId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cuentaOrigenId),
+      medioDestino: Value(medioDestino),
+      cuentaDestinoId: cuentaDestinoId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cuentaDestinoId),
+      monto: Value(monto),
+      fecha: Value(fecha),
+      nota: nota == null && nullToAbsent ? const Value.absent() : Value(nota),
+    );
+  }
+
+  factory TransferenciasDineroData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransferenciasDineroData(
+      id: serializer.fromJson<int>(json['id']),
+      medioOrigen: serializer.fromJson<String>(json['medioOrigen']),
+      cuentaOrigenId: serializer.fromJson<int?>(json['cuentaOrigenId']),
+      medioDestino: serializer.fromJson<String>(json['medioDestino']),
+      cuentaDestinoId: serializer.fromJson<int?>(json['cuentaDestinoId']),
+      monto: serializer.fromJson<double>(json['monto']),
+      fecha: serializer.fromJson<DateTime>(json['fecha']),
+      nota: serializer.fromJson<String?>(json['nota']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'medioOrigen': serializer.toJson<String>(medioOrigen),
+      'cuentaOrigenId': serializer.toJson<int?>(cuentaOrigenId),
+      'medioDestino': serializer.toJson<String>(medioDestino),
+      'cuentaDestinoId': serializer.toJson<int?>(cuentaDestinoId),
+      'monto': serializer.toJson<double>(monto),
+      'fecha': serializer.toJson<DateTime>(fecha),
+      'nota': serializer.toJson<String?>(nota),
+    };
+  }
+
+  TransferenciasDineroData copyWith({
+    int? id,
+    String? medioOrigen,
+    Value<int?> cuentaOrigenId = const Value.absent(),
+    String? medioDestino,
+    Value<int?> cuentaDestinoId = const Value.absent(),
+    double? monto,
+    DateTime? fecha,
+    Value<String?> nota = const Value.absent(),
+  }) => TransferenciasDineroData(
+    id: id ?? this.id,
+    medioOrigen: medioOrigen ?? this.medioOrigen,
+    cuentaOrigenId: cuentaOrigenId.present
+        ? cuentaOrigenId.value
+        : this.cuentaOrigenId,
+    medioDestino: medioDestino ?? this.medioDestino,
+    cuentaDestinoId: cuentaDestinoId.present
+        ? cuentaDestinoId.value
+        : this.cuentaDestinoId,
+    monto: monto ?? this.monto,
+    fecha: fecha ?? this.fecha,
+    nota: nota.present ? nota.value : this.nota,
+  );
+  TransferenciasDineroData copyWithCompanion(
+    TransferenciasDineroCompanion data,
+  ) {
+    return TransferenciasDineroData(
+      id: data.id.present ? data.id.value : this.id,
+      medioOrigen: data.medioOrigen.present
+          ? data.medioOrigen.value
+          : this.medioOrigen,
+      cuentaOrigenId: data.cuentaOrigenId.present
+          ? data.cuentaOrigenId.value
+          : this.cuentaOrigenId,
+      medioDestino: data.medioDestino.present
+          ? data.medioDestino.value
+          : this.medioDestino,
+      cuentaDestinoId: data.cuentaDestinoId.present
+          ? data.cuentaDestinoId.value
+          : this.cuentaDestinoId,
+      monto: data.monto.present ? data.monto.value : this.monto,
+      fecha: data.fecha.present ? data.fecha.value : this.fecha,
+      nota: data.nota.present ? data.nota.value : this.nota,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransferenciasDineroData(')
+          ..write('id: $id, ')
+          ..write('medioOrigen: $medioOrigen, ')
+          ..write('cuentaOrigenId: $cuentaOrigenId, ')
+          ..write('medioDestino: $medioDestino, ')
+          ..write('cuentaDestinoId: $cuentaDestinoId, ')
+          ..write('monto: $monto, ')
+          ..write('fecha: $fecha, ')
+          ..write('nota: $nota')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    medioOrigen,
+    cuentaOrigenId,
+    medioDestino,
+    cuentaDestinoId,
+    monto,
+    fecha,
+    nota,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransferenciasDineroData &&
+          other.id == this.id &&
+          other.medioOrigen == this.medioOrigen &&
+          other.cuentaOrigenId == this.cuentaOrigenId &&
+          other.medioDestino == this.medioDestino &&
+          other.cuentaDestinoId == this.cuentaDestinoId &&
+          other.monto == this.monto &&
+          other.fecha == this.fecha &&
+          other.nota == this.nota);
+}
+
+class TransferenciasDineroCompanion
+    extends UpdateCompanion<TransferenciasDineroData> {
+  final Value<int> id;
+  final Value<String> medioOrigen;
+  final Value<int?> cuentaOrigenId;
+  final Value<String> medioDestino;
+  final Value<int?> cuentaDestinoId;
+  final Value<double> monto;
+  final Value<DateTime> fecha;
+  final Value<String?> nota;
+  const TransferenciasDineroCompanion({
+    this.id = const Value.absent(),
+    this.medioOrigen = const Value.absent(),
+    this.cuentaOrigenId = const Value.absent(),
+    this.medioDestino = const Value.absent(),
+    this.cuentaDestinoId = const Value.absent(),
+    this.monto = const Value.absent(),
+    this.fecha = const Value.absent(),
+    this.nota = const Value.absent(),
+  });
+  TransferenciasDineroCompanion.insert({
+    this.id = const Value.absent(),
+    required String medioOrigen,
+    this.cuentaOrigenId = const Value.absent(),
+    required String medioDestino,
+    this.cuentaDestinoId = const Value.absent(),
+    required double monto,
+    required DateTime fecha,
+    this.nota = const Value.absent(),
+  }) : medioOrigen = Value(medioOrigen),
+       medioDestino = Value(medioDestino),
+       monto = Value(monto),
+       fecha = Value(fecha);
+  static Insertable<TransferenciasDineroData> custom({
+    Expression<int>? id,
+    Expression<String>? medioOrigen,
+    Expression<int>? cuentaOrigenId,
+    Expression<String>? medioDestino,
+    Expression<int>? cuentaDestinoId,
+    Expression<double>? monto,
+    Expression<DateTime>? fecha,
+    Expression<String>? nota,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (medioOrigen != null) 'medio_origen': medioOrigen,
+      if (cuentaOrigenId != null) 'cuenta_origen_id': cuentaOrigenId,
+      if (medioDestino != null) 'medio_destino': medioDestino,
+      if (cuentaDestinoId != null) 'cuenta_destino_id': cuentaDestinoId,
+      if (monto != null) 'monto': monto,
+      if (fecha != null) 'fecha': fecha,
+      if (nota != null) 'nota': nota,
+    });
+  }
+
+  TransferenciasDineroCompanion copyWith({
+    Value<int>? id,
+    Value<String>? medioOrigen,
+    Value<int?>? cuentaOrigenId,
+    Value<String>? medioDestino,
+    Value<int?>? cuentaDestinoId,
+    Value<double>? monto,
+    Value<DateTime>? fecha,
+    Value<String?>? nota,
+  }) {
+    return TransferenciasDineroCompanion(
+      id: id ?? this.id,
+      medioOrigen: medioOrigen ?? this.medioOrigen,
+      cuentaOrigenId: cuentaOrigenId ?? this.cuentaOrigenId,
+      medioDestino: medioDestino ?? this.medioDestino,
+      cuentaDestinoId: cuentaDestinoId ?? this.cuentaDestinoId,
+      monto: monto ?? this.monto,
+      fecha: fecha ?? this.fecha,
+      nota: nota ?? this.nota,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (medioOrigen.present) {
+      map['medio_origen'] = Variable<String>(medioOrigen.value);
+    }
+    if (cuentaOrigenId.present) {
+      map['cuenta_origen_id'] = Variable<int>(cuentaOrigenId.value);
+    }
+    if (medioDestino.present) {
+      map['medio_destino'] = Variable<String>(medioDestino.value);
+    }
+    if (cuentaDestinoId.present) {
+      map['cuenta_destino_id'] = Variable<int>(cuentaDestinoId.value);
+    }
+    if (monto.present) {
+      map['monto'] = Variable<double>(monto.value);
+    }
+    if (fecha.present) {
+      map['fecha'] = Variable<DateTime>(fecha.value);
+    }
+    if (nota.present) {
+      map['nota'] = Variable<String>(nota.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransferenciasDineroCompanion(')
+          ..write('id: $id, ')
+          ..write('medioOrigen: $medioOrigen, ')
+          ..write('cuentaOrigenId: $cuentaOrigenId, ')
+          ..write('medioDestino: $medioDestino, ')
+          ..write('cuentaDestinoId: $cuentaDestinoId, ')
+          ..write('monto: $monto, ')
+          ..write('fecha: $fecha, ')
+          ..write('nota: $nota')
           ..write(')'))
         .toString();
   }
@@ -4955,7 +6464,11 @@ class SuscripcionesCompanion extends UpdateCompanion<Suscripcion> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $CuentasDigitalesTable cuentasDigitales = $CuentasDigitalesTable(
+    this,
+  );
   late final $IngresosTable ingresos = $IngresosTable(this);
+  late final $SuscripcionesTable suscripciones = $SuscripcionesTable(this);
   late final $GastosTable gastos = $GastosTable(this);
   late final $DeudasTable deudas = $DeudasTable(this);
   late final $PagosDeudaTable pagosDeuda = $PagosDeudaTable(this);
@@ -4970,13 +6483,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $MovimientosReservaGastoFuturoTable(this);
   late final $AsignacionesDineroTable asignacionesDinero =
       $AsignacionesDineroTable(this);
-  late final $SuscripcionesTable suscripciones = $SuscripcionesTable(this);
+  late final $IngresoDistribucionesTable ingresoDistribuciones =
+      $IngresoDistribucionesTable(this);
+  late final $TransferenciasDineroTable transferenciasDinero =
+      $TransferenciasDineroTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    cuentasDigitales,
     ingresos,
+    suscripciones,
     gastos,
     deudas,
     pagosDeuda,
@@ -4986,10 +6504,39 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     gastosFuturos,
     movimientosReservaGastoFuturo,
     asignacionesDinero,
-    suscripciones,
+    ingresoDistribuciones,
+    transferenciasDinero,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('ingresos', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('suscripciones', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('gastos', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'suscripciones',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('gastos', kind: UpdateKind.update)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'ingresos',
@@ -5023,9 +6570,877 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         ),
       ],
     ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('asignaciones_dinero', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'ingresos',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('ingreso_distribuciones', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('ingreso_distribuciones', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('transferencias_dinero', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'cuentas_digitales',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('transferencias_dinero', kind: UpdateKind.update)],
+    ),
   ]);
 }
 
+typedef $$CuentasDigitalesTableCreateCompanionBuilder =
+    CuentasDigitalesCompanion Function({Value<int> id, required String nombre});
+typedef $$CuentasDigitalesTableUpdateCompanionBuilder =
+    CuentasDigitalesCompanion Function({Value<int> id, Value<String> nombre});
+
+final class $$CuentasDigitalesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $CuentasDigitalesTable, CuentasDigitale> {
+  $$CuentasDigitalesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$IngresosTable, List<Ingreso>> _ingresosRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.ingresos,
+    aliasName: 'cuentas_digitales__id__ingresos__cuenta_digital_id',
+  );
+
+  $$IngresosTableProcessedTableManager get ingresosRefs {
+    final manager = $$IngresosTableTableManager(
+      $_db,
+      $_db.ingresos,
+    ).filter((f) => f.cuentaDigitalId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_ingresosRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SuscripcionesTable, List<Suscripcion>>
+  _suscripcionesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.suscripciones,
+    aliasName: 'cuentas_digitales__id__suscripciones__cuenta_digital_id',
+  );
+
+  $$SuscripcionesTableProcessedTableManager get suscripcionesRefs {
+    final manager = $$SuscripcionesTableTableManager(
+      $_db,
+      $_db.suscripciones,
+    ).filter((f) => f.cuentaDigitalId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_suscripcionesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$GastosTable, List<Gasto>> _gastosRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.gastos,
+    aliasName: 'cuentas_digitales__id__gastos__cuenta_digital_id',
+  );
+
+  $$GastosTableProcessedTableManager get gastosRefs {
+    final manager = $$GastosTableTableManager(
+      $_db,
+      $_db.gastos,
+    ).filter((f) => f.cuentaDigitalId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_gastosRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $AsignacionesDineroTable,
+    List<AsignacionesDineroData>
+  >
+  _asignacionesDineroRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.asignacionesDinero,
+        aliasName:
+            'cuentas_digitales__id__asignaciones_dinero__cuenta_digital_id',
+      );
+
+  $$AsignacionesDineroTableProcessedTableManager get asignacionesDineroRefs {
+    final manager = $$AsignacionesDineroTableTableManager(
+      $_db,
+      $_db.asignacionesDinero,
+    ).filter((f) => f.cuentaDigitalId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _asignacionesDineroRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $IngresoDistribucionesTable,
+    List<IngresoDistribucione>
+  >
+  _ingresoDistribucionesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.ingresoDistribuciones,
+        aliasName:
+            'cuentas_digitales__id__ingreso_distribuciones__cuenta_digital_id',
+      );
+
+  $$IngresoDistribucionesTableProcessedTableManager
+  get ingresoDistribucionesRefs {
+    final manager = $$IngresoDistribucionesTableTableManager(
+      $_db,
+      $_db.ingresoDistribuciones,
+    ).filter((f) => f.cuentaDigitalId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _ingresoDistribucionesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $TransferenciasDineroTable,
+    List<TransferenciasDineroData>
+  >
+  _sourceTransfersTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.transferenciasDinero,
+    aliasName: 'cuentas_digitales__id__transferencias_dinero__cuenta_origen_id',
+  );
+
+  $$TransferenciasDineroTableProcessedTableManager get sourceTransfers {
+    final manager = $$TransferenciasDineroTableTableManager(
+      $_db,
+      $_db.transferenciasDinero,
+    ).filter((f) => f.cuentaOrigenId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_sourceTransfersTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $TransferenciasDineroTable,
+    List<TransferenciasDineroData>
+  >
+  _destinationTransfersTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.transferenciasDinero,
+    aliasName:
+        'cuentas_digitales__id__transferencias_dinero__cuenta_destino_id',
+  );
+
+  $$TransferenciasDineroTableProcessedTableManager get destinationTransfers {
+    final manager = $$TransferenciasDineroTableTableManager(
+      $_db,
+      $_db.transferenciasDinero,
+    ).filter((f) => f.cuentaDestinoId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _destinationTransfersTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$CuentasDigitalesTableFilterComposer
+    extends Composer<_$AppDatabase, $CuentasDigitalesTable> {
+  $$CuentasDigitalesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> ingresosRefs(
+    Expression<bool> Function($$IngresosTableFilterComposer f) f,
+  ) {
+    final $$IngresosTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ingresos,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$IngresosTableFilterComposer(
+            $db: $db,
+            $table: $db.ingresos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> suscripcionesRefs(
+    Expression<bool> Function($$SuscripcionesTableFilterComposer f) f,
+  ) {
+    final $$SuscripcionesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.suscripciones,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SuscripcionesTableFilterComposer(
+            $db: $db,
+            $table: $db.suscripciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> gastosRefs(
+    Expression<bool> Function($$GastosTableFilterComposer f) f,
+  ) {
+    final $$GastosTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.gastos,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GastosTableFilterComposer(
+            $db: $db,
+            $table: $db.gastos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> asignacionesDineroRefs(
+    Expression<bool> Function($$AsignacionesDineroTableFilterComposer f) f,
+  ) {
+    final $$AsignacionesDineroTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.asignacionesDinero,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AsignacionesDineroTableFilterComposer(
+            $db: $db,
+            $table: $db.asignacionesDinero,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> ingresoDistribucionesRefs(
+    Expression<bool> Function($$IngresoDistribucionesTableFilterComposer f) f,
+  ) {
+    final $$IngresoDistribucionesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.ingresoDistribuciones,
+          getReferencedColumn: (t) => t.cuentaDigitalId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$IngresoDistribucionesTableFilterComposer(
+                $db: $db,
+                $table: $db.ingresoDistribuciones,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> sourceTransfers(
+    Expression<bool> Function($$TransferenciasDineroTableFilterComposer f) f,
+  ) {
+    final $$TransferenciasDineroTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.transferenciasDinero,
+      getReferencedColumn: (t) => t.cuentaOrigenId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransferenciasDineroTableFilterComposer(
+            $db: $db,
+            $table: $db.transferenciasDinero,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> destinationTransfers(
+    Expression<bool> Function($$TransferenciasDineroTableFilterComposer f) f,
+  ) {
+    final $$TransferenciasDineroTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.transferenciasDinero,
+      getReferencedColumn: (t) => t.cuentaDestinoId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransferenciasDineroTableFilterComposer(
+            $db: $db,
+            $table: $db.transferenciasDinero,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$CuentasDigitalesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CuentasDigitalesTable> {
+  $$CuentasDigitalesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CuentasDigitalesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CuentasDigitalesTable> {
+  $$CuentasDigitalesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get nombre =>
+      $composableBuilder(column: $table.nombre, builder: (column) => column);
+
+  Expression<T> ingresosRefs<T extends Object>(
+    Expression<T> Function($$IngresosTableAnnotationComposer a) f,
+  ) {
+    final $$IngresosTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ingresos,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$IngresosTableAnnotationComposer(
+            $db: $db,
+            $table: $db.ingresos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> suscripcionesRefs<T extends Object>(
+    Expression<T> Function($$SuscripcionesTableAnnotationComposer a) f,
+  ) {
+    final $$SuscripcionesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.suscripciones,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SuscripcionesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.suscripciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> gastosRefs<T extends Object>(
+    Expression<T> Function($$GastosTableAnnotationComposer a) f,
+  ) {
+    final $$GastosTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.gastos,
+      getReferencedColumn: (t) => t.cuentaDigitalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GastosTableAnnotationComposer(
+            $db: $db,
+            $table: $db.gastos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> asignacionesDineroRefs<T extends Object>(
+    Expression<T> Function($$AsignacionesDineroTableAnnotationComposer a) f,
+  ) {
+    final $$AsignacionesDineroTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.asignacionesDinero,
+          getReferencedColumn: (t) => t.cuentaDigitalId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$AsignacionesDineroTableAnnotationComposer(
+                $db: $db,
+                $table: $db.asignacionesDinero,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> ingresoDistribucionesRefs<T extends Object>(
+    Expression<T> Function($$IngresoDistribucionesTableAnnotationComposer a) f,
+  ) {
+    final $$IngresoDistribucionesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.ingresoDistribuciones,
+          getReferencedColumn: (t) => t.cuentaDigitalId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$IngresoDistribucionesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.ingresoDistribuciones,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> sourceTransfers<T extends Object>(
+    Expression<T> Function($$TransferenciasDineroTableAnnotationComposer a) f,
+  ) {
+    final $$TransferenciasDineroTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.transferenciasDinero,
+          getReferencedColumn: (t) => t.cuentaOrigenId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TransferenciasDineroTableAnnotationComposer(
+                $db: $db,
+                $table: $db.transferenciasDinero,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> destinationTransfers<T extends Object>(
+    Expression<T> Function($$TransferenciasDineroTableAnnotationComposer a) f,
+  ) {
+    final $$TransferenciasDineroTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.transferenciasDinero,
+          getReferencedColumn: (t) => t.cuentaDestinoId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TransferenciasDineroTableAnnotationComposer(
+                $db: $db,
+                $table: $db.transferenciasDinero,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$CuentasDigitalesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CuentasDigitalesTable,
+          CuentasDigitale,
+          $$CuentasDigitalesTableFilterComposer,
+          $$CuentasDigitalesTableOrderingComposer,
+          $$CuentasDigitalesTableAnnotationComposer,
+          $$CuentasDigitalesTableCreateCompanionBuilder,
+          $$CuentasDigitalesTableUpdateCompanionBuilder,
+          (CuentasDigitale, $$CuentasDigitalesTableReferences),
+          CuentasDigitale,
+          PrefetchHooks Function({
+            bool ingresosRefs,
+            bool suscripcionesRefs,
+            bool gastosRefs,
+            bool asignacionesDineroRefs,
+            bool ingresoDistribucionesRefs,
+            bool sourceTransfers,
+            bool destinationTransfers,
+          })
+        > {
+  $$CuentasDigitalesTableTableManager(
+    _$AppDatabase db,
+    $CuentasDigitalesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CuentasDigitalesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CuentasDigitalesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CuentasDigitalesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> nombre = const Value.absent(),
+              }) => CuentasDigitalesCompanion(id: id, nombre: nombre),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String nombre,
+              }) => CuentasDigitalesCompanion.insert(id: id, nombre: nombre),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CuentasDigitalesTable, CuentasDigitale>(table),
+                  $$CuentasDigitalesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                ingresosRefs = false,
+                suscripcionesRefs = false,
+                gastosRefs = false,
+                asignacionesDineroRefs = false,
+                ingresoDistribucionesRefs = false,
+                sourceTransfers = false,
+                destinationTransfers = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (ingresosRefs) db.ingresos,
+                    if (suscripcionesRefs) db.suscripciones,
+                    if (gastosRefs) db.gastos,
+                    if (asignacionesDineroRefs) db.asignacionesDinero,
+                    if (ingresoDistribucionesRefs) db.ingresoDistribuciones,
+                    if (sourceTransfers) db.transferenciasDinero,
+                    if (destinationTransfers) db.transferenciasDinero,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (ingresosRefs)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          Ingreso
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._ingresosRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).ingresosRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaDigitalId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (suscripcionesRefs)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          Suscripcion
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._suscripcionesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).suscripcionesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaDigitalId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (gastosRefs)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          Gasto
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._gastosRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).gastosRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaDigitalId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (asignacionesDineroRefs)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          AsignacionesDineroData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._asignacionesDineroRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).asignacionesDineroRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaDigitalId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (ingresoDistribucionesRefs)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          IngresoDistribucione
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._ingresoDistribucionesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).ingresoDistribucionesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaDigitalId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (sourceTransfers)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          TransferenciasDineroData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._sourceTransfersTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).sourceTransfers,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaOrigenId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (destinationTransfers)
+                        await $_getPrefetchedData<
+                          CuentasDigitale,
+                          $CuentasDigitalesTable,
+                          TransferenciasDineroData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CuentasDigitalesTableReferences
+                              ._destinationTransfersTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CuentasDigitalesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).destinationTransfers,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.cuentaDestinoId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$CuentasDigitalesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CuentasDigitalesTable,
+      CuentasDigitale,
+      $$CuentasDigitalesTableFilterComposer,
+      $$CuentasDigitalesTableOrderingComposer,
+      $$CuentasDigitalesTableAnnotationComposer,
+      $$CuentasDigitalesTableCreateCompanionBuilder,
+      $$CuentasDigitalesTableUpdateCompanionBuilder,
+      (CuentasDigitale, $$CuentasDigitalesTableReferences),
+      CuentasDigitale,
+      PrefetchHooks Function({
+        bool ingresosRefs,
+        bool suscripcionesRefs,
+        bool gastosRefs,
+        bool asignacionesDineroRefs,
+        bool ingresoDistribucionesRefs,
+        bool sourceTransfers,
+        bool destinationTransfers,
+      })
+    >;
 typedef $$IngresosTableCreateCompanionBuilder =
     IngresosCompanion Function({
       Value<int> id,
@@ -5034,6 +7449,7 @@ typedef $$IngresosTableCreateCompanionBuilder =
       required DateTime fecha,
       Value<String?> descripcion,
       Value<String?> medio,
+      Value<int?> cuentaDigitalId,
     });
 typedef $$IngresosTableUpdateCompanionBuilder =
     IngresosCompanion Function({
@@ -5043,11 +7459,30 @@ typedef $$IngresosTableUpdateCompanionBuilder =
       Value<DateTime> fecha,
       Value<String?> descripcion,
       Value<String?> medio,
+      Value<int?> cuentaDigitalId,
     });
 
 final class $$IngresosTableReferences
     extends BaseReferences<_$AppDatabase, $IngresosTable, Ingreso> {
   $$IngresosTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CuentasDigitalesTable _cuentaDigitalIdTable(_$AppDatabase db) => db
+      .cuentasDigitales
+      .createAlias('ingresos__cuenta_digital_id__cuentas_digitales__id');
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaDigitalId {
+    final $_column = $_itemColumn<int>('cuenta_digital_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaDigitalIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$DeudasTable, List<Deuda>> _deudasRefsTable(
     _$AppDatabase db,
@@ -5063,6 +7498,31 @@ final class $$IngresosTableReferences
     ).filter((f) => f.ingresoId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_deudasRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $IngresoDistribucionesTable,
+    List<IngresoDistribucione>
+  >
+  _ingresoDistribucionesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.ingresoDistribuciones,
+        aliasName: 'ingresos__id__ingreso_distribuciones__ingreso_id',
+      );
+
+  $$IngresoDistribucionesTableProcessedTableManager
+  get ingresoDistribucionesRefs {
+    final manager = $$IngresoDistribucionesTableTableManager(
+      $_db,
+      $_db.ingresoDistribuciones,
+    ).filter((f) => f.ingresoId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _ingresoDistribucionesRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -5108,6 +7568,29 @@ class $$IngresosTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  $$CuentasDigitalesTableFilterComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<bool> deudasRefs(
     Expression<bool> Function($$DeudasTableFilterComposer f) f,
   ) {
@@ -5130,6 +7613,32 @@ class $$IngresosTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> ingresoDistribucionesRefs(
+    Expression<bool> Function($$IngresoDistribucionesTableFilterComposer f) f,
+  ) {
+    final $$IngresoDistribucionesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.ingresoDistribuciones,
+          getReferencedColumn: (t) => t.ingresoId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$IngresoDistribucionesTableFilterComposer(
+                $db: $db,
+                $table: $db.ingresoDistribuciones,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -5172,6 +7681,29 @@ class $$IngresosTableOrderingComposer
     column: $table.medio,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$IngresosTableAnnotationComposer
@@ -5203,6 +7735,29 @@ class $$IngresosTableAnnotationComposer
   GeneratedColumn<String> get medio =>
       $composableBuilder(column: $table.medio, builder: (column) => column);
 
+  $$CuentasDigitalesTableAnnotationComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> deudasRefs<T extends Object>(
     Expression<T> Function($$DeudasTableAnnotationComposer a) f,
   ) {
@@ -5227,6 +7782,32 @@ class $$IngresosTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> ingresoDistribucionesRefs<T extends Object>(
+    Expression<T> Function($$IngresoDistribucionesTableAnnotationComposer a) f,
+  ) {
+    final $$IngresoDistribucionesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.ingresoDistribuciones,
+          getReferencedColumn: (t) => t.ingresoId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$IngresoDistribucionesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.ingresoDistribuciones,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$IngresosTableTableManager
@@ -5242,7 +7823,11 @@ class $$IngresosTableTableManager
           $$IngresosTableUpdateCompanionBuilder,
           (Ingreso, $$IngresosTableReferences),
           Ingreso,
-          PrefetchHooks Function({bool deudasRefs})
+          PrefetchHooks Function({
+            bool cuentaDigitalId,
+            bool deudasRefs,
+            bool ingresoDistribucionesRefs,
+          })
         > {
   $$IngresosTableTableManager(_$AppDatabase db, $IngresosTable table)
     : super(
@@ -5263,6 +7848,7 @@ class $$IngresosTableTableManager
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String?> descripcion = const Value.absent(),
                 Value<String?> medio = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
               }) => IngresosCompanion(
                 id: id,
                 monto: monto,
@@ -5270,6 +7856,7 @@ class $$IngresosTableTableManager
                 fecha: fecha,
                 descripcion: descripcion,
                 medio: medio,
+                cuentaDigitalId: cuentaDigitalId,
               ),
           createCompanionCallback:
               ({
@@ -5279,6 +7866,7 @@ class $$IngresosTableTableManager
                 required DateTime fecha,
                 Value<String?> descripcion = const Value.absent(),
                 Value<String?> medio = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
               }) => IngresosCompanion.insert(
                 id: id,
                 monto: monto,
@@ -5286,6 +7874,7 @@ class $$IngresosTableTableManager
                 fecha: fecha,
                 descripcion: descripcion,
                 medio: medio,
+                cuentaDigitalId: cuentaDigitalId,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5295,28 +7884,98 @@ class $$IngresosTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({deudasRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (deudasRefs) db.deudas],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (deudasRefs)
-                    await $_getPrefetchedData<Ingreso, $IngresosTable, Deuda>(
-                      currentTable: table,
-                      referencedTable: $$IngresosTableReferences
-                          ._deudasRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$IngresosTableReferences(db, table, p0).deudasRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.ingresoId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                cuentaDigitalId = false,
+                deudasRefs = false,
+                ingresoDistribucionesRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (deudasRefs) db.deudas,
+                    if (ingresoDistribucionesRefs) db.ingresoDistribuciones,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (cuentaDigitalId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.cuentaDigitalId,
+                                    referencedTable: $$IngresosTableReferences
+                                        ._cuentaDigitalIdTable(db),
+                                    referencedColumn: $$IngresosTableReferences
+                                        ._cuentaDigitalIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (deudasRefs)
+                        await $_getPrefetchedData<
+                          Ingreso,
+                          $IngresosTable,
+                          Deuda
+                        >(
+                          currentTable: table,
+                          referencedTable: $$IngresosTableReferences
+                              ._deudasRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$IngresosTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).deudasRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.ingresoId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (ingresoDistribucionesRefs)
+                        await $_getPrefetchedData<
+                          Ingreso,
+                          $IngresosTable,
+                          IngresoDistribucione
+                        >(
+                          currentTable: table,
+                          referencedTable: $$IngresosTableReferences
+                              ._ingresoDistribucionesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$IngresosTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).ingresoDistribucionesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.ingresoId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -5333,7 +7992,482 @@ typedef $$IngresosTableProcessedTableManager =
       $$IngresosTableUpdateCompanionBuilder,
       (Ingreso, $$IngresosTableReferences),
       Ingreso,
-      PrefetchHooks Function({bool deudasRefs})
+      PrefetchHooks Function({
+        bool cuentaDigitalId,
+        bool deudasRefs,
+        bool ingresoDistribucionesRefs,
+      })
+    >;
+typedef $$SuscripcionesTableCreateCompanionBuilder =
+    SuscripcionesCompanion Function({
+      Value<int> id,
+      required String nombre,
+      required double precio,
+      required DateTime proximoPago,
+      required String frecuencia,
+      Value<String?> medio,
+      Value<int?> cuentaDigitalId,
+      Value<bool> activa,
+    });
+typedef $$SuscripcionesTableUpdateCompanionBuilder =
+    SuscripcionesCompanion Function({
+      Value<int> id,
+      Value<String> nombre,
+      Value<double> precio,
+      Value<DateTime> proximoPago,
+      Value<String> frecuencia,
+      Value<String?> medio,
+      Value<int?> cuentaDigitalId,
+      Value<bool> activa,
+    });
+
+final class $$SuscripcionesTableReferences
+    extends BaseReferences<_$AppDatabase, $SuscripcionesTable, Suscripcion> {
+  $$SuscripcionesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CuentasDigitalesTable _cuentaDigitalIdTable(_$AppDatabase db) => db
+      .cuentasDigitales
+      .createAlias('suscripciones__cuenta_digital_id__cuentas_digitales__id');
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaDigitalId {
+    final $_column = $_itemColumn<int>('cuenta_digital_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaDigitalIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$GastosTable, List<Gasto>> _gastosRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.gastos,
+    aliasName: 'suscripciones__id__gastos__suscripcion_id',
+  );
+
+  $$GastosTableProcessedTableManager get gastosRefs {
+    final manager = $$GastosTableTableManager(
+      $_db,
+      $_db.gastos,
+    ).filter((f) => f.suscripcionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_gastosRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$SuscripcionesTableFilterComposer
+    extends Composer<_$AppDatabase, $SuscripcionesTable> {
+  $$SuscripcionesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get precio => $composableBuilder(
+    column: $table.precio,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get proximoPago => $composableBuilder(
+    column: $table.proximoPago,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get frecuencia => $composableBuilder(
+    column: $table.frecuencia,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get activa => $composableBuilder(
+    column: $table.activa,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CuentasDigitalesTableFilterComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> gastosRefs(
+    Expression<bool> Function($$GastosTableFilterComposer f) f,
+  ) {
+    final $$GastosTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.gastos,
+      getReferencedColumn: (t) => t.suscripcionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GastosTableFilterComposer(
+            $db: $db,
+            $table: $db.gastos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SuscripcionesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SuscripcionesTable> {
+  $$SuscripcionesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get precio => $composableBuilder(
+    column: $table.precio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get proximoPago => $composableBuilder(
+    column: $table.proximoPago,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get frecuencia => $composableBuilder(
+    column: $table.frecuencia,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get medio => $composableBuilder(
+    column: $table.medio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get activa => $composableBuilder(
+    column: $table.activa,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SuscripcionesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SuscripcionesTable> {
+  $$SuscripcionesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get nombre =>
+      $composableBuilder(column: $table.nombre, builder: (column) => column);
+
+  GeneratedColumn<double> get precio =>
+      $composableBuilder(column: $table.precio, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get proximoPago => $composableBuilder(
+    column: $table.proximoPago,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get frecuencia => $composableBuilder(
+    column: $table.frecuencia,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get medio =>
+      $composableBuilder(column: $table.medio, builder: (column) => column);
+
+  GeneratedColumn<bool> get activa =>
+      $composableBuilder(column: $table.activa, builder: (column) => column);
+
+  $$CuentasDigitalesTableAnnotationComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> gastosRefs<T extends Object>(
+    Expression<T> Function($$GastosTableAnnotationComposer a) f,
+  ) {
+    final $$GastosTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.gastos,
+      getReferencedColumn: (t) => t.suscripcionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GastosTableAnnotationComposer(
+            $db: $db,
+            $table: $db.gastos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SuscripcionesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SuscripcionesTable,
+          Suscripcion,
+          $$SuscripcionesTableFilterComposer,
+          $$SuscripcionesTableOrderingComposer,
+          $$SuscripcionesTableAnnotationComposer,
+          $$SuscripcionesTableCreateCompanionBuilder,
+          $$SuscripcionesTableUpdateCompanionBuilder,
+          (Suscripcion, $$SuscripcionesTableReferences),
+          Suscripcion,
+          PrefetchHooks Function({bool cuentaDigitalId, bool gastosRefs})
+        > {
+  $$SuscripcionesTableTableManager(_$AppDatabase db, $SuscripcionesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SuscripcionesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SuscripcionesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SuscripcionesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> nombre = const Value.absent(),
+                Value<double> precio = const Value.absent(),
+                Value<DateTime> proximoPago = const Value.absent(),
+                Value<String> frecuencia = const Value.absent(),
+                Value<String?> medio = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
+                Value<bool> activa = const Value.absent(),
+              }) => SuscripcionesCompanion(
+                id: id,
+                nombre: nombre,
+                precio: precio,
+                proximoPago: proximoPago,
+                frecuencia: frecuencia,
+                medio: medio,
+                cuentaDigitalId: cuentaDigitalId,
+                activa: activa,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String nombre,
+                required double precio,
+                required DateTime proximoPago,
+                required String frecuencia,
+                Value<String?> medio = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
+                Value<bool> activa = const Value.absent(),
+              }) => SuscripcionesCompanion.insert(
+                id: id,
+                nombre: nombre,
+                precio: precio,
+                proximoPago: proximoPago,
+                frecuencia: frecuencia,
+                medio: medio,
+                cuentaDigitalId: cuentaDigitalId,
+                activa: activa,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SuscripcionesTable, Suscripcion>(table),
+                  $$SuscripcionesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({cuentaDigitalId = false, gastosRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [if (gastosRefs) db.gastos],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (cuentaDigitalId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.cuentaDigitalId,
+                                    referencedTable:
+                                        $$SuscripcionesTableReferences
+                                            ._cuentaDigitalIdTable(db),
+                                    referencedColumn:
+                                        $$SuscripcionesTableReferences
+                                            ._cuentaDigitalIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (gastosRefs)
+                        await $_getPrefetchedData<
+                          Suscripcion,
+                          $SuscripcionesTable,
+                          Gasto
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SuscripcionesTableReferences
+                              ._gastosRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SuscripcionesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).gastosRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.suscripcionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$SuscripcionesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SuscripcionesTable,
+      Suscripcion,
+      $$SuscripcionesTableFilterComposer,
+      $$SuscripcionesTableOrderingComposer,
+      $$SuscripcionesTableAnnotationComposer,
+      $$SuscripcionesTableCreateCompanionBuilder,
+      $$SuscripcionesTableUpdateCompanionBuilder,
+      (Suscripcion, $$SuscripcionesTableReferences),
+      Suscripcion,
+      PrefetchHooks Function({bool cuentaDigitalId, bool gastosRefs})
     >;
 typedef $$GastosTableCreateCompanionBuilder =
     GastosCompanion Function({
@@ -5344,6 +8478,9 @@ typedef $$GastosTableCreateCompanionBuilder =
       required DateTime fecha,
       Value<String?> nota,
       Value<String?> medio,
+      Value<int?> cuentaDigitalId,
+      Value<int?> suscripcionId,
+      Value<DateTime?> suscripcionPeriodo,
     });
 typedef $$GastosTableUpdateCompanionBuilder =
     GastosCompanion Function({
@@ -5354,7 +8491,50 @@ typedef $$GastosTableUpdateCompanionBuilder =
       Value<DateTime> fecha,
       Value<String?> nota,
       Value<String?> medio,
+      Value<int?> cuentaDigitalId,
+      Value<int?> suscripcionId,
+      Value<DateTime?> suscripcionPeriodo,
     });
+
+final class $$GastosTableReferences
+    extends BaseReferences<_$AppDatabase, $GastosTable, Gasto> {
+  $$GastosTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CuentasDigitalesTable _cuentaDigitalIdTable(_$AppDatabase db) => db
+      .cuentasDigitales
+      .createAlias('gastos__cuenta_digital_id__cuentas_digitales__id');
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaDigitalId {
+    final $_column = $_itemColumn<int>('cuenta_digital_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaDigitalIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $SuscripcionesTable _suscripcionIdTable(_$AppDatabase db) =>
+      db.suscripciones.createAlias('gastos__suscripcion_id__suscripciones__id');
+
+  $$SuscripcionesTableProcessedTableManager? get suscripcionId {
+    final $_column = $_itemColumn<int>('suscripcion_id');
+    if ($_column == null) return null;
+    final manager = $$SuscripcionesTableTableManager(
+      $_db,
+      $_db.suscripciones,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_suscripcionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
 
 class $$GastosTableFilterComposer
     extends Composer<_$AppDatabase, $GastosTable> {
@@ -5399,6 +8579,57 @@ class $$GastosTableFilterComposer
     column: $table.medio,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<DateTime> get suscripcionPeriodo => $composableBuilder(
+    column: $table.suscripcionPeriodo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CuentasDigitalesTableFilterComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SuscripcionesTableFilterComposer get suscripcionId {
+    final $$SuscripcionesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.suscripcionId,
+      referencedTable: $db.suscripciones,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SuscripcionesTableFilterComposer(
+            $db: $db,
+            $table: $db.suscripciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$GastosTableOrderingComposer
@@ -5444,6 +8675,57 @@ class $$GastosTableOrderingComposer
     column: $table.medio,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get suscripcionPeriodo => $composableBuilder(
+    column: $table.suscripcionPeriodo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SuscripcionesTableOrderingComposer get suscripcionId {
+    final $$SuscripcionesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.suscripcionId,
+      referencedTable: $db.suscripciones,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SuscripcionesTableOrderingComposer(
+            $db: $db,
+            $table: $db.suscripciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$GastosTableAnnotationComposer
@@ -5475,6 +8757,57 @@ class $$GastosTableAnnotationComposer
 
   GeneratedColumn<String> get medio =>
       $composableBuilder(column: $table.medio, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get suscripcionPeriodo => $composableBuilder(
+    column: $table.suscripcionPeriodo,
+    builder: (column) => column,
+  );
+
+  $$CuentasDigitalesTableAnnotationComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$SuscripcionesTableAnnotationComposer get suscripcionId {
+    final $$SuscripcionesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.suscripcionId,
+      referencedTable: $db.suscripciones,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SuscripcionesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.suscripciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$GastosTableTableManager
@@ -5488,9 +8821,9 @@ class $$GastosTableTableManager
           $$GastosTableAnnotationComposer,
           $$GastosTableCreateCompanionBuilder,
           $$GastosTableUpdateCompanionBuilder,
-          (Gasto, BaseReferences<_$AppDatabase, $GastosTable, Gasto>),
+          (Gasto, $$GastosTableReferences),
           Gasto,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool cuentaDigitalId, bool suscripcionId})
         > {
   $$GastosTableTableManager(_$AppDatabase db, $GastosTable table)
     : super(
@@ -5512,6 +8845,9 @@ class $$GastosTableTableManager
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String?> nota = const Value.absent(),
                 Value<String?> medio = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
+                Value<int?> suscripcionId = const Value.absent(),
+                Value<DateTime?> suscripcionPeriodo = const Value.absent(),
               }) => GastosCompanion(
                 id: id,
                 nombre: nombre,
@@ -5520,6 +8856,9 @@ class $$GastosTableTableManager
                 fecha: fecha,
                 nota: nota,
                 medio: medio,
+                cuentaDigitalId: cuentaDigitalId,
+                suscripcionId: suscripcionId,
+                suscripcionPeriodo: suscripcionPeriodo,
               ),
           createCompanionCallback:
               ({
@@ -5530,6 +8869,9 @@ class $$GastosTableTableManager
                 required DateTime fecha,
                 Value<String?> nota = const Value.absent(),
                 Value<String?> medio = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
+                Value<int?> suscripcionId = const Value.absent(),
+                Value<DateTime?> suscripcionPeriodo = const Value.absent(),
               }) => GastosCompanion.insert(
                 id: id,
                 nombre: nombre,
@@ -5538,20 +8880,73 @@ class $$GastosTableTableManager
                 fecha: fecha,
                 nota: nota,
                 medio: medio,
+                cuentaDigitalId: cuentaDigitalId,
+                suscripcionId: suscripcionId,
+                suscripcionPeriodo: suscripcionPeriodo,
               ),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
                   e.readTable<$GastosTable, Gasto>(table),
-                  BaseReferences<_$AppDatabase, $GastosTable, Gasto>(
-                    db,
-                    table,
-                    e,
-                  ),
+                  $$GastosTableReferences(db, table, e),
                 ),
               )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback:
+              ({cuentaDigitalId = false, suscripcionId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (cuentaDigitalId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.cuentaDigitalId,
+                                    referencedTable: $$GastosTableReferences
+                                        ._cuentaDigitalIdTable(db),
+                                    referencedColumn: $$GastosTableReferences
+                                        ._cuentaDigitalIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (suscripcionId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.suscripcionId,
+                                    referencedTable: $$GastosTableReferences
+                                        ._suscripcionIdTable(db),
+                                    referencedColumn: $$GastosTableReferences
+                                        ._suscripcionIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
         ),
       );
 }
@@ -5566,9 +8961,9 @@ typedef $$GastosTableProcessedTableManager =
       $$GastosTableAnnotationComposer,
       $$GastosTableCreateCompanionBuilder,
       $$GastosTableUpdateCompanionBuilder,
-      (Gasto, BaseReferences<_$AppDatabase, $GastosTable, Gasto>),
+      (Gasto, $$GastosTableReferences),
       Gasto,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool cuentaDigitalId, bool suscripcionId})
     >;
 typedef $$DeudasTableCreateCompanionBuilder =
     DeudasCompanion Function({
@@ -8157,6 +11552,7 @@ typedef $$AsignacionesDineroTableCreateCompanionBuilder =
       Value<int> id,
       required String medio,
       required double monto,
+      Value<int?> cuentaDigitalId,
       Value<String?> origen,
       Value<int?> origenId,
     });
@@ -8165,9 +11561,43 @@ typedef $$AsignacionesDineroTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> medio,
       Value<double> monto,
+      Value<int?> cuentaDigitalId,
       Value<String?> origen,
       Value<int?> origenId,
     });
+
+final class $$AsignacionesDineroTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $AsignacionesDineroTable,
+          AsignacionesDineroData
+        > {
+  $$AsignacionesDineroTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CuentasDigitalesTable _cuentaDigitalIdTable(_$AppDatabase db) =>
+      db.cuentasDigitales.createAlias(
+        'asignaciones_dinero__cuenta_digital_id__cuentas_digitales__id',
+      );
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaDigitalId {
+    final $_column = $_itemColumn<int>('cuenta_digital_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaDigitalIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
 
 class $$AsignacionesDineroTableFilterComposer
     extends Composer<_$AppDatabase, $AsignacionesDineroTable> {
@@ -8202,6 +11632,29 @@ class $$AsignacionesDineroTableFilterComposer
     column: $table.origenId,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$CuentasDigitalesTableFilterComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$AsignacionesDineroTableOrderingComposer
@@ -8237,6 +11690,29 @@ class $$AsignacionesDineroTableOrderingComposer
     column: $table.origenId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$AsignacionesDineroTableAnnotationComposer
@@ -8262,6 +11738,29 @@ class $$AsignacionesDineroTableAnnotationComposer
 
   GeneratedColumn<int> get origenId =>
       $composableBuilder(column: $table.origenId, builder: (column) => column);
+
+  $$CuentasDigitalesTableAnnotationComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$AsignacionesDineroTableTableManager
@@ -8275,16 +11774,9 @@ class $$AsignacionesDineroTableTableManager
           $$AsignacionesDineroTableAnnotationComposer,
           $$AsignacionesDineroTableCreateCompanionBuilder,
           $$AsignacionesDineroTableUpdateCompanionBuilder,
-          (
-            AsignacionesDineroData,
-            BaseReferences<
-              _$AppDatabase,
-              $AsignacionesDineroTable,
-              AsignacionesDineroData
-            >,
-          ),
+          (AsignacionesDineroData, $$AsignacionesDineroTableReferences),
           AsignacionesDineroData,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool cuentaDigitalId})
         > {
   $$AsignacionesDineroTableTableManager(
     _$AppDatabase db,
@@ -8307,12 +11799,14 @@ class $$AsignacionesDineroTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> medio = const Value.absent(),
                 Value<double> monto = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
                 Value<String?> origen = const Value.absent(),
                 Value<int?> origenId = const Value.absent(),
               }) => AsignacionesDineroCompanion(
                 id: id,
                 medio: medio,
                 monto: monto,
+                cuentaDigitalId: cuentaDigitalId,
                 origen: origen,
                 origenId: origenId,
               ),
@@ -8321,12 +11815,14 @@ class $$AsignacionesDineroTableTableManager
                 Value<int> id = const Value.absent(),
                 required String medio,
                 required double monto,
+                Value<int?> cuentaDigitalId = const Value.absent(),
                 Value<String?> origen = const Value.absent(),
                 Value<int?> origenId = const Value.absent(),
               }) => AsignacionesDineroCompanion.insert(
                 id: id,
                 medio: medio,
                 monto: monto,
+                cuentaDigitalId: cuentaDigitalId,
                 origen: origen,
                 origenId: origenId,
               ),
@@ -8336,15 +11832,53 @@ class $$AsignacionesDineroTableTableManager
                   e.readTable<$AsignacionesDineroTable, AsignacionesDineroData>(
                     table,
                   ),
-                  BaseReferences<
-                    _$AppDatabase,
-                    $AsignacionesDineroTable,
-                    AsignacionesDineroData
-                  >(db, table, e),
+                  $$AsignacionesDineroTableReferences(db, table, e),
                 ),
               )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({cuentaDigitalId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (cuentaDigitalId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.cuentaDigitalId,
+                                referencedTable:
+                                    $$AsignacionesDineroTableReferences
+                                        ._cuentaDigitalIdTable(db),
+                                referencedColumn:
+                                    $$AsignacionesDineroTableReferences
+                                        ._cuentaDigitalIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
         ),
       );
 }
@@ -8359,39 +11893,80 @@ typedef $$AsignacionesDineroTableProcessedTableManager =
       $$AsignacionesDineroTableAnnotationComposer,
       $$AsignacionesDineroTableCreateCompanionBuilder,
       $$AsignacionesDineroTableUpdateCompanionBuilder,
-      (
-        AsignacionesDineroData,
-        BaseReferences<
-          _$AppDatabase,
-          $AsignacionesDineroTable,
-          AsignacionesDineroData
-        >,
-      ),
+      (AsignacionesDineroData, $$AsignacionesDineroTableReferences),
       AsignacionesDineroData,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool cuentaDigitalId})
     >;
-typedef $$SuscripcionesTableCreateCompanionBuilder =
-    SuscripcionesCompanion Function({
+typedef $$IngresoDistribucionesTableCreateCompanionBuilder =
+    IngresoDistribucionesCompanion Function({
       Value<int> id,
-      required String nombre,
-      required double precio,
-      required DateTime proximoPago,
-      required String frecuencia,
-      Value<String?> medio,
+      required int ingresoId,
+      required String medio,
+      required double monto,
+      Value<int?> cuentaDigitalId,
     });
-typedef $$SuscripcionesTableUpdateCompanionBuilder =
-    SuscripcionesCompanion Function({
+typedef $$IngresoDistribucionesTableUpdateCompanionBuilder =
+    IngresoDistribucionesCompanion Function({
       Value<int> id,
-      Value<String> nombre,
-      Value<double> precio,
-      Value<DateTime> proximoPago,
-      Value<String> frecuencia,
-      Value<String?> medio,
+      Value<int> ingresoId,
+      Value<String> medio,
+      Value<double> monto,
+      Value<int?> cuentaDigitalId,
     });
 
-class $$SuscripcionesTableFilterComposer
-    extends Composer<_$AppDatabase, $SuscripcionesTable> {
-  $$SuscripcionesTableFilterComposer({
+final class $$IngresoDistribucionesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $IngresoDistribucionesTable,
+          IngresoDistribucione
+        > {
+  $$IngresoDistribucionesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $IngresosTable _ingresoIdTable(_$AppDatabase db) => db.ingresos
+      .createAlias('ingreso_distribuciones__ingreso_id__ingresos__id');
+
+  $$IngresosTableProcessedTableManager get ingresoId {
+    final $_column = $_itemColumn<int>('ingreso_id')!;
+
+    final manager = $$IngresosTableTableManager(
+      $_db,
+      $_db.ingresos,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_ingresoIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $CuentasDigitalesTable _cuentaDigitalIdTable(_$AppDatabase db) =>
+      db.cuentasDigitales.createAlias(
+        'ingreso_distribuciones__cuenta_digital_id__cuentas_digitales__id',
+      );
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaDigitalId {
+    final $_column = $_itemColumn<int>('cuenta_digital_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaDigitalIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$IngresoDistribucionesTableFilterComposer
+    extends Composer<_$AppDatabase, $IngresoDistribucionesTable> {
+  $$IngresoDistribucionesTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -8403,35 +11978,66 @@ class $$SuscripcionesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get nombre => $composableBuilder(
-    column: $table.nombre,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<double> get precio => $composableBuilder(
-    column: $table.precio,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get proximoPago => $composableBuilder(
-    column: $table.proximoPago,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get frecuencia => $composableBuilder(
-    column: $table.frecuencia,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<String> get medio => $composableBuilder(
     column: $table.medio,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<double> get monto => $composableBuilder(
+    column: $table.monto,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$IngresosTableFilterComposer get ingresoId {
+    final $$IngresosTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.ingresoId,
+      referencedTable: $db.ingresos,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$IngresosTableFilterComposer(
+            $db: $db,
+            $table: $db.ingresos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CuentasDigitalesTableFilterComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
-class $$SuscripcionesTableOrderingComposer
-    extends Composer<_$AppDatabase, $SuscripcionesTable> {
-  $$SuscripcionesTableOrderingComposer({
+class $$IngresoDistribucionesTableOrderingComposer
+    extends Composer<_$AppDatabase, $IngresoDistribucionesTable> {
+  $$IngresoDistribucionesTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -8443,35 +12049,66 @@ class $$SuscripcionesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get nombre => $composableBuilder(
-    column: $table.nombre,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<double> get precio => $composableBuilder(
-    column: $table.precio,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get proximoPago => $composableBuilder(
-    column: $table.proximoPago,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get frecuencia => $composableBuilder(
-    column: $table.frecuencia,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get medio => $composableBuilder(
     column: $table.medio,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get monto => $composableBuilder(
+    column: $table.monto,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$IngresosTableOrderingComposer get ingresoId {
+    final $$IngresosTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.ingresoId,
+      referencedTable: $db.ingresos,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$IngresosTableOrderingComposer(
+            $db: $db,
+            $table: $db.ingresos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
-class $$SuscripcionesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $SuscripcionesTable> {
-  $$SuscripcionesTableAnnotationComposer({
+class $$IngresoDistribucionesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $IngresoDistribucionesTable> {
+  $$IngresoDistribucionesTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -8481,127 +12118,709 @@ class $$SuscripcionesTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get nombre =>
-      $composableBuilder(column: $table.nombre, builder: (column) => column);
-
-  GeneratedColumn<double> get precio =>
-      $composableBuilder(column: $table.precio, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get proximoPago => $composableBuilder(
-    column: $table.proximoPago,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get frecuencia => $composableBuilder(
-    column: $table.frecuencia,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<String> get medio =>
       $composableBuilder(column: $table.medio, builder: (column) => column);
+
+  GeneratedColumn<double> get monto =>
+      $composableBuilder(column: $table.monto, builder: (column) => column);
+
+  $$IngresosTableAnnotationComposer get ingresoId {
+    final $$IngresosTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.ingresoId,
+      referencedTable: $db.ingresos,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$IngresosTableAnnotationComposer(
+            $db: $db,
+            $table: $db.ingresos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CuentasDigitalesTableAnnotationComposer get cuentaDigitalId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDigitalId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
-class $$SuscripcionesTableTableManager
+class $$IngresoDistribucionesTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $SuscripcionesTable,
-          Suscripcion,
-          $$SuscripcionesTableFilterComposer,
-          $$SuscripcionesTableOrderingComposer,
-          $$SuscripcionesTableAnnotationComposer,
-          $$SuscripcionesTableCreateCompanionBuilder,
-          $$SuscripcionesTableUpdateCompanionBuilder,
-          (
-            Suscripcion,
-            BaseReferences<_$AppDatabase, $SuscripcionesTable, Suscripcion>,
-          ),
-          Suscripcion,
-          PrefetchHooks Function()
+          $IngresoDistribucionesTable,
+          IngresoDistribucione,
+          $$IngresoDistribucionesTableFilterComposer,
+          $$IngresoDistribucionesTableOrderingComposer,
+          $$IngresoDistribucionesTableAnnotationComposer,
+          $$IngresoDistribucionesTableCreateCompanionBuilder,
+          $$IngresoDistribucionesTableUpdateCompanionBuilder,
+          (IngresoDistribucione, $$IngresoDistribucionesTableReferences),
+          IngresoDistribucione,
+          PrefetchHooks Function({bool ingresoId, bool cuentaDigitalId})
         > {
-  $$SuscripcionesTableTableManager(_$AppDatabase db, $SuscripcionesTable table)
-    : super(
+  $$IngresoDistribucionesTableTableManager(
+    _$AppDatabase db,
+    $IngresoDistribucionesTable table,
+  ) : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$SuscripcionesTableFilterComposer($db: db, $table: table),
+              $$IngresoDistribucionesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
           createOrderingComposer: () =>
-              $$SuscripcionesTableOrderingComposer($db: db, $table: table),
+              $$IngresoDistribucionesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
           createComputedFieldComposer: () =>
-              $$SuscripcionesTableAnnotationComposer($db: db, $table: table),
+              $$IngresoDistribucionesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                Value<String> nombre = const Value.absent(),
-                Value<double> precio = const Value.absent(),
-                Value<DateTime> proximoPago = const Value.absent(),
-                Value<String> frecuencia = const Value.absent(),
-                Value<String?> medio = const Value.absent(),
-              }) => SuscripcionesCompanion(
+                Value<int> ingresoId = const Value.absent(),
+                Value<String> medio = const Value.absent(),
+                Value<double> monto = const Value.absent(),
+                Value<int?> cuentaDigitalId = const Value.absent(),
+              }) => IngresoDistribucionesCompanion(
                 id: id,
-                nombre: nombre,
-                precio: precio,
-                proximoPago: proximoPago,
-                frecuencia: frecuencia,
+                ingresoId: ingresoId,
                 medio: medio,
+                monto: monto,
+                cuentaDigitalId: cuentaDigitalId,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                required String nombre,
-                required double precio,
-                required DateTime proximoPago,
-                required String frecuencia,
-                Value<String?> medio = const Value.absent(),
-              }) => SuscripcionesCompanion.insert(
+                required int ingresoId,
+                required String medio,
+                required double monto,
+                Value<int?> cuentaDigitalId = const Value.absent(),
+              }) => IngresoDistribucionesCompanion.insert(
                 id: id,
-                nombre: nombre,
-                precio: precio,
-                proximoPago: proximoPago,
-                frecuencia: frecuencia,
+                ingresoId: ingresoId,
                 medio: medio,
+                monto: monto,
+                cuentaDigitalId: cuentaDigitalId,
               ),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable<$SuscripcionesTable, Suscripcion>(table),
-                  BaseReferences<
-                    _$AppDatabase,
-                    $SuscripcionesTable,
-                    Suscripcion
-                  >(db, table, e),
+                  e.readTable<
+                    $IngresoDistribucionesTable,
+                    IngresoDistribucione
+                  >(table),
+                  $$IngresoDistribucionesTableReferences(db, table, e),
                 ),
               )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback:
+              ({ingresoId = false, cuentaDigitalId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (ingresoId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.ingresoId,
+                                    referencedTable:
+                                        $$IngresoDistribucionesTableReferences
+                                            ._ingresoIdTable(db),
+                                    referencedColumn:
+                                        $$IngresoDistribucionesTableReferences
+                                            ._ingresoIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (cuentaDigitalId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.cuentaDigitalId,
+                                    referencedTable:
+                                        $$IngresoDistribucionesTableReferences
+                                            ._cuentaDigitalIdTable(db),
+                                    referencedColumn:
+                                        $$IngresoDistribucionesTableReferences
+                                            ._cuentaDigitalIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
         ),
       );
 }
 
-typedef $$SuscripcionesTableProcessedTableManager =
+typedef $$IngresoDistribucionesTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $SuscripcionesTable,
-      Suscripcion,
-      $$SuscripcionesTableFilterComposer,
-      $$SuscripcionesTableOrderingComposer,
-      $$SuscripcionesTableAnnotationComposer,
-      $$SuscripcionesTableCreateCompanionBuilder,
-      $$SuscripcionesTableUpdateCompanionBuilder,
-      (
-        Suscripcion,
-        BaseReferences<_$AppDatabase, $SuscripcionesTable, Suscripcion>,
-      ),
-      Suscripcion,
-      PrefetchHooks Function()
+      $IngresoDistribucionesTable,
+      IngresoDistribucione,
+      $$IngresoDistribucionesTableFilterComposer,
+      $$IngresoDistribucionesTableOrderingComposer,
+      $$IngresoDistribucionesTableAnnotationComposer,
+      $$IngresoDistribucionesTableCreateCompanionBuilder,
+      $$IngresoDistribucionesTableUpdateCompanionBuilder,
+      (IngresoDistribucione, $$IngresoDistribucionesTableReferences),
+      IngresoDistribucione,
+      PrefetchHooks Function({bool ingresoId, bool cuentaDigitalId})
+    >;
+typedef $$TransferenciasDineroTableCreateCompanionBuilder =
+    TransferenciasDineroCompanion Function({
+      Value<int> id,
+      required String medioOrigen,
+      Value<int?> cuentaOrigenId,
+      required String medioDestino,
+      Value<int?> cuentaDestinoId,
+      required double monto,
+      required DateTime fecha,
+      Value<String?> nota,
+    });
+typedef $$TransferenciasDineroTableUpdateCompanionBuilder =
+    TransferenciasDineroCompanion Function({
+      Value<int> id,
+      Value<String> medioOrigen,
+      Value<int?> cuentaOrigenId,
+      Value<String> medioDestino,
+      Value<int?> cuentaDestinoId,
+      Value<double> monto,
+      Value<DateTime> fecha,
+      Value<String?> nota,
+    });
+
+final class $$TransferenciasDineroTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $TransferenciasDineroTable,
+          TransferenciasDineroData
+        > {
+  $$TransferenciasDineroTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CuentasDigitalesTable _cuentaOrigenIdTable(_$AppDatabase db) =>
+      db.cuentasDigitales.createAlias(
+        'transferencias_dinero__cuenta_origen_id__cuentas_digitales__id',
+      );
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaOrigenId {
+    final $_column = $_itemColumn<int>('cuenta_origen_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaOrigenIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $CuentasDigitalesTable _cuentaDestinoIdTable(_$AppDatabase db) =>
+      db.cuentasDigitales.createAlias(
+        'transferencias_dinero__cuenta_destino_id__cuentas_digitales__id',
+      );
+
+  $$CuentasDigitalesTableProcessedTableManager? get cuentaDestinoId {
+    final $_column = $_itemColumn<int>('cuenta_destino_id');
+    if ($_column == null) return null;
+    final manager = $$CuentasDigitalesTableTableManager(
+      $_db,
+      $_db.cuentasDigitales,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_cuentaDestinoIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TransferenciasDineroTableFilterComposer
+    extends Composer<_$AppDatabase, $TransferenciasDineroTable> {
+  $$TransferenciasDineroTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medioOrigen => $composableBuilder(
+    column: $table.medioOrigen,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get medioDestino => $composableBuilder(
+    column: $table.medioDestino,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get monto => $composableBuilder(
+    column: $table.monto,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fecha => $composableBuilder(
+    column: $table.fecha,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nota => $composableBuilder(
+    column: $table.nota,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CuentasDigitalesTableFilterComposer get cuentaOrigenId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaOrigenId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CuentasDigitalesTableFilterComposer get cuentaDestinoId {
+    final $$CuentasDigitalesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDestinoId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableFilterComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TransferenciasDineroTableOrderingComposer
+    extends Composer<_$AppDatabase, $TransferenciasDineroTable> {
+  $$TransferenciasDineroTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get medioOrigen => $composableBuilder(
+    column: $table.medioOrigen,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get medioDestino => $composableBuilder(
+    column: $table.medioDestino,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get monto => $composableBuilder(
+    column: $table.monto,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fecha => $composableBuilder(
+    column: $table.fecha,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nota => $composableBuilder(
+    column: $table.nota,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaOrigenId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaOrigenId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CuentasDigitalesTableOrderingComposer get cuentaDestinoId {
+    final $$CuentasDigitalesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDestinoId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableOrderingComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TransferenciasDineroTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TransferenciasDineroTable> {
+  $$TransferenciasDineroTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get medioOrigen => $composableBuilder(
+    column: $table.medioOrigen,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get medioDestino => $composableBuilder(
+    column: $table.medioDestino,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get monto =>
+      $composableBuilder(column: $table.monto, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get fecha =>
+      $composableBuilder(column: $table.fecha, builder: (column) => column);
+
+  GeneratedColumn<String> get nota =>
+      $composableBuilder(column: $table.nota, builder: (column) => column);
+
+  $$CuentasDigitalesTableAnnotationComposer get cuentaOrigenId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaOrigenId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CuentasDigitalesTableAnnotationComposer get cuentaDestinoId {
+    final $$CuentasDigitalesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.cuentaDestinoId,
+      referencedTable: $db.cuentasDigitales,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CuentasDigitalesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.cuentasDigitales,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TransferenciasDineroTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TransferenciasDineroTable,
+          TransferenciasDineroData,
+          $$TransferenciasDineroTableFilterComposer,
+          $$TransferenciasDineroTableOrderingComposer,
+          $$TransferenciasDineroTableAnnotationComposer,
+          $$TransferenciasDineroTableCreateCompanionBuilder,
+          $$TransferenciasDineroTableUpdateCompanionBuilder,
+          (TransferenciasDineroData, $$TransferenciasDineroTableReferences),
+          TransferenciasDineroData,
+          PrefetchHooks Function({bool cuentaOrigenId, bool cuentaDestinoId})
+        > {
+  $$TransferenciasDineroTableTableManager(
+    _$AppDatabase db,
+    $TransferenciasDineroTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransferenciasDineroTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransferenciasDineroTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$TransferenciasDineroTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> medioOrigen = const Value.absent(),
+                Value<int?> cuentaOrigenId = const Value.absent(),
+                Value<String> medioDestino = const Value.absent(),
+                Value<int?> cuentaDestinoId = const Value.absent(),
+                Value<double> monto = const Value.absent(),
+                Value<DateTime> fecha = const Value.absent(),
+                Value<String?> nota = const Value.absent(),
+              }) => TransferenciasDineroCompanion(
+                id: id,
+                medioOrigen: medioOrigen,
+                cuentaOrigenId: cuentaOrigenId,
+                medioDestino: medioDestino,
+                cuentaDestinoId: cuentaDestinoId,
+                monto: monto,
+                fecha: fecha,
+                nota: nota,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String medioOrigen,
+                Value<int?> cuentaOrigenId = const Value.absent(),
+                required String medioDestino,
+                Value<int?> cuentaDestinoId = const Value.absent(),
+                required double monto,
+                required DateTime fecha,
+                Value<String?> nota = const Value.absent(),
+              }) => TransferenciasDineroCompanion.insert(
+                id: id,
+                medioOrigen: medioOrigen,
+                cuentaOrigenId: cuentaOrigenId,
+                medioDestino: medioDestino,
+                cuentaDestinoId: cuentaDestinoId,
+                monto: monto,
+                fecha: fecha,
+                nota: nota,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $TransferenciasDineroTable,
+                    TransferenciasDineroData
+                  >(table),
+                  $$TransferenciasDineroTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({cuentaOrigenId = false, cuentaDestinoId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (cuentaOrigenId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.cuentaOrigenId,
+                                    referencedTable:
+                                        $$TransferenciasDineroTableReferences
+                                            ._cuentaOrigenIdTable(db),
+                                    referencedColumn:
+                                        $$TransferenciasDineroTableReferences
+                                            ._cuentaOrigenIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (cuentaDestinoId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.cuentaDestinoId,
+                                    referencedTable:
+                                        $$TransferenciasDineroTableReferences
+                                            ._cuentaDestinoIdTable(db),
+                                    referencedColumn:
+                                        $$TransferenciasDineroTableReferences
+                                            ._cuentaDestinoIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$TransferenciasDineroTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TransferenciasDineroTable,
+      TransferenciasDineroData,
+      $$TransferenciasDineroTableFilterComposer,
+      $$TransferenciasDineroTableOrderingComposer,
+      $$TransferenciasDineroTableAnnotationComposer,
+      $$TransferenciasDineroTableCreateCompanionBuilder,
+      $$TransferenciasDineroTableUpdateCompanionBuilder,
+      (TransferenciasDineroData, $$TransferenciasDineroTableReferences),
+      TransferenciasDineroData,
+      PrefetchHooks Function({bool cuentaOrigenId, bool cuentaDestinoId})
     >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$CuentasDigitalesTableTableManager get cuentasDigitales =>
+      $$CuentasDigitalesTableTableManager(_db, _db.cuentasDigitales);
   $$IngresosTableTableManager get ingresos =>
       $$IngresosTableTableManager(_db, _db.ingresos);
+  $$SuscripcionesTableTableManager get suscripciones =>
+      $$SuscripcionesTableTableManager(_db, _db.suscripciones);
   $$GastosTableTableManager get gastos =>
       $$GastosTableTableManager(_db, _db.gastos);
   $$DeudasTableTableManager get deudas =>
@@ -8624,6 +12843,8 @@ class $AppDatabaseManager {
       );
   $$AsignacionesDineroTableTableManager get asignacionesDinero =>
       $$AsignacionesDineroTableTableManager(_db, _db.asignacionesDinero);
-  $$SuscripcionesTableTableManager get suscripciones =>
-      $$SuscripcionesTableTableManager(_db, _db.suscripciones);
+  $$IngresoDistribucionesTableTableManager get ingresoDistribuciones =>
+      $$IngresoDistribucionesTableTableManager(_db, _db.ingresoDistribuciones);
+  $$TransferenciasDineroTableTableManager get transferenciasDinero =>
+      $$TransferenciasDineroTableTableManager(_db, _db.transferenciasDinero);
 }

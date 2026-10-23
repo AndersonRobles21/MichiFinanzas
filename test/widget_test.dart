@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
 import 'package:finanzas_app/main.dart' as app;
+import 'package:finanzas_app/models/money_medium.dart';
 import 'package:finanzas_app/services/database_service.dart';
 
 void main() {
@@ -21,11 +22,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.runAsync(() async => app.main());
-    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+    await _completeWelcome(tester);
 
-    expect(find.text('Todavía no hay ingresos por aquí.'), findsNWidgets(2));
+    expect(find.text('Todavía no hay ingresos por aquí.'), findsOneWidget);
     final emptyExpenses = find.textContaining(
-      'Todavía no hay gastos por aquí.',
+      'Todavía no hay gastos registrados.',
     );
     await _pumpUntilFound(tester, emptyExpenses);
     expect(emptyExpenses, findsOneWidget);
@@ -37,10 +38,8 @@ void main() {
     _expectNoTestException(tester);
 
     await _openDrawerAndSelect(tester, 'Ingresos');
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-monthly-received')),
-    );
-    expect(find.byKey(const ValueKey('home-monthly-received')), findsOneWidget);
+    expect(find.text('Ingresos'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-monthly-received')), findsNothing);
     _expectNoTestException(tester);
 
     await _openDrawerAndSelect(tester, 'Gastos');
@@ -64,7 +63,7 @@ void main() {
     await _pumpUntilFound(tester, find.text('Tu historial'));
     _expectNoTestException(tester);
 
-    await _openDrawerAndSelect(tester, 'Deudas');
+    await _openDrawerAndSelect(tester, 'Deudas y préstamos');
     await tester.pumpAndSettle();
     expect(find.text('Estamos cargando tus deudas...'), findsOneWidget);
     _expectNoTestException(tester);
@@ -104,12 +103,14 @@ void main() {
         monto: 1000,
         fecha: now,
         descripcion: 'Ingreso de prueba',
+        medio: MoneyMedium.cash,
       );
       await service.agregarGasto(
         nombre: 'Gasto de prueba',
         monto: 200,
         categoria: 'Prueba',
         fecha: now,
+        medio: MoneyMedium.cash,
       );
       final deudaId = await service.agregarDeuda(
         nombre: 'Deuda de prueba',
@@ -123,6 +124,7 @@ void main() {
         monto: 50,
         fecha: now,
         operationId: 'widget-payment-1',
+        medio: MoneyMedium.cash,
       );
     });
     addTearDown(() => tester.runAsync(() => service.close()));
@@ -133,6 +135,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _completeWelcome(tester);
     await _pumpUntilFound(tester, find.text('25,0%'));
 
     final availableBalance = find.byKey(
@@ -141,7 +144,7 @@ void main() {
     expect(availableBalance, findsOneWidget);
     expect(tester.widget<Text>(availableBalance).data, r'$ 750');
     expect(find.byKey(const ValueKey('home-monthly-received')), findsOneWidget);
-    expect(find.text(r'$ 1.000'), findsNWidgets(4));
+    expect(find.text(r'$ 1.000'), findsNWidgets(2));
     expect(find.text(r'$ 200'), findsOneWidget);
     expect(find.text('25,0%'), findsOneWidget);
     expect(find.text(r'$ 450'), findsOneWidget);
@@ -165,10 +168,46 @@ void main() {
     final service = DatabaseService(database);
     addTearDown(() => tester.runAsync(() => service.close()));
     await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _completeWelcome(tester);
     await _pumpUntilFound(tester, find.text('Dinero disponible'));
 
     expect(find.text('Dinero disponible'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await _unmountApp(tester);
+  });
+
+  testWidgets('guarda el nombre de bienvenida y no la repite al reabrir', (
+    tester,
+  ) async {
+    await _prepareTemporaryDatabaseDirectory(tester);
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    addTearDown(() => tester.runAsync(() => service.close()));
+
+    await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('welcome-user-name')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('welcome-user-name')),
+      'María José',
+    );
+    await tester.tap(find.text('Continuar'));
+    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+    expect(
+      find.text('Hola, María José. Aquí ves cómo va tu dinero.'),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+    expect(find.byKey(const ValueKey('welcome-user-name')), findsNothing);
+    expect(
+      find.text('Hola, María José. Aquí ves cómo va tu dinero.'),
+      findsOneWidget,
+    );
     await _unmountApp(tester);
   });
 }
@@ -218,6 +257,23 @@ Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
     if (finder.evaluate().isNotEmpty) return;
   }
   fail('No se encontró el contenido esperado: $finder');
+}
+
+Future<void> _completeWelcome(WidgetTester tester) async {
+  final nameField = find.byKey(const ValueKey('welcome-user-name'));
+  final dashboard = find.text('Dinero disponible');
+  for (var attempt = 0; attempt < 100; attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+    if (dashboard.evaluate().isNotEmpty) return;
+    if (nameField.evaluate().isNotEmpty) break;
+  }
+  expect(nameField, findsOneWidget);
+  await tester.enterText(nameField, 'Anderson');
+  await tester.tap(find.text('Continuar'));
+  await _pumpUntilFound(tester, dashboard);
 }
 
 void _expectNoTestException(WidgetTester tester) {

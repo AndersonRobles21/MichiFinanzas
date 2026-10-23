@@ -129,6 +129,7 @@ void main() {
       monto: 25,
       categoria: 'Otros',
       fecha: now,
+      medio: MoneyMedium.cash,
     );
     final debtId = await service.agregarDeuda(
       nombre: 'Cuotas de prueba',
@@ -155,6 +156,7 @@ void main() {
       monto: 15,
       fecha: now,
       operationId: 'statistics-debt-unclassified',
+      medio: MoneyMedium.cash,
     );
 
     await _mountStatisticsScreen(tester, service: service);
@@ -177,8 +179,8 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Pagos de deudas'), findsNWidgets(2));
-    expect(find.textContaining(r'Movimientos sin medio: $ 40'), findsOneWidget);
+    expect(find.text('Pagos de deudas'), findsNWidgets(3));
+    expect(find.textContaining('Movimientos sin medio:'), findsNothing);
     expect(
       find.byKey(const ValueKey('digital-category-pie-chart')),
       findsOneWidget,
