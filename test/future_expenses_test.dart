@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart'
     show
-        IconButton,
         MaterialApp,
         Scaffold,
         Scrollable,
@@ -19,7 +18,6 @@ import 'package:finanzas_app/screens/future_expenses/future_expenses_screen.dart
 import 'package:finanzas_app/screens/home/home_screen.dart';
 import 'package:finanzas_app/services/database_service.dart';
 import 'package:finanzas_app/utils/future_expense_calculator.dart';
-import 'package:finanzas_app/utils/money_format.dart';
 
 void main() {
   test('calcula recomendaciones por frecuencia y no excede la meta', () {
@@ -547,7 +545,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('el dashboard informa y solo ofrece ir a todos los planes', (
+  testWidgets('el dashboard recuerda los planes sin mezclarlos con el saldo', (
     tester,
   ) async {
     _setMobileSize(tester);
@@ -574,13 +572,10 @@ void main() {
       ),
     );
     await _pumpUntilFound(tester, find.text('Comida para gatos'));
-    final summary = find.byKey(const ValueKey('home-future-expenses'));
-    expect(
-      find.descendant(of: summary, matching: find.byType(IconButton)),
-      findsNothing,
-    );
-    expect(find.text('Reservado: ${formatMoney(0)}'), findsOneWidget);
-    expect(find.text('Falta: ${formatMoney(80000)}'), findsOneWidget);
+    expect(find.text('Gastos futuros planeados'), findsOneWidget);
+    expect(find.textContaining('Planeado · 15/11/2026'), findsOneWidget);
+    expect(find.textContaining('Reservado:'), findsNothing);
+    expect(find.textContaining('Falta:'), findsNothing);
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-future-expenses-see-all')),
     );

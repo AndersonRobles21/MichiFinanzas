@@ -44,11 +44,7 @@ class SectionPlaceholder extends StatelessWidget {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(20),
-                          child: Icon(
-                            icon,
-                            size: 34,
-                            color: AppColors.primary,
-                          ),
+                          child: Icon(icon, size: 34, color: AppColors.primary),
                         ),
                       ),
                       const SizedBox(height: 28),

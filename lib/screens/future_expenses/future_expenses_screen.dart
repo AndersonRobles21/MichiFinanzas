@@ -13,6 +13,7 @@ import '../../utils/date_format.dart';
 import '../../utils/future_expense_calculator.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 import '../../widgets/money_medium_selector.dart';
 
@@ -387,7 +388,9 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 420 ? 18.0 : 36.0;
+            final horizontalPadding = constraints.maxWidth < 420
+                ? AppSpacing.pageHorizontal
+                : AppSpacing.pageHorizontalWide;
             return FutureBuilder<_FutureExpensesData>(
               future: _dataFuture,
               builder: (context, snapshot) {
@@ -407,44 +410,24 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
                         SliverPadding(
                           padding: EdgeInsets.fromLTRB(
                             horizontalPadding,
-                            26,
+                            AppSpacing.pageTop,
                             horizontalPadding,
                             120,
                           ),
                           sliver: SliverList.list(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Gastos futuros',
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.headlineMedium,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Organiza con tiempo lo que vas a necesitar.',
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodyLarge,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const AnimatedCat(
-                                    asset: CatAssets.gastos,
-                                    label: 'Gato organizando sus gastos',
-                                    width: 66,
-                                    height: 58,
-                                  ),
-                                ],
+                              const AppPageHeader(
+                                title: 'Gastos futuros',
+                                subtitle:
+                                    'Organiza con tiempo lo que vas a necesitar.',
+                                trailing: AnimatedCat(
+                                  asset: CatAssets.gastos,
+                                  label: 'Gato organizando sus gastos',
+                                  width: 60,
+                                  height: 52,
+                                ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: AppSpacing.section),
                               _AvailableFutureFunds(available: data.available),
                               const SizedBox(height: 20),
                               SegmentedButton<FutureExpenseStatus>(

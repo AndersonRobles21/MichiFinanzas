@@ -10,6 +10,7 @@ import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 
 enum StatisticsPeriod { thisMonth, previousMonth, last7Days, last30Days }
@@ -77,6 +78,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         _databaseService.obtenerSaldoDisponible(),
         _databaseService.obtenerTodosLosMovimientosReservaGastoFuturo(),
         _databaseService.obtenerTodosLosPagosDeuda(),
+        _databaseService.obtenerCuentasDigitales(),
       ]);
       return _StatisticsData(
         incomes: results[0] as List<Ingreso>,
@@ -87,6 +89,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           results[4] as List<MovimientosReservaGastoFuturoData>,
         ),
         debtPayments: results[5] as List<PagosDeudaData>,
+        digitalAccounts: results[6] as List<DigitalAccountBalance>,
       );
     });
   }
@@ -110,7 +113,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+            final horizontalPadding = constraints.maxWidth < 420
+                ? AppSpacing.pageHorizontal
+                : AppSpacing.pageHorizontalWide;
             return FutureBuilder<_StatisticsData>(
               future: _statisticsFuture,
               builder: (context, snapshot) {
@@ -160,7 +165,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    28,
+                    AppSpacing.pageTop,
                     horizontalPadding,
                     36,
                   ),
@@ -170,50 +175,35 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Estadísticas',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.headlineMedium,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Ingresos, gastos y ahorros en un vistazo.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodyLarge,
-                                    ),
-                                  ],
+                          AppPageHeader(
+                            title: 'Estadísticas',
+                            subtitle:
+                                'Ingresos, gastos y ahorros en un vistazo.',
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const AnimatedCat(
+                                  asset: CatAssets.estadisticas,
+                                  label: 'Gato revisando estadísticas',
+                                  width: 64,
+                                  height: 52,
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              const AnimatedCat(
-                                asset: CatAssets.estadisticas,
-                                label: 'Gato revisando estadísticas',
-                                width: 88,
-                                height: 66,
-                              ),
-                              IconButton(
-                                tooltip: 'Actualizar estadísticas',
-                                onPressed: _retry,
-                                icon: const Icon(Icons.refresh_rounded),
-                              ),
-                            ],
+                                IconButton(
+                                  tooltip: 'Actualizar estadísticas',
+                                  onPressed: _retry,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: AppSpacing.section),
                           _PeriodSelector(
                             selected: _period,
                             onChanged: (period) => setState(() {
                               _period = period;
                             }),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.section),
                           _SummaryGrid(summary: summary),
                           const SizedBox(height: 28),
                           Text(
@@ -288,6 +278,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                 'en este período.',
                           ),
                           const SizedBox(height: 16),
+                          _DigitalAccountStatistics(
+                            accounts: data.digitalAccounts
+                                .where((account) => account.balance > 1e-8)
+                                .map(
+                                  (account) => _DigitalAccountPeriodSummary(
+                                    account: account,
+                                    expenses: periodExpenses
+                                        .where(
+                                          (expense) =>
+                                              expense.cuentaDigitalId ==
+                                              account.account.id,
+                                        )
+                                        .toList(),
+                                    range: range,
+                                  ),
+                                )
+                                .toList(),
+                          ),
                           const SizedBox(height: 28),
                           Text(
                             'Evolución del dinero',
@@ -371,6 +379,7 @@ class _StatisticsData {
     required this.availableBalance,
     required this.futureExpenses,
     required this.debtPayments,
+    required this.digitalAccounts,
   });
 
   final List<Ingreso> incomes;
@@ -379,6 +388,229 @@ class _StatisticsData {
   final double availableBalance;
   final List<_FutureExpenseReservation> futureExpenses;
   final List<PagosDeudaData> debtPayments;
+  final List<DigitalAccountBalance> digitalAccounts;
+}
+
+class _DigitalAccountPeriodSummary {
+  const _DigitalAccountPeriodSummary({
+    required this.account,
+    required this.expenses,
+    required this.range,
+  });
+
+  final DigitalAccountBalance account;
+  final List<Gasto> expenses;
+  final _StatisticsRange range;
+
+  double get spent =>
+      expenses.fold<double>(0, (total, expense) => total + expense.monto);
+}
+
+class _DigitalAccountStatistics extends StatelessWidget {
+  const _DigitalAccountStatistics({required this.accounts});
+
+  final List<_DigitalAccountPeriodSummary> accounts;
+
+  @override
+  Widget build(BuildContext context) {
+    if (accounts.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Por cuenta digital',
+          key: const ValueKey('statistics-accounts-title'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Saldos actuales y gastos del período en cuentas con dinero disponible.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        for (final account in accounts)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _DigitalAccountStatisticsCard(summary: account),
+          ),
+      ],
+    );
+  }
+}
+
+class _DigitalAccountStatisticsCard extends StatelessWidget {
+  const _DigitalAccountStatisticsCard({required this.summary});
+
+  final _DigitalAccountPeriodSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = summary.account.account.nombre;
+    final expenseDays = summary.expenses
+        .map(
+          (expense) => DateTime(
+            expense.fecha.year,
+            expense.fecha.month,
+            expense.fecha.day,
+          ),
+        )
+        .toSet();
+    return Container(
+      key: ValueKey('statistics-account-${summary.account.account.id}'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.card),
+      decoration: AppCardDecorations.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                child: Text(
+                  name.substring(0, 1).toUpperCase(),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: AppColors.accent),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _AccountMetric(
+                  label: 'Saldo actual',
+                  amount: summary.account.balance,
+                  amountKey: ValueKey(
+                    'statistics-account-balance-${summary.account.account.id}',
+                  ),
+                  color: AppColors.positive,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _AccountMetric(
+                  label: 'Gastos del período',
+                  amount: summary.spent,
+                  amountKey: ValueKey(
+                    'statistics-account-spent-${summary.account.account.id}',
+                  ),
+                  color: AppColors.negative,
+                ),
+              ),
+            ],
+          ),
+          if (expenseDays.length > 1) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Evolución de gastos',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 4),
+            _AccountSpendingTrend(summary: summary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountMetric extends StatelessWidget {
+  const _AccountMetric({
+    required this.label,
+    required this.amount,
+    required this.amountKey,
+    required this.color,
+  });
+
+  final String label;
+  final double amount;
+  final Key amountKey;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 4),
+        Text(
+          _formatMoney(amount),
+          key: amountKey,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountSpendingTrend extends StatelessWidget {
+  const _AccountSpendingTrend({required this.summary});
+
+  final _DigitalAccountPeriodSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = List<double>.filled(summary.range.dayCount, 0);
+    for (final expense in summary.expenses) {
+      final date = DateTime(
+        expense.fecha.year,
+        expense.fecha.month,
+        expense.fecha.day,
+      );
+      final index = date.difference(summary.range.start).inDays;
+      if (index >= 0 && index < totals.length) totals[index] += expense.monto;
+    }
+    final maxAmount = totals.fold<double>(
+      0,
+      (maximum, amount) => math.max(maximum, amount),
+    );
+    return SizedBox(
+      key: ValueKey('statistics-account-trend-${summary.account.account.id}'),
+      height: 72,
+      child: LineChart(
+        LineChartData(
+          minY: 0,
+          maxY: math.max(1, maxAmount * 1.15),
+          minX: 0,
+          maxX: math.max(1, totals.length - 1).toDouble(),
+          titlesData: const FlTitlesData(show: false),
+          gridData: const FlGridData(show: false),
+          borderData: FlBorderData(show: false),
+          lineTouchData: const LineTouchData(enabled: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: [
+                for (var index = 0; index < totals.length; index++)
+                  FlSpot(index.toDouble(), totals[index]),
+              ],
+              isCurved: true,
+              color: AppColors.primary,
+              barWidth: 2,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                color: AppColors.primary.withValues(alpha: 0.12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _FutureExpenseReservation {
@@ -893,17 +1125,6 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-const _chartColors = [
-  AppColors.primary,
-  AppColors.primaryDeep,
-  Color(0xFF8C70B5),
-  Color(0xFF70558F),
-  Color(0xFFD7C2F5),
-  Color(0xFF5C4677),
-  Color(0xFFAB91D0),
-  Color(0xFF8066A4),
-];
-
 class _CategoryChart extends StatelessWidget {
   const _CategoryChart({
     required this.categories,
@@ -955,7 +1176,9 @@ class _CategoryChart extends StatelessWidget {
                           )
                             PieChartSectionData(
                               value: categories[index].amount,
-                              color: _chartColors[index % _chartColors.length],
+                              color:
+                                  AppColors.chartPalette[index %
+                                      AppColors.chartPalette.length],
                               radius: 48,
                               showTitle: false,
                             ),
@@ -994,7 +1217,8 @@ class _CategoryChart extends StatelessWidget {
                         'statistics-category-${categories[index].name}',
                       ),
                       category: categories[index],
-                      color: _chartColors[index % _chartColors.length],
+                      color: AppColors
+                          .chartPalette[index % AppColors.chartPalette.length],
                       total: base,
                     ),
                   if (remaining != null)
@@ -1171,8 +1395,8 @@ class _TrendChart extends StatelessWidget {
                   spacing: 18,
                   runSpacing: 8,
                   children: [
-                    _ChartLegend(color: Color(0xFF65B89C), label: 'Ingresos'),
-                    _ChartLegend(color: Color(0xFFE98D9B), label: 'Gastos'),
+                    _ChartLegend(color: AppColors.positive, label: 'Ingresos'),
+                    _ChartLegend(color: AppColors.negative, label: 'Gastos'),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -1216,13 +1440,13 @@ class _TrendChart extends StatelessWidget {
                                   barRods: [
                                     BarChartRodData(
                                       toY: points[index].income,
-                                      color: const Color(0xFF65B89C),
+                                      color: AppColors.positive,
                                       width: 9,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     BarChartRodData(
                                       toY: points[index].expense,
-                                      color: const Color(0xFFE98D9B),
+                                      color: AppColors.negative,
                                       width: 9,
                                       borderRadius: BorderRadius.circular(4),
                                     ),

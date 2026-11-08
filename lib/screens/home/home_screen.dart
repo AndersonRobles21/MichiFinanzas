@@ -12,7 +12,9 @@ import '../../theme/app_theme.dart';
 import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
+import 'dashboard_data.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -23,6 +25,8 @@ class HomeScreen extends StatefulWidget {
     this.onViewExpenses,
     this.onViewIncomes,
     this.onViewSubscriptions,
+    this.onViewDebts,
+    this.onViewSavings,
     this.onViewSettings,
   });
 
@@ -32,6 +36,8 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
   final VoidCallback? onViewSubscriptions;
+  final VoidCallback? onViewDebts;
+  final VoidCallback? onViewSavings;
   final VoidCallback? onViewSettings;
 
   @override
@@ -41,7 +47,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final DatabaseService _databaseService;
   late final bool _ownsDatabaseService;
-  late Future<_DashboardData> _dashboardFuture;
+  late Future<DashboardData> _dashboardFuture;
   late final StreamSubscription<void> _financialChanges;
   bool _isSavingIncome = false;
   bool _isSavingDistribution = false;
@@ -211,12 +217,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final horizontalPadding = constraints.maxWidth < 420 ? 22.0 : 36.0;
+          final horizontalPadding = constraints.maxWidth < 420
+              ? AppSpacing.pageHorizontal
+              : AppSpacing.pageHorizontalWide;
 
           return SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               horizontalPadding,
-              28,
+              AppSpacing.pageTop,
               horizontalPadding,
               36,
             ),
@@ -226,49 +234,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        AnimatedCat(
-                          asset: CatAssets.inicio,
-                          label: 'Gato de inicio',
-                          width: 64,
-                          height: 54,
-                          floating: widget.isActive,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Michi Finanzas',
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 36),
-                    Text(
-                      'Inicio',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    FutureBuilder<_DashboardData>(
+                    FutureBuilder<DashboardData>(
                       future: _dashboardFuture,
                       builder: (context, snapshot) {
                         final name = snapshot.data?.userName ?? '';
-                        return Text(
-                          name.isEmpty
+                        return AppPageHeader(
+                          title: 'Inicio',
+                          subtitleKey: const ValueKey('home-user-greeting'),
+                          subtitle: name.isEmpty
                               ? 'Aquí ves cómo va tu dinero, sin enredos.'
                               : 'Hola, $name. Aquí ves cómo va tu dinero.',
-                          key: const ValueKey('home-user-greeting'),
-                          style: Theme.of(context).textTheme.bodyLarge,
+                          caption: formatSpanishLongDate(DateTime.now()),
+                          captionKey: const ValueKey('home-current-date'),
+                          trailing: AnimatedCat(
+                            asset: CatAssets.inicio,
+                            label: 'Gato de inicio',
+                            width: 64,
+                            height: 54,
+                            floating: widget.isActive,
+                          ),
                         );
                       },
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      formatSpanishLongDate(DateTime.now()),
-                      key: const ValueKey('home-current-date'),
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 24),
-                    FutureBuilder<_DashboardData>(
+                    const SizedBox(height: AppSpacing.section),
+                    FutureBuilder<DashboardData>(
                       future: _dashboardFuture,
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
@@ -287,6 +276,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           onViewExpenses: widget.onViewExpenses,
                           onViewIncomes: widget.onViewIncomes,
                           onViewSubscriptions: widget.onViewSubscriptions,
+                          onViewDebts: widget.onViewDebts,
+                          onViewSavings: widget.onViewSavings,
                           onViewSettings: widget.onViewSettings,
                         );
                       },
@@ -552,20 +543,23 @@ class _IncomesScreenState extends State<IncomesScreen> {
           );
           return LayoutBuilder(
             builder: (context, constraints) {
-              final padding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+              final padding = constraints.maxWidth < 420
+                  ? AppSpacing.pageHorizontal
+                  : AppSpacing.pageHorizontalWide;
               return ListView(
-                padding: EdgeInsets.fromLTRB(padding, 26, padding, 100),
+                padding: EdgeInsets.fromLTRB(
+                  padding,
+                  AppSpacing.pageTop,
+                  padding,
+                  100,
+                ),
                 children: [
-                  Text(
-                    'Ingresos',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                  const AppPageHeader(
+                    title: 'Ingresos',
+                    subtitle:
+                        'Aquí tienes el historial de todo el dinero que has recibido.',
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Aquí tienes el historial de todo el dinero que has recibido.',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.section),
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: AppCardDecorations.featured,
@@ -579,7 +573,8 @@ class _IncomesScreenState extends State<IncomesScreen> {
                         const SizedBox(height: 6),
                         Text(
                           formatMoney(total),
-                          style: Theme.of(context).textTheme.titleLarge,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(color: AppColors.positive),
                         ),
                         Text('${data.incomes.length} movimientos'),
                       ],
@@ -725,7 +720,7 @@ class _IncomeHistoryTile extends StatelessWidget {
   }
 }
 
-Future<_DashboardData> _loadDashboard(DatabaseService service) async {
+Future<DashboardData> _loadDashboard(DatabaseService service) async {
   return runWithLoggedErrors('cargar el resumen financiero', () async {
     var userName = '';
     try {
@@ -746,9 +741,12 @@ Future<_DashboardData> _loadDashboard(DatabaseService service) async {
       service.obtenerPlanesGastosFuturos(),
       service.obtenerCuentasDigitales(),
       service.obtenerSuscripciones(),
+      service.obtenerTotalAhorros(),
+      service.obtenerMovimientosAhorro(),
+      service.obtenerTransferencias(),
     ]);
 
-    return _DashboardData.fromRecords(
+    return DashboardData.fromRecords(
       ingresos: results[0] as List<Ingreso>,
       gastos: results[1] as List<Gasto>,
       deudas: results[2] as List<Deuda>,
@@ -758,224 +756,11 @@ Future<_DashboardData> _loadDashboard(DatabaseService service) async {
       userName: userName,
       digitalAccounts: results[5] as List<DigitalAccountBalance>,
       subscriptions: results[6] as List<Suscripcion>,
+      totalAhorros: results[7] as double,
+      savingsMovements: results[8] as List<MovimientosAhorroData>,
+      transfers: results[9] as List<TransferenciasDineroData>,
     );
   });
-}
-
-class _DashboardData {
-  const _DashboardData({
-    required this.totalIngresos,
-    required this.ingresosDelMes,
-    required this.totalRecibidoDelMes,
-    required this.totalGanadoDelMes,
-    required this.totalPrestamosDelMes,
-    required this.totalGastos,
-    required this.totalGastosDelMes,
-    required this.totalPagosDeuda,
-    required this.dineroDisponible,
-    required this.balanceBreakdown,
-    required this.userName,
-    required this.digitalAccounts,
-    required this.subscriptions,
-    required this.recentExpenses,
-    required this.porcentajeGastado,
-    required this.cantidadIngresos,
-    required this.cantidadGastos,
-    required this.cantidadGastosDelMes,
-    required this.cantidadPagosDeuda,
-    required this.cantidadDeudas,
-    required this.deudasPendientes,
-    required this.totalDeudaPendiente,
-    required this.pagosProximos,
-    required this.futureExpenses,
-  });
-
-  factory _DashboardData.fromRecords({
-    required List<Ingreso> ingresos,
-    required List<Gasto> gastos,
-    required List<Deuda> deudas,
-    required List<PagosDeudaData> pagos,
-    required List<FutureExpenseSummary> futureExpenses,
-    required AvailableBalanceBreakdown balanceBreakdown,
-    required String userName,
-    required List<DigitalAccountBalance> digitalAccounts,
-    required List<Suscripcion> subscriptions,
-  }) {
-    final totalIngresos = ingresos.fold<double>(
-      0,
-      (total, ingreso) => total + ingreso.monto,
-    );
-    final now = DateTime.now();
-    final ingresosDelMes =
-        ingresos
-            .where(
-              (ingreso) =>
-                  ingreso.fecha.year == now.year &&
-                  ingreso.fecha.month == now.month,
-            )
-            .toList()
-          ..sort((a, b) => b.fecha.compareTo(a.fecha));
-    final totalRecibidoDelMes = ingresosDelMes.fold<double>(
-      0,
-      (total, ingreso) => total + ingreso.monto,
-    );
-    final totalPrestamosDelMes = ingresosDelMes
-        .where(
-          (ingreso) => IncomeType.fromStorage(ingreso.tipo) == IncomeType.loan,
-        )
-        .fold<double>(0, (total, ingreso) => total + ingreso.monto);
-    final totalGanadoDelMes = totalRecibidoDelMes - totalPrestamosDelMes;
-    final totalGastos = gastos.fold<double>(
-      0,
-      (total, gasto) => total + gasto.monto,
-    );
-    final recentExpenses = [...gastos]
-      ..sort((first, second) => second.fecha.compareTo(first.fecha));
-    final upcomingSubscriptions =
-        subscriptions.where((item) => item.activa).toList()..sort(
-          (first, second) => first.proximoPago.compareTo(second.proximoPago),
-        );
-    final gastosDelMes = gastos
-        .where(
-          (gasto) =>
-              gasto.fecha.year == now.year && gasto.fecha.month == now.month,
-        )
-        .toList();
-    final totalGastosDelMes = gastosDelMes.fold<double>(
-      0,
-      (total, gasto) => total + gasto.monto,
-    );
-    final totalPagosDeuda = pagos.fold<double>(
-      0,
-      (total, pago) => total + pago.monto,
-    );
-    final totalGastado = totalGastos + totalPagosDeuda;
-    final porcentajeGastado = totalIngresos > 0
-        ? totalGastado / totalIngresos * 100
-        : null;
-
-    final pagosPorDeuda = <int, double>{};
-    for (final pago in pagos) {
-      pagosPorDeuda.update(
-        pago.deudaId,
-        (total) => total + pago.monto,
-        ifAbsent: () => pago.monto,
-      );
-    }
-
-    final pagosProximos = <_PendingDebt>[];
-    for (final deuda in deudas) {
-      final saldoPendiente =
-          deuda.montoOriginal - (pagosPorDeuda[deuda.id] ?? 0);
-      if (saldoPendiente <= 0) continue;
-
-      pagosProximos.add(
-        _PendingDebt(
-          deuda: deuda,
-          saldoPendiente: saldoPendiente,
-          montoProximoPago: deuda.cuota < saldoPendiente
-              ? deuda.cuota
-              : saldoPendiente,
-        ),
-      );
-    }
-    pagosProximos.sort(
-      (a, b) => (a.deuda.fechaProximoPago ?? DateTime(9999)).compareTo(
-        b.deuda.fechaProximoPago ?? DateTime(9999),
-      ),
-    );
-
-    return _DashboardData(
-      totalIngresos: totalIngresos,
-      ingresosDelMes: ingresosDelMes,
-      totalRecibidoDelMes: totalRecibidoDelMes,
-      totalGanadoDelMes: totalGanadoDelMes,
-      totalPrestamosDelMes: totalPrestamosDelMes,
-      totalGastos: totalGastos,
-      totalGastosDelMes: totalGastosDelMes,
-      totalPagosDeuda: totalPagosDeuda,
-      dineroDisponible: balanceBreakdown.total,
-      balanceBreakdown: balanceBreakdown,
-      userName: userName,
-      digitalAccounts: digitalAccounts,
-      subscriptions: upcomingSubscriptions,
-      recentExpenses: recentExpenses.take(3).toList(),
-      porcentajeGastado: porcentajeGastado,
-      cantidadIngresos: ingresos.length,
-      cantidadGastos: gastos.length,
-      cantidadGastosDelMes: gastosDelMes.length,
-      cantidadPagosDeuda: pagos.length,
-      cantidadDeudas: deudas.length,
-      deudasPendientes: pagosProximos.length,
-      totalDeudaPendiente: pagosProximos.fold<double>(
-        0,
-        (total, deuda) => total + deuda.saldoPendiente,
-      ),
-      pagosProximos: pagosProximos,
-      futureExpenses: futureExpenses,
-    );
-  }
-
-  final double totalIngresos;
-  final List<Ingreso> ingresosDelMes;
-  final double totalRecibidoDelMes;
-  final double totalGanadoDelMes;
-  final double totalPrestamosDelMes;
-  final double totalGastos;
-  final double totalGastosDelMes;
-  final double totalPagosDeuda;
-  final double dineroDisponible;
-  final AvailableBalanceBreakdown balanceBreakdown;
-  final String userName;
-  final List<DigitalAccountBalance> digitalAccounts;
-  final List<Suscripcion> subscriptions;
-  final List<Gasto> recentExpenses;
-  final double? porcentajeGastado;
-  final int cantidadIngresos;
-  final int cantidadGastos;
-  final int cantidadGastosDelMes;
-  final int cantidadPagosDeuda;
-  final int cantidadDeudas;
-  final int deudasPendientes;
-  final double totalDeudaPendiente;
-  final List<_PendingDebt> pagosProximos;
-  final List<FutureExpenseSummary> futureExpenses;
-
-  bool get tieneMovimientos =>
-      cantidadIngresos > 0 || cantidadGastos > 0 || cantidadPagosDeuda > 0;
-
-  String get consejo {
-    if (totalIngresos <= 0) {
-      return 'Agrega tu primer ingreso y empieza a organizar tu dinero.';
-    }
-
-    final porcentaje = porcentajeGastado ?? 0;
-    if (porcentaje >= 80) {
-      return '¡Ojo con los gastos! Revisa cuáles están pesando más.';
-    }
-    if (dineroDisponible <= totalIngresos * 0.1) {
-      return 'Te queda poquito disponible. Prioriza lo más importante.';
-    }
-    if (pagosProximos.isNotEmpty) {
-      return 'Ten presentes tus próximos pagos para llegar con calma.';
-    }
-    if (porcentaje <= 50) {
-      return 'Vas muy bien; todavía tienes margen para tus planes.';
-    }
-    return 'Sigue llevando el control de lo que entra y sale.';
-  }
-}
-
-class _PendingDebt {
-  const _PendingDebt({
-    required this.deuda,
-    required this.saldoPendiente,
-    required this.montoProximoPago,
-  });
-
-  final Deuda deuda;
-  final double saldoPendiente;
-  final double montoProximoPago;
 }
 
 class _IncomeDraft {
@@ -1379,8 +1164,8 @@ class _IncomeFormSheetState extends State<_IncomeFormSheet> {
                           : 'Sobran ${formatMoney(_distributionTotal - _incomeAmount)} en la distribución.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: _distributionTotal > _incomeAmount
-                            ? Theme.of(context).colorScheme.error
-                            : AppColors.primary,
+                            ? AppColors.negative
+                            : AppColors.positive,
                       ),
                     ),
                   const SizedBox(height: 8),
@@ -1670,10 +1455,12 @@ class _DashboardContent extends StatelessWidget {
     required this.onViewExpenses,
     required this.onViewIncomes,
     required this.onViewSubscriptions,
+    required this.onViewDebts,
+    required this.onViewSavings,
     required this.onViewSettings,
   });
 
-  final _DashboardData data;
+  final DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
   final VoidCallback onDistributeBalance;
@@ -1682,6 +1469,8 @@ class _DashboardContent extends StatelessWidget {
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
   final VoidCallback? onViewSubscriptions;
+  final VoidCallback? onViewDebts;
+  final VoidCallback? onViewSavings;
   final VoidCallback? onViewSettings;
 
   @override
@@ -1689,151 +1478,182 @@ class _DashboardContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AvailableBalanceCard(
-          data: data,
-          onDistributeBalance: onDistributeBalance,
-          isSavingDistribution: isSavingDistribution,
-        ),
-        const SizedBox(height: 12),
-        _BalanceBreakdownCards(data: data),
-        const SizedBox(height: 18),
-        _IncomeSummaryPanel(
-          data: data,
+        _AvailableBalanceCard(data: data, onViewSettings: onViewSettings),
+        const SizedBox(height: 16),
+        _QuickActionsPanel(
           onAddIncome: onAddIncome,
           isSavingIncome: isSavingIncome,
+          onDistributeBalance: onDistributeBalance,
+          isSavingDistribution: isSavingDistribution,
           onViewExpenses: onViewExpenses,
+        ),
+        const SizedBox(height: AppSpacing.section),
+        _FinancialSummaryPanel(
+          data: data,
+          onViewDebts: onViewDebts,
+          onViewSavings: onViewSavings,
+        ),
+        const SizedBox(height: AppSpacing.section),
+        _RecentActivityPanel(
+          activities: data.recentActivities,
           onViewIncomes: onViewIncomes,
+          onViewExpenses: onViewExpenses,
+          onViewSavings: onViewSavings,
+          onViewSettings: onViewSettings,
         ),
-        const SizedBox(height: 18),
-        _RecentExpensesPanel(expenses: data.recentExpenses),
-        const SizedBox(height: 18),
-        _UpcomingSubscriptionsPanel(
-          subscriptions: data.subscriptions.take(3).toList(),
-          onViewAll: onViewSubscriptions,
+        const SizedBox(height: AppSpacing.section),
+        _RemindersPanel(
+          data: data,
+          onViewFutureExpenses: onViewFutureExpenses,
+          onViewSubscriptions: onViewSubscriptions,
+          onViewDebts: onViewDebts,
         ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: TextButton.icon(
-            onPressed: onViewSettings,
-            icon: const Icon(Icons.swap_horiz_rounded),
-            label: const Text('Ver todas las cuentas · mover dinero'),
-          ),
-        ),
-        const SizedBox(height: 28),
-        const _SectionHeading('Deudas pendientes'),
-        const SizedBox(height: 12),
-        _DebtSummaryPanel(data: data),
-        const SizedBox(height: 26),
-        const _SectionHeading('Mis gastos futuros'),
-        const SizedBox(height: 12),
-        _FutureExpensesSummaryPanel(
-          plans: data.futureExpenses,
-          onViewAll: onViewFutureExpenses,
-        ),
-        const SizedBox(height: 26),
-        const _SectionHeading('Próximos pagos'),
-        const SizedBox(height: 12),
-        _UpcomingPaymentsPanel(data: data),
-        const SizedBox(height: 26),
+        const SizedBox(height: AppSpacing.section),
         _AdvicePanel(advice: data.consejo),
       ],
     );
   }
 }
 
-class _IncomeSummaryPanel extends StatelessWidget {
-  const _IncomeSummaryPanel({
-    required this.data,
+class _QuickActionsPanel extends StatelessWidget {
+  const _QuickActionsPanel({
     required this.onAddIncome,
     required this.isSavingIncome,
+    required this.onDistributeBalance,
+    required this.isSavingDistribution,
     required this.onViewExpenses,
-    required this.onViewIncomes,
   });
 
-  final _DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
+  final VoidCallback onDistributeBalance;
+  final bool isSavingDistribution;
   final VoidCallback? onViewExpenses;
-  final VoidCallback? onViewIncomes;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(17),
-      decoration: AppCardDecorations.surface,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        FilledButton.icon(
+          key: const ValueKey('home-quick-income'),
+          onPressed: isSavingIncome ? null : onAddIncome,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Agregar ingreso'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('home-quick-expense'),
+          onPressed: onViewExpenses,
+          icon: const Icon(Icons.north_east_rounded),
+          label: const Text('Registrar gasto'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('distribute-available-balance'),
+          onPressed: isSavingDistribution ? null : onDistributeBalance,
+          icon: isSavingDistribution
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.swap_horiz_rounded),
+          label: const Text('Distribuir dinero'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FinancialSummaryPanel extends StatelessWidget {
+  const _FinancialSummaryPanel({
+    required this.data,
+    required this.onViewDebts,
+    required this.onViewSavings,
+  });
+
+  final DashboardData data;
+  final VoidCallback? onViewDebts;
+  final VoidCallback? onViewSavings;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final month = '${_monthName(now.month)} ${now.year}';
+
+    return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'Resumen financiero',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 3),
+          Text(month, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              final total = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const spacing = 12.0;
+              final itemWidth = (constraints.maxWidth - spacing) / 2;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: 16,
                 children: [
-                  Text(
-                    'Dinero recibido este mes',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    formatMoney(data.totalRecibidoDelMes),
-                    key: const ValueKey('home-monthly-received'),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ],
-              );
-              final addButton = FilledButton.icon(
-                onPressed: isSavingIncome ? null : onAddIncome,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Agregar dinero'),
-              );
-              final addExpenseButton = OutlinedButton.icon(
-                onPressed: onViewExpenses,
-                icon: const Icon(Icons.add_shopping_cart_outlined),
-                label: const Text('Registrar gasto'),
-              );
-              if (constraints.maxWidth < 420) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    total,
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [addButton, addExpenseButton],
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SummaryMetric(
+                      label: 'Ingresos del mes',
+                      value: data.totalRecibidoDelMes,
+                      color: AppColors.positive,
+                      valueKey: const ValueKey('home-monthly-received'),
+                      footnote: data.totalPrestamosDelMes > 0
+                          ? 'Incluye préstamos'
+                          : 'Sueldo y dinero extra',
                     ),
-                  ],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: total),
-                  addButton,
-                  const SizedBox(width: 8),
-                  addExpenseButton,
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SummaryMetric(
+                      label: 'Gastos del mes',
+                      value: data.totalGastosDelMes,
+                      color: AppColors.negative,
+                      valueKey: const ValueKey('home-monthly-expenses'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SummaryMetric(
+                      label: 'Ahorro acumulado',
+                      value: data.totalAhorros,
+                      color: AppColors.accent,
+                      valueKey: const ValueKey('home-total-savings'),
+                      footnote: 'Total registrado',
+                      onTap: onViewSavings,
+                    ),
+                  ),
+                  if (data.deudasPendientes > 0)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _SummaryMetric(
+                        label: 'Deuda pendiente',
+                        value: data.totalDeudaPendiente,
+                        color: AppColors.warning,
+                        valueKey: const ValueKey('home-outstanding-debt'),
+                        footnote: _recordCount(
+                          data.deudasPendientes,
+                          'deuda',
+                          'deudas',
+                        ),
+                        onTap: onViewDebts,
+                      ),
+                    ),
                 ],
               );
             },
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 20,
-            runSpacing: 8,
-            children: [
-              _IncomeBreakdown(
-                label: 'Sueldo y dinero extra',
-                value: data.totalGanadoDelMes,
-              ),
-              _IncomeBreakdown(
-                label: 'Préstamos recibidos',
-                value: data.totalPrestamosDelMes,
-              ),
-            ],
-          ),
           if (data.porcentajeGastado != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 5,
               children: [
@@ -1848,139 +1668,63 @@ class _IncomeSummaryPanel extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 8),
-          TextButton.icon(
-            key: const ValueKey('home-view-incomes'),
-            onPressed: onViewIncomes,
-            icon: const Icon(Icons.history_rounded),
-            label: const Text('Ver historial de ingresos'),
-          ),
         ],
       ),
     );
   }
 }
 
-class _IncomeBreakdown extends StatelessWidget {
-  const _IncomeBreakdown({required this.label, required this.value});
-
-  final String label;
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 3),
-        Text(
-          formatMoney(value),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-      ],
-    );
-  }
-}
-
-class _BalanceBreakdownCards extends StatelessWidget {
-  const _BalanceBreakdownCards({required this.data});
-
-  final _DashboardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final visibleAccounts = data.digitalAccounts.take(2).toList();
-    final remainingAccounts =
-        data.digitalAccounts.length - visibleAccounts.length;
-    final digitalDetail = visibleAccounts.isEmpty
-        ? 'Sin cuentas agregadas'
-        : visibleAccounts
-              .map(
-                (account) =>
-                    '${account.account.nombre}: ${formatMoney(account.balance)}',
-              )
-              .followedBy(
-                remainingAccounts > 0
-                    ? ['+$remainingAccounts cuentas más']
-                    : const <String>[],
-              )
-              .join(' · ');
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cashCard = _BalanceMediumCard(
-          label: 'Dinero en efectivo',
-          amount: data.balanceBreakdown.cash,
-          detail: 'Movimientos en efectivo',
-          icon: Icons.payments_outlined,
-        );
-        final digitalCard = _BalanceMediumCard(
-          label: 'Dinero digital',
-          amount: data.balanceBreakdown.digital,
-          detail: digitalDetail,
-          icon: Icons.account_balance_wallet_outlined,
-        );
-        if (constraints.maxWidth < 440) {
-          return Column(
-            children: [cashCard, const SizedBox(height: 10), digitalCard],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: cashCard),
-            const SizedBox(width: 12),
-            Expanded(child: digitalCard),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _BalanceMediumCard extends StatelessWidget {
-  const _BalanceMediumCard({
+class _SummaryMetric extends StatelessWidget {
+  const _SummaryMetric({
+    this.valueKey,
     required this.label,
-    required this.amount,
-    required this.detail,
-    required this.icon,
+    required this.value,
+    required this.color,
+    this.footnote,
+    this.onTap,
   });
 
+  final Key? valueKey;
   final String label;
-  final double amount;
-  final String detail;
-  final IconData icon;
+  final double value;
+  final Color color;
+  final String? footnote;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: AppCardDecorations.surface,
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 5),
-                Text(
-                  formatMoney(amount),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 5),
+        Text(
+          formatMoney(value),
+          key: valueKey,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
+        ),
+        if (footnote != null) ...[
+          const SizedBox(height: 3),
+          Text(footnote!, style: Theme.of(context).textTheme.bodySmall),
         ],
+      ],
+    );
+    if (onTap == null) return content;
+    return Semantics(
+      button: true,
+      label: 'Ver $label',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.small),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: content,
+        ),
       ),
     );
   }
@@ -1989,28 +1733,27 @@ class _BalanceMediumCard extends StatelessWidget {
 class _AvailableBalanceCard extends StatelessWidget {
   const _AvailableBalanceCard({
     required this.data,
-    required this.onDistributeBalance,
-    required this.isSavingDistribution,
+    required this.onViewSettings,
   });
 
-  final _DashboardData data;
-  final VoidCallback onDistributeBalance;
-  final bool isSavingDistribution;
+  final DashboardData data;
+  final VoidCallback? onViewSettings;
 
   @override
   Widget build(BuildContext context) {
-    final separated =
-        data.balanceBreakdown.cash + data.balanceBreakdown.digital;
-    final distributionProgress = data.dineroDisponible <= 0
-        ? 0.0
-        : (separated / data.dineroDisponible).clamp(0.0, 1.0).toDouble();
+    final digitalAccountTotal = data.digitalAccounts.fold<double>(
+      0,
+      (total, account) => total + account.balance,
+    );
+    final digitalWithoutAccount =
+        data.balanceBreakdown.digital - digitalAccountTotal;
     final description = data.cantidadIngresos == 0
-        ? 'Todavía no hay ingresos por aquí.'
-        : 'Ingresos menos gastos, pagos, ahorros y reservas reales.';
+        ? 'Agrega un ingreso para comenzar a organizar tu dinero.'
+        : 'Saldo real después de gastos, pagos, ahorros y reservas.';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: AppCardDecorations.featured,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2023,15 +1766,19 @@ class _AvailableBalanceCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              const Icon(
-                Icons.account_balance_wallet_outlined,
-                color: AppColors.primary,
+              const AnimatedCat(
+                asset: CatAssets.inicio,
+                label: 'Gato de MichiFinanzas',
+                width: 42,
+                height: 38,
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
-            data.tieneMovimientos ? _formatMoney(data.dineroDisponible) : '—',
+            data.tieneMovimientos || data.digitalAccounts.isNotEmpty
+                ? _formatMoney(data.dineroDisponible)
+                : '—',
             key: const ValueKey('home-available-balance'),
             style: Theme.of(
               context,
@@ -2039,61 +1786,54 @@ class _AvailableBalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Total disponible',
+            'Total disponible · no incluye deudas ni planes futuros',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
           Text(description, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Efectivo + digital',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              Text(_formatMoney(separated)),
-            ],
+          const SizedBox(height: 16),
+          Text(
+            '¿Dónde está mi dinero?',
+            key: const ValueKey('home-money-location-title'),
+            style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: distributionProgress,
-              minHeight: 8,
-              backgroundColor: AppColors.outline.withValues(alpha: 0.45),
-            ),
-          ),
-          const SizedBox(height: 12),
           _BalanceMediumLine(
             label: 'Efectivo',
             amount: data.balanceBreakdown.cash,
+            icon: Icons.payments_outlined,
+            valueKey: const ValueKey('home-cash-balance'),
           ),
+          for (final account in data.digitalAccounts) ...[
+            const SizedBox(height: 8),
+            _DigitalAccountBalanceLine(account: account),
+          ],
+          if (digitalWithoutAccount > 1e-8) ...[
+            const SizedBox(height: 8),
+            _BalanceMediumLine(
+              label: 'Digital sin cuenta',
+              amount: digitalWithoutAccount,
+              icon: Icons.account_balance_wallet_outlined,
+              valueKey: const ValueKey('home-unassigned-digital-balance'),
+            ),
+          ],
+          if (data.balanceBreakdown.unclassified > 1e-8) ...[
+            const SizedBox(height: 8),
+            _BalanceMediumLine(
+              label: 'Sin asignar a un medio',
+              amount: data.balanceBreakdown.unclassified,
+              icon: Icons.help_outline_rounded,
+              valueKey: const ValueKey('home-unclassified-balance'),
+            ),
+          ],
           const SizedBox(height: 8),
-          _BalanceMediumLine(
-            label: 'Digital',
-            amount: data.balanceBreakdown.digital,
-          ),
-          const SizedBox(height: 8),
-          _BalanceMediumLine(
-            label: 'Pendiente de asignación',
-            amount: data.balanceBreakdown.unclassified,
-          ),
-          const SizedBox(height: 12),
           Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('distribute-available-balance'),
-              onPressed: isSavingDistribution ? null : onDistributeBalance,
-              icon: isSavingDistribution
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.swap_horiz_rounded),
-              label: const Text('Distribuir / editar'),
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton.icon(
+              key: const ValueKey('home-view-accounts'),
+              onPressed: onViewSettings,
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: const Text('Cuentas y transferencias'),
             ),
           ),
         ],
@@ -2103,130 +1843,68 @@ class _AvailableBalanceCard extends StatelessWidget {
 }
 
 class _BalanceMediumLine extends StatelessWidget {
-  const _BalanceMediumLine({required this.label, required this.amount});
+  const _BalanceMediumLine({
+    required this.label,
+    required this.amount,
+    this.icon,
+    this.valueKey,
+  });
 
   final String label;
   final double amount;
+  final IconData? icon;
+  final Key? valueKey;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: AppColors.accent),
+          const SizedBox(width: 8),
+        ],
         Expanded(child: Text(label)),
-        Text(_formatMoney(amount)),
+        Text(_formatMoney(amount), key: valueKey),
       ],
     );
   }
 }
 
-class _RecentExpensesPanel extends StatelessWidget {
-  const _RecentExpensesPanel({required this.expenses});
+class _DigitalAccountBalanceLine extends StatelessWidget {
+  const _DigitalAccountBalanceLine({required this.account});
 
-  final List<Gasto> expenses;
+  final DigitalAccountBalance account;
 
   @override
   Widget build(BuildContext context) {
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeading('Gastos recientes'),
-          const SizedBox(height: 10),
-          if (expenses.isEmpty)
-            const _EmptyMessage('Todavía no hay gastos registrados.'),
-          for (var index = 0; index < expenses.length; index++) ...[
-            if (index > 0) const Divider(height: 18),
-            Row(
-              children: [
-                const Icon(
-                  Icons.north_east_rounded,
-                  color: AppColors.primary,
-                  size: 19,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        expenses[index].nombre,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      Text(
-                        '${expenses[index].categoria} · '
-                        '${MoneyMedium.fromStorage(expenses[index].medio)?.label ?? 'Medio sin clasificar'}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(formatMoney(expenses[index].monto)),
-              ],
-            ),
-          ],
-        ],
+    final name = account.account.nombre;
+    return Container(
+      key: ValueKey('home-account-balance-${account.account.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(AppRadii.small),
       ),
-    );
-  }
-}
-
-class _UpcomingSubscriptionsPanel extends StatelessWidget {
-  const _UpcomingSubscriptionsPanel({
-    required this.subscriptions,
-    required this.onViewAll,
-  });
-
-  final List<Suscripcion> subscriptions;
-  final VoidCallback? onViewAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const _SectionHeading('Próximos pagos de suscripciones'),
-          const SizedBox(height: 10),
-          if (subscriptions.isEmpty)
-            const _EmptyMessage('No tienes pagos de suscripción próximos.'),
-          for (var index = 0; index < subscriptions.length; index++) ...[
-            if (index > 0) const Divider(height: 18),
-            Row(
-              children: [
-                const Icon(
-                  Icons.autorenew_rounded,
-                  color: AppColors.primary,
-                  size: 19,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subscriptions[index].nombre,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      Text(
-                        _shortDate(subscriptions[index].proximoPago),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                Text(formatMoney(subscriptions[index].precio)),
-              ],
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+            child: Text(
+              name.substring(0, 1).toUpperCase(),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.accent),
             ),
-          ],
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: TextButton(
-              onPressed: onViewAll,
-              child: const Text('Ver suscripciones'),
-            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          Text(
+            _formatMoney(account.balance),
+            key: ValueKey('home-account-balance-value-${account.account.id}'),
+            style: Theme.of(context).textTheme.titleSmall,
           ),
         ],
       ),
@@ -2234,126 +1912,306 @@ class _UpcomingSubscriptionsPanel extends StatelessWidget {
   }
 }
 
-class _DebtSummaryPanel extends StatelessWidget {
-  const _DebtSummaryPanel({required this.data});
-
-  final _DashboardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DashboardPanel(
-      child: data.cantidadDeudas == 0
-          ? const _EmptyMessage('Todavía no hay deudas por aquí.')
-          : data.deudasPendientes == 0
-          ? const _EmptyMessage('¡Bien! No hay deudas pendientes.')
-          : Row(
-              children: [
-                const Icon(
-                  Icons.account_balance_outlined,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _recordCount(
-                          data.deudasPendientes,
-                          'deuda pendiente',
-                          'deudas pendientes',
-                        ),
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'Saldo pendiente total',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    _formatMoney(data.totalDeudaPendiente),
-                    textAlign: TextAlign.end,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-}
-
-class _UpcomingPaymentsPanel extends StatelessWidget {
-  const _UpcomingPaymentsPanel({required this.data});
-
-  final _DashboardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    if (data.cantidadDeudas == 0) {
-      return const _DashboardPanel(
-        child: _EmptyMessage('Todavía no hay deudas por aquí.'),
-      );
-    }
-    if (data.pagosProximos.isEmpty) {
-      return const _DashboardPanel(
-        child: _EmptyMessage('Por ahora no hay pagos próximos.'),
-      );
-    }
-
-    return _DashboardPanel(
-      child: Column(
-        children: [
-          for (var index = 0; index < data.pagosProximos.length; index++) ...[
-            _UpcomingPaymentRow(payment: data.pagosProximos[index]),
-            if (index < data.pagosProximos.length - 1)
-              const Divider(height: 22),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _FutureExpensesSummaryPanel extends StatelessWidget {
-  const _FutureExpensesSummaryPanel({
-    required this.plans,
-    required this.onViewAll,
+class _RecentActivityPanel extends StatelessWidget {
+  const _RecentActivityPanel({
+    required this.activities,
+    required this.onViewIncomes,
+    required this.onViewExpenses,
+    required this.onViewSavings,
+    required this.onViewSettings,
   });
 
-  final List<FutureExpenseSummary> plans;
-  final VoidCallback? onViewAll;
+  final List<DashboardActivity> activities;
+  final VoidCallback? onViewIncomes;
+  final VoidCallback? onViewExpenses;
+  final VoidCallback? onViewSavings;
+  final VoidCallback? onViewSettings;
 
   @override
   Widget build(BuildContext context) {
-    final activePlans = plans
-        .where((item) => item.plan.status == FutureExpenseStatus.active)
-        .take(3)
-        .toList();
     return _DashboardPanel(
       child: Column(
         key: const ValueKey('home-future-expenses'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (activePlans.isEmpty)
-            const _EmptyMessage('Todavía no hay planes por aquí.'),
-          for (var index = 0; index < activePlans.length; index++) ...[
-            _FutureExpenseSummaryRow(summary: activePlans[index]),
-            if (index < activePlans.length - 1) const Divider(height: 20),
-          ],
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: TextButton.icon(
-              key: const ValueKey('home-future-expenses-see-all'),
-              onPressed: onViewAll,
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Ver todos'),
+          const _SectionHeading('Actividad reciente'),
+          const SizedBox(height: 12),
+          if (activities.isEmpty)
+            const _EmptyMessage('Tus movimientos aparecerán aquí.'),
+          for (var index = 0; index < activities.length; index++) ...[
+            if (index > 0) const Divider(height: 20),
+            _ActivityRow(
+              activity: activities[index],
+              onTap: _destinationFor(activities[index].kind),
             ),
+          ],
+          if (activities.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              children: [
+                TextButton(
+                  key: const ValueKey('home-view-incomes'),
+                  onPressed: onViewIncomes,
+                  child: const Text('Ingresos'),
+                ),
+                TextButton(
+                  key: const ValueKey('home-view-expenses'),
+                  onPressed: onViewExpenses,
+                  child: const Text('Gastos'),
+                ),
+                TextButton(
+                  onPressed: onViewSettings,
+                  child: const Text('Transferencias'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  VoidCallback? _destinationFor(DashboardActivityKind kind) {
+    return switch (kind) {
+      DashboardActivityKind.income => onViewIncomes,
+      DashboardActivityKind.expense ||
+      DashboardActivityKind.debtPayment => onViewExpenses,
+      DashboardActivityKind.transfer => onViewSettings,
+      DashboardActivityKind.savingsContribution ||
+      DashboardActivityKind.savingsWithdrawal => onViewSavings,
+    };
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.activity, required this.onTap});
+
+  final DashboardActivity activity;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _activityStyle(activity.kind);
+    final amount = switch (activity.kind) {
+      DashboardActivityKind.income || DashboardActivityKind.savingsWithdrawal =>
+        '+${formatMoney(activity.amount)}',
+      DashboardActivityKind.expense ||
+      DashboardActivityKind.debtPayment ||
+      DashboardActivityKind.savingsContribution =>
+        '-${formatMoney(activity.amount)}',
+      DashboardActivityKind.transfer => formatMoney(activity.amount),
+    };
+
+    return Semantics(
+      button: onTap != null,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.small),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Icon(style.icon, color: style.color, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      activity.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      '${activity.detail} · ${_shortDate(activity.date)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                amount,
+                textAlign: TextAlign.end,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(color: style.color),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityStyle {
+  const _ActivityStyle(this.icon, this.color);
+
+  final IconData icon;
+  final Color color;
+}
+
+_ActivityStyle _activityStyle(DashboardActivityKind kind) {
+  return switch (kind) {
+    DashboardActivityKind.income => const _ActivityStyle(
+      Icons.south_west_rounded,
+      AppColors.positive,
+    ),
+    DashboardActivityKind.expense => const _ActivityStyle(
+      Icons.north_east_rounded,
+      AppColors.negative,
+    ),
+    DashboardActivityKind.debtPayment => const _ActivityStyle(
+      Icons.payments_outlined,
+      AppColors.warning,
+    ),
+    DashboardActivityKind.transfer => const _ActivityStyle(
+      Icons.swap_horiz_rounded,
+      AppColors.primary,
+    ),
+    DashboardActivityKind.savingsContribution => const _ActivityStyle(
+      Icons.savings_outlined,
+      AppColors.accent,
+    ),
+    DashboardActivityKind.savingsWithdrawal => const _ActivityStyle(
+      Icons.savings_outlined,
+      AppColors.positive,
+    ),
+  };
+}
+
+class _RemindersPanel extends StatelessWidget {
+  const _RemindersPanel({
+    required this.data,
+    required this.onViewFutureExpenses,
+    required this.onViewSubscriptions,
+    required this.onViewDebts,
+  });
+
+  final DashboardData data;
+  final VoidCallback? onViewFutureExpenses;
+  final VoidCallback? onViewSubscriptions;
+  final VoidCallback? onViewDebts;
+
+  @override
+  Widget build(BuildContext context) {
+    final subscriptions = data.subscriptions.take(3).toList();
+    final debts = data.pagosProximos
+        .where((payment) => payment.deuda.fechaProximoPago != null)
+        .take(3)
+        .toList();
+    final plans = data.futureExpenses
+        .where((item) => item.plan.status == FutureExpenseStatus.active)
+        .take(3)
+        .toList();
+    final hasReminders =
+        subscriptions.isNotEmpty || debts.isNotEmpty || plans.isNotEmpty;
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeading('Recordatorios'),
+          const SizedBox(height: 12),
+          if (!hasReminders)
+            Row(
+              children: [
+                const AnimatedCat(
+                  asset: CatAssets.vacio,
+                  label: 'Gato descansando',
+                  width: 52,
+                  height: 46,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No tienes pagos o planes próximos.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          if (subscriptions.isNotEmpty) ...[
+            _ReminderGroupTitle(
+              buttonKey: const ValueKey('home-view-subscriptions'),
+              title: 'Suscripciones',
+              onTap: onViewSubscriptions,
+            ),
+            for (final subscription in subscriptions)
+              _ReminderLine(
+                icon: Icons.autorenew_rounded,
+                title: subscription.nombre,
+                detail:
+                    'Próximo cobro · ${_shortDate(subscription.proximoPago)}',
+                amount: subscription.precio,
+              ),
+          ],
+          if (debts.isNotEmpty) ...[
+            _ReminderGroupTitle(
+              buttonKey: const ValueKey('home-view-debts'),
+              title: 'Cuotas',
+              onTap: onViewDebts,
+            ),
+            for (final payment in debts)
+              _ReminderLine(
+                icon: Icons.event_outlined,
+                title: payment.deuda.nombre,
+                detail: _formatDebtDate(payment.deuda.fechaProximoPago!),
+                amount: payment.montoProximoPago,
+              ),
+          ],
+          if (plans.isNotEmpty) ...[
+            _ReminderGroupTitle(
+              buttonKey: const ValueKey('home-future-expenses-see-all'),
+              title: 'Gastos futuros planeados',
+              onTap: onViewFutureExpenses,
+              actionLabel: 'Ver todos',
+            ),
+            for (final plan in plans)
+              _ReminderLine(
+                icon: Icons.event_note_outlined,
+                title: plan.plan.name,
+                detail: 'Planeado · ${_shortDate(plan.plan.targetDate)}',
+                amount: plan.plan.targetAmount,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderGroupTitle extends StatelessWidget {
+  const _ReminderGroupTitle({
+    this.buttonKey,
+    required this.title,
+    required this.onTap,
+    this.actionLabel = 'Ver',
+  });
+
+  final Key? buttonKey;
+  final String title;
+  final VoidCallback? onTap;
+  final String actionLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+          ),
+          TextButton(
+            key: buttonKey,
+            onPressed: onTap,
+            child: Text(actionLabel),
           ),
         ],
       ),
@@ -2361,103 +2219,40 @@ class _FutureExpensesSummaryPanel extends StatelessWidget {
   }
 }
 
-class _FutureExpenseSummaryRow extends StatelessWidget {
-  const _FutureExpenseSummaryRow({required this.summary});
+class _ReminderLine extends StatelessWidget {
+  const _ReminderLine({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.amount,
+  });
 
-  final FutureExpenseSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final plan = summary.plan;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                plan.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              formatMoney(plan.targetAmount),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        Wrap(
-          spacing: 14,
-          runSpacing: 4,
-          children: [
-            Text('Reservado: ${formatMoney(summary.reservedAmount)}'),
-            Text('Falta: ${formatMoney(summary.amountMissing)}'),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${formatSpanishLongDate(plan.targetDate)} · ${plan.frequency.label}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
-}
-
-class _UpcomingPaymentRow extends StatelessWidget {
-  const _UpcomingPaymentRow({required this.payment});
-
-  final _PendingDebt payment;
+  final IconData icon;
+  final String title;
+  final String detail;
+  final double amount;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceRaised,
-            borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(detail, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
           ),
-          child: const Icon(
-            Icons.event_outlined,
-            color: AppColors.primary,
-            size: 19,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                payment.deuda.nombre,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                payment.deuda.fechaProximoPago == null
-                    ? 'Fecha no definida'
-                    : _formatDebtDate(payment.deuda.fechaProximoPago!),
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          _formatMoney(payment.montoProximoPago),
-          textAlign: TextAlign.end,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-      ],
+          const SizedBox(width: 8),
+          Text(formatMoney(amount)),
+        ],
+      ),
     );
   }
 }
@@ -2574,6 +2369,24 @@ class _DashboardError extends StatelessWidget {
 
 String _recordCount(int count, String singular, String plural) {
   return '$count ${count == 1 ? singular : plural}';
+}
+
+String _monthName(int month) {
+  const months = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
+  return months[month - 1];
 }
 
 String _formatMoney(double amount) {

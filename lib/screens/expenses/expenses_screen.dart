@@ -9,8 +9,8 @@ import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
-import '../../widgets/money_medium_selector.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key, this.isActive = true, this.databaseService});
@@ -29,6 +29,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   AppSettings _settings = AppSettings.defaults();
   List<Gasto>? _loadedExpenses;
   List<CuentasDigitale> _loadedAccounts = const [];
+  List<DigitalAccountBalance> _loadedAccountBalances = const [];
+  double _cashBalance = 0;
+  double _digitalWithoutAccount = 0;
 
   @override
   void initState() {
@@ -75,23 +78,35 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       _databaseService.obtenerTodosLosPagosDeuda(),
       _databaseService.obtenerDeudas(),
       _databaseService.obtenerCuentasDigitales(),
+      _databaseService.obtenerSaldosPorMedio(),
     ]);
+    final digitalAccounts = results[2] as List<DigitalAccountBalance>;
+    final balances = results[3] as AvailableBalanceBreakdown;
     final data = _ExpensesData(
       expenses: sortedExpenses,
       debtPayments: results[0] as List<PagosDeudaData>,
       debts: results[1] as List<Deuda>,
-      accounts: (results[2] as List<DigitalAccountBalance>)
-          .map((item) => item.account)
-          .toList(),
+      digitalAccounts: digitalAccounts,
+      balances: balances,
+    );
+    final digitalAccountsTotal = digitalAccounts.fold<double>(
+      0,
+      (total, account) => total + account.balance,
     );
     if (mounted) {
       setState(() {
         _loadedExpenses = sortedExpenses;
         _loadedAccounts = data.accounts;
+        _loadedAccountBalances = digitalAccounts;
+        _cashBalance = balances.cash;
+        _digitalWithoutAccount = balances.digital - digitalAccountsTotal;
       });
     } else {
       _loadedExpenses = sortedExpenses;
       _loadedAccounts = data.accounts;
+      _loadedAccountBalances = digitalAccounts;
+      _cashBalance = balances.cash;
+      _digitalWithoutAccount = balances.digital - digitalAccountsTotal;
     }
     return data;
   }
@@ -110,8 +125,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.surface,
-      builder: (context) =>
-          _ExpenseFormSheet(categories: categories, accounts: _loadedAccounts),
+      builder: (context) => _ExpenseFormSheet(
+        categories: categories,
+        accounts: _loadedAccountBalances,
+        cashBalance: _cashBalance,
+        digitalWithoutAccount: _digitalWithoutAccount,
+      ),
     );
     if (draft == null || !mounted) return;
 
@@ -154,7 +173,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       backgroundColor: AppColors.surface,
       builder: (context) => _ExpenseFormSheet(
         categories: categories,
-        accounts: _loadedAccounts,
+        accounts: _loadedAccountBalances,
+        cashBalance: _cashBalance,
+        digitalWithoutAccount: _digitalWithoutAccount,
         expense: expense,
       ),
     );
@@ -243,7 +264,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+            final horizontalPadding = constraints.maxWidth < 420
+                ? AppSpacing.pageHorizontal
+                : AppSpacing.pageHorizontalWide;
             return FutureBuilder<_ExpensesData>(
               future: _expensesFuture,
               builder: (context, snapshot) {
@@ -308,7 +331,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    28,
+                    AppSpacing.pageTop,
                     horizontalPadding,
                     104,
                   ),
@@ -318,28 +341,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Gastos',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.headlineMedium,
-                                ),
-                              ),
-                              const AnimatedCat(
-                                asset: CatAssets.gastos,
-                                label: 'Gato organizando gastos',
-                                width: 92,
-                                height: 68,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Registra y consulta tus gastos.',
-                            style: Theme.of(context).textTheme.bodyLarge,
+                          const AppPageHeader(
+                            title: 'Gastos',
+                            subtitle: 'Registra y consulta tus gastos.',
+                            trailing: AnimatedCat(
+                              asset: CatAssets.gastos,
+                              label: 'Gato organizando gastos',
+                              width: 72,
+                              height: 58,
+                            ),
                           ),
                           const SizedBox(height: 24),
                           _MonthlySummary(
@@ -432,13 +442,18 @@ class _ExpensesData {
     required this.expenses,
     required this.debtPayments,
     required this.debts,
-    required this.accounts,
+    required this.digitalAccounts,
+    required this.balances,
   });
 
   final List<Gasto> expenses;
   final List<PagosDeudaData> debtPayments;
   final List<Deuda> debts;
-  final List<CuentasDigitale> accounts;
+  final List<DigitalAccountBalance> digitalAccounts;
+  final AvailableBalanceBreakdown balances;
+
+  List<CuentasDigitale> get accounts =>
+      digitalAccounts.map((account) => account.account).toList();
 }
 
 class _ExpenseHistoryEntry {
@@ -471,11 +486,15 @@ class _ExpenseFormSheet extends StatefulWidget {
   const _ExpenseFormSheet({
     required this.categories,
     required this.accounts,
+    required this.cashBalance,
+    required this.digitalWithoutAccount,
     this.expense,
   });
 
   final List<String> categories;
-  final List<CuentasDigitale> accounts;
+  final List<DigitalAccountBalance> accounts;
+  final double cashBalance;
+  final double digitalWithoutAccount;
   final Gasto? expense;
 
   @override
@@ -547,6 +566,40 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
     );
   }
 
+  double get _cashBalanceForForm {
+    final oldExpense = widget.expense;
+    return widget.cashBalance +
+        (oldExpense?.medio == MoneyMedium.cash.storageValue
+            ? oldExpense!.monto
+            : 0);
+  }
+
+  double get _unassignedDigitalAllowance {
+    final oldExpense = widget.expense;
+    return oldExpense?.medio == MoneyMedium.digital.storageValue &&
+            oldExpense?.cuentaDigitalId == null
+        ? oldExpense!.monto
+        : 0;
+  }
+
+  double get _selectedAvailableBalance {
+    if (_medium == MoneyMedium.cash) return _cashBalanceForForm;
+    if (_medium != MoneyMedium.digital) return 0;
+    if (_digitalAccountId == null) {
+      return widget.digitalWithoutAccount + _unassignedDigitalAllowance;
+    }
+    final account = widget.accounts.where(
+      (item) => item.account.id == _digitalAccountId,
+    );
+    if (account.isEmpty) return 0;
+    final oldExpense = widget.expense;
+    return account.first.balance +
+        (oldExpense?.medio == MoneyMedium.digital.storageValue &&
+                oldExpense?.cuentaDigitalId == _digitalAccountId
+            ? oldExpense!.monto
+            : 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -581,33 +634,20 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                       : null,
                 ),
                 const SizedBox(height: 14),
-                MoneyMediumSelector(
-                  selected: _medium,
-                  title: 'Medio de pago',
+                _ExpenseSourceSelector(
+                  medium: _medium,
+                  accountId: _digitalAccountId,
+                  cashBalance: _cashBalanceForForm,
+                  digitalWithoutAccount:
+                      widget.digitalWithoutAccount +
+                      _unassignedDigitalAllowance,
+                  accounts: widget.accounts,
                   allowUnclassified: widget.expense != null,
-                  onChanged: (medium) => setState(() {
+                  onChanged: (medium, accountId) => setState(() {
                     _medium = medium;
-                    if (medium != MoneyMedium.digital) {
-                      _digitalAccountId = null;
-                    }
+                    _digitalAccountId = accountId;
                   }),
                 ),
-                if (_medium == MoneyMedium.digital) ...[
-                  const SizedBox(height: 12),
-                  DigitalAccountSelector(
-                    accounts: widget.accounts,
-                    selectedId: _digitalAccountId,
-                    onChanged: (value) =>
-                        setState(() => _digitalAccountId = value),
-                  ),
-                  if (widget.accounts.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Agrega una cuenta digital en Configuración antes de elegir ese medio.',
-                      ),
-                    ),
-                ],
                 const SizedBox(height: 14),
                 TextFormField(
                   key: const ValueKey('expense-amount'),
@@ -625,6 +665,11 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                     final amount = tryParseMoney(value);
                     if (amount == null || amount <= 0) {
                       return 'Escribe un monto mayor que cero.';
+                    }
+                    if (widget.expense == null &&
+                        amount > _selectedAvailableBalance + 1e-8) {
+                      return 'El saldo de esta cuenta es insuficiente '
+                          '(${formatMoney(_selectedAvailableBalance)} disponibles).';
                     }
                     return null;
                   },
@@ -741,9 +786,14 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                       child: FilledButton.icon(
                         onPressed:
                             _medium == MoneyMedium.digital &&
-                                !widget.accounts.any(
-                                  (account) => account.id == _digitalAccountId,
-                                )
+                                (widget.expense == null &&
+                                        _digitalAccountId == null ||
+                                    _digitalAccountId != null &&
+                                        !widget.accounts.any(
+                                          (account) =>
+                                              account.account.id ==
+                                              _digitalAccountId,
+                                        ))
                             ? null
                             : _save,
                         icon: const Icon(Icons.save_outlined),
@@ -758,6 +808,160 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpenseSourceSelector extends StatelessWidget {
+  const _ExpenseSourceSelector({
+    required this.medium,
+    required this.accountId,
+    required this.cashBalance,
+    required this.digitalWithoutAccount,
+    required this.accounts,
+    required this.allowUnclassified,
+    required this.onChanged,
+  });
+
+  final MoneyMedium? medium;
+  final int? accountId;
+  final double cashBalance;
+  final double digitalWithoutAccount;
+  final List<DigitalAccountBalance> accounts;
+  final bool allowUnclassified;
+  final void Function(MoneyMedium? medium, int? accountId) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '¿De dónde sale el dinero?',
+          key: const ValueKey('expense-source-title'),
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        _ExpenseSourceTile(
+          key: const ValueKey('expense-source-cash'),
+          name: 'Efectivo',
+          balance: cashBalance,
+          icon: Icons.payments_outlined,
+          selected: medium == MoneyMedium.cash,
+          onTap: () => onChanged(MoneyMedium.cash, null),
+        ),
+        for (final account in accounts) ...[
+          const SizedBox(height: 8),
+          _ExpenseSourceTile(
+            key: ValueKey('expense-source-account-${account.account.id}'),
+            name: account.account.nombre,
+            balance: account.balance,
+            icon: Icons.account_balance_wallet_outlined,
+            selected:
+                medium == MoneyMedium.digital &&
+                accountId == account.account.id,
+            onTap: () => onChanged(MoneyMedium.digital, account.account.id),
+          ),
+        ],
+        if (allowUnclassified &&
+            medium == MoneyMedium.digital &&
+            accountId == null) ...[
+          const SizedBox(height: 8),
+          _ExpenseSourceTile(
+            key: const ValueKey('expense-source-digital-unassigned'),
+            name: 'Digital sin cuenta',
+            balance: digitalWithoutAccount,
+            icon: Icons.account_balance_wallet_outlined,
+            selected: true,
+            onTap: () => onChanged(MoneyMedium.digital, null),
+          ),
+        ],
+        if (allowUnclassified && medium == null) ...[
+          const SizedBox(height: 8),
+          _ExpenseSourceTile(
+            key: const ValueKey('expense-source-unclassified'),
+            name: 'Sin clasificar',
+            balance: 0,
+            icon: Icons.help_outline_rounded,
+            selected: true,
+            onTap: () => onChanged(null, null),
+          ),
+        ],
+        if (accounts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Agrega una cuenta digital desde Configuración para seleccionarla aquí.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ExpenseSourceTile extends StatelessWidget {
+  const _ExpenseSourceTile({
+    super.key,
+    required this.name,
+    required this.balance,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final double balance;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppColors.primary.withValues(alpha: 0.12)
+          : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadii.small),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.small),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadii.small),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.outline,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? AppColors.accent : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formatMoney(balance),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                size: 20,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ],
           ),
         ),
       ),

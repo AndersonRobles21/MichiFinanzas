@@ -10,6 +10,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -492,7 +493,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF9B4355),
+              backgroundColor: AppColors.negative,
+              foregroundColor: AppColors.background,
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Sí, borrar todo'),
@@ -552,7 +554,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+            final horizontalPadding = constraints.maxWidth < 420
+                ? AppSpacing.pageHorizontal
+                : AppSpacing.pageHorizontalWide;
             return FutureBuilder<_SettingsData>(
               future: _settingsFuture,
               builder: (context, snapshot) {
@@ -563,7 +567,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    28,
+                    AppSpacing.pageTop,
                     horizontalPadding,
                     36,
                   ),
@@ -573,30 +577,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Ajustes',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.headlineMedium,
-                                ),
-                              ),
-                              const AnimatedCat(
-                                asset: CatAssets.icono,
-                                label: 'Gato de Finanzas',
-                                width: 72,
-                                height: 54,
-                              ),
-                            ],
+                          const AppPageHeader(
+                            title: 'Ajustes',
+                            subtitle: 'Personaliza tus preferencias locales.',
+                            trailing: AnimatedCat(
+                              asset: CatAssets.icono,
+                              label: 'Gato de Finanzas',
+                              width: 60,
+                              height: 48,
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Personaliza tus preferencias locales.',
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                          const SizedBox(height: 26),
+                          const SizedBox(height: AppSpacing.section),
                           _SettingsSection(
                             title: 'Tu nombre',
                             icon: Icons.person_outline_rounded,
@@ -759,7 +750,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   icon: const Icon(Icons.delete_sweep_outlined),
                                   label: const Text('Borrar todos los datos'),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFFE99AA6),
+                                    foregroundColor: AppColors.negative,
                                   ),
                                 ),
                               ],

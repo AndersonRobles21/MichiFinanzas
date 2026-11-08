@@ -9,6 +9,7 @@ import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 import '../../widgets/money_medium_selector.dart';
 
@@ -302,45 +303,33 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     return SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final padding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+          final padding = constraints.maxWidth < 420
+              ? AppSpacing.pageHorizontal
+              : AppSpacing.pageHorizontalWide;
           return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(padding, 26, padding, 36),
+            padding: EdgeInsets.fromLTRB(
+              padding,
+              AppSpacing.pageTop,
+              padding,
+              36,
+            ),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 820),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Suscripciones',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Ten a la vista tus cobros recurrentes.',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const AnimatedCat(
-                          asset: CatAssets.gastos,
-                          label: 'Gato organizando gastos',
-                          width: 78,
-                          height: 64,
-                        ),
-                      ],
+                    const AppPageHeader(
+                      title: 'Suscripciones',
+                      subtitle: 'Ten a la vista tus cobros recurrentes.',
+                      trailing: AnimatedCat(
+                        asset: CatAssets.gastos,
+                        label: 'Gato organizando gastos',
+                        width: 64,
+                        height: 56,
+                      ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: AppSpacing.section),
                     if (_loadError != null)
                       _SubscriptionsError(
                         onRetry: () {
@@ -617,7 +606,7 @@ class _SubscriptionCard extends StatelessWidget {
                 dueLabel,
               ].join(' · '),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isSoon ? AppColors.primary : null,
+                color: isSoon ? AppColors.warning : null,
                 fontWeight: isSoon ? FontWeight.w700 : null,
               ),
             ),

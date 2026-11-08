@@ -2,13 +2,15 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
-import 'package:flutter/material.dart' show SizedBox, Text;
+import 'package:flutter/material.dart'
+    show Drawer, ListTile, ListView, SizedBox, Text;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
 import 'package:finanzas_app/main.dart' as app;
 import 'package:finanzas_app/models/money_medium.dart';
+import 'package:finanzas_app/services/app_settings_service.dart';
 import 'package:finanzas_app/services/database_service.dart';
 
 void main() {
@@ -24,17 +26,31 @@ void main() {
     await tester.runAsync(() async => app.main());
     await _completeWelcome(tester);
 
-    expect(find.text('Todavía no hay ingresos por aquí.'), findsOneWidget);
-    final emptyExpenses = find.textContaining(
-      'Todavía no hay gastos registrados.',
-    );
-    await _pumpUntilFound(tester, emptyExpenses);
-    expect(emptyExpenses, findsOneWidget);
-    expect(find.text('Todavía no hay deudas por aquí.'), findsNWidgets(2));
+    expect(find.text('Tus movimientos aparecerán aquí.'), findsOneWidget);
+    expect(find.text('No tienes pagos o planes próximos.'), findsOneWidget);
     expect(
       find.text('Agrega tu primer ingreso y empieza a organizar tu dinero.'),
       findsOneWidget,
     );
+    await tester.tap(find.byTooltip('Abrir menú'));
+    await tester.pumpAndSettle();
+    final homeTile = find.byKey(const ValueKey('navigation-Inicio'));
+    expect(tester.widget<ListTile>(homeTile).selected, isTrue);
+    for (final group in [
+      'RESUMEN',
+      'MI DINERO',
+      'ORGANIZACIÓN',
+      'MIS OBJETIVOS',
+      'ANÁLISIS',
+      'PREFERENCIAS',
+    ]) {
+      final groupHeading = find.text(group);
+      await _ensureDrawerItemVisible(tester, groupHeading);
+      expect(groupHeading, findsOneWidget);
+    }
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer), findsNothing);
     _expectNoTestException(tester);
 
     await _openDrawerAndSelect(tester, 'Ingresos');
@@ -75,6 +91,16 @@ void main() {
     );
     expect(find.text('Personaliza tus preferencias locales.'), findsOneWidget);
     _expectNoTestException(tester);
+    await tester.tap(find.byTooltip('Abrir menú'));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.text('Personaliza tus preferencias locales.'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Dinero disponible'), findsOneWidget);
+    _expectNoTestException(tester);
 
     await _openDrawerAndSelect(tester, 'Suscripciones');
     await _pumpUntilFound(tester, find.text('Suscripciones'));
@@ -82,6 +108,22 @@ void main() {
     _expectNoTestException(tester);
 
     await _openDrawerAndSelect(tester, 'Inicio');
+    expect(find.text('Dinero disponible'), findsOneWidget);
+    final quickExpense = find.byKey(const ValueKey('home-quick-expense'));
+    await tester.ensureVisible(quickExpense);
+    await tester.tap(quickExpense);
+    await tester.pumpAndSettle();
+    expect(find.text('Gastos'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Dinero disponible'), findsOneWidget);
+
+    final accountsLink = find.byKey(const ValueKey('home-view-accounts'));
+    await tester.ensureVisible(accountsLink);
+    await tester.tap(accountsLink);
+    await tester.pumpAndSettle();
+    expect(find.text('Personaliza tus preferencias locales.'), findsOneWidget);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Dinero disponible'), findsOneWidget);
     _expectNoTestException(tester);
@@ -144,7 +186,7 @@ void main() {
     expect(availableBalance, findsOneWidget);
     expect(tester.widget<Text>(availableBalance).data, r'$ 750');
     expect(find.byKey(const ValueKey('home-monthly-received')), findsOneWidget);
-    expect(find.text(r'$ 1.000'), findsNWidgets(2));
+    expect(find.text(r'$ 1.000'), findsOneWidget);
     expect(find.text(r'$ 200'), findsOneWidget);
     expect(find.text('25,0%'), findsOneWidget);
     expect(find.text(r'$ 450'), findsOneWidget);
@@ -194,7 +236,18 @@ void main() {
       'María José',
     );
     await tester.tap(find.text('Continuar'));
+    await _pumpUntilFound(
+      tester,
+      find.text('¿Qué cuentas digitales utilizas?'),
+    );
+    final continueWithoutAccounts = find.text('Continuar sin cuentas');
+    await tester.ensureVisible(continueWithoutAccounts);
+    await tester.tap(continueWithoutAccounts);
     await _pumpUntilFound(tester, find.text('Dinero disponible'));
+    final settings = await tester.runAsync(
+      () => const AppSettingsService().load(),
+    );
+    expect(settings?.hasCompletedAccountSetup, isTrue);
     expect(
       find.text('Hola, María José. Aquí ves cómo va tu dinero.'),
       findsOneWidget,
@@ -210,6 +263,118 @@ void main() {
     );
     await _unmountApp(tester);
   });
+
+  testWidgets('configura cuentas digitales sin registrar saldos', (
+    tester,
+  ) async {
+    await _prepareTemporaryDatabaseDirectory(tester);
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(() => tester.runAsync(() => service.close()));
+    late int existingAccountId;
+    await tester.runAsync(() async {
+      existingAccountId = await service.crearCuentaDigital('Cuenta existente');
+      await service.agregarIngreso(
+        monto: 500,
+        fecha: DateTime(2026, 11, 6),
+        descripcion: 'Ingreso existente',
+        medio: MoneyMedium.digital,
+        cuentaDigitalId: existingAccountId,
+      );
+    });
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('welcome-user-name')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('welcome-user-name')),
+      'Camila2',
+    );
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Usa solo letras y espacios; no dejes el campo vacío.'),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('welcome-user-name')),
+      'Camila',
+    );
+    await tester.tap(find.text('Continuar'));
+    await _pumpUntilFound(
+      tester,
+      find.text('¿Qué cuentas digitales utilizas?'),
+    );
+    expect(find.text('Cuenta existente'), findsOneWidget);
+
+    await _unmountApp(tester);
+    await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _pumpUntilFound(
+      tester,
+      find.text('¿Qué cuentas digitales utilizas?'),
+    );
+
+    for (final name in ['Nequi', 'Daviplata']) {
+      final option = find.byKey(ValueKey('onboarding-account-$name'));
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+    }
+
+    final addCustom = find.byKey(const ValueKey('onboarding-add-custom'));
+    await tester.ensureVisible(addCustom);
+    await tester.tap(addCustom);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('onboarding-custom-account-name')),
+      'Mi billetera',
+    );
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mi billetera'), findsOneWidget);
+
+    final editCustom = find.byTooltip('Editar Mi billetera');
+    await tester.ensureVisible(editCustom);
+    await tester.tap(editCustom);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('onboarding-custom-account-name')),
+      'Billetera personal',
+    );
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Billetera personal'), findsOneWidget);
+
+    final confirm = find.byKey(const ValueKey('onboarding-confirm'));
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await _pumpUntilFound(tester, find.text('Dinero disponible'));
+
+    final accounts = await tester.runAsync(service.obtenerCuentasDigitales);
+    final balances = {
+      for (final account in accounts ?? [])
+        account.account.nombre: account.balance,
+    };
+    expect(balances, {
+      'Billetera personal': 0,
+      'Cuenta existente': 500,
+      'Daviplata': 0,
+      'Nequi': 0,
+    });
+    final incomes = await tester.runAsync(service.obtenerIngresos) ?? const [];
+    expect(incomes, hasLength(1));
+    expect(incomes.single.descripcion, 'Ingreso existente');
+    final settings = await tester.runAsync(
+      () => const AppSettingsService().load(),
+    );
+    expect(settings?.hasCompletedAccountSetup, isTrue);
+
+    await _unmountApp(tester);
+  });
 }
 
 Future<void> _openDrawerAndSelect(
@@ -218,8 +383,32 @@ Future<void> _openDrawerAndSelect(
 ) async {
   await tester.tap(find.byTooltip('Abrir menú'));
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(ValueKey('navigation-$destination')));
+  final destinationTile = find.byKey(ValueKey('navigation-$destination'));
+  final drawerList = find.descendant(
+    of: find.byType(Drawer),
+    matching: find.byType(ListView),
+  );
+  await tester.drag(drawerList, const Offset(0, 1000));
   await tester.pumpAndSettle();
+  await _ensureDrawerItemVisible(tester, destinationTile);
+  await tester.tap(destinationTile);
+  await tester.pumpAndSettle();
+  expect(find.byType(Drawer), findsNothing);
+}
+
+Future<void> _ensureDrawerItemVisible(WidgetTester tester, Finder item) async {
+  final drawerList = find.descendant(
+    of: find.byType(Drawer),
+    matching: find.byType(ListView),
+  );
+  for (var attempt = 0; item.evaluate().isEmpty && attempt < 8; attempt++) {
+    await tester.drag(drawerList, const Offset(0, -280));
+    await tester.pumpAndSettle();
+  }
+  if (item.evaluate().isEmpty) {
+    fail('No se encontró la opción del menú: $item');
+  }
+  await tester.ensureVisible(item);
 }
 
 Future<void> _prepareTemporaryDatabaseDirectory(WidgetTester tester) async {
@@ -273,6 +462,10 @@ Future<void> _completeWelcome(WidgetTester tester) async {
   expect(nameField, findsOneWidget);
   await tester.enterText(nameField, 'Anderson');
   await tester.tap(find.text('Continuar'));
+  final continueWithoutAccounts = find.text('Continuar sin cuentas');
+  await _pumpUntilFound(tester, continueWithoutAccounts);
+  await tester.ensureVisible(continueWithoutAccounts);
+  await tester.tap(continueWithoutAccounts);
   await _pumpUntilFound(tester, dashboard);
 }
 

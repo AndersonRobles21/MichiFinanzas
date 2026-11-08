@@ -299,6 +299,105 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('resume gastos por cuenta solo para saldos actuales positivos', (
+    tester,
+  ) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    addTearDown(service.close);
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    final outsideRange = now.subtract(const Duration(days: 60));
+    final nequiId = await service.crearCuentaDigital('Nequi');
+    final nuId = await service.crearCuentaDigital('Nu');
+    final emptyId = await service.crearCuentaDigital('Cuenta en cero');
+
+    await service.agregarIngreso(
+      monto: 1000,
+      fecha: now,
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: nequiId,
+    );
+    await service.agregarIngreso(
+      monto: 500,
+      fecha: now,
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: nuId,
+    );
+    await service.agregarIngreso(
+      monto: 200,
+      fecha: now,
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: emptyId,
+    );
+    for (final (name, amount, date, accountId) in [
+      ('Nequi hoy', 700.0, now, nequiId),
+      ('Nequi ayer', 300.0, yesterday, nequiId),
+      ('Nu hoy', 100.0, now, nuId),
+      ('Nu ayer', 50.0, yesterday, nuId),
+      ('Nu anterior', 20.0, outsideRange, nuId),
+      ('Cuenta en cero', 200.0, now, emptyId),
+    ]) {
+      await service.agregarGasto(
+        nombre: name,
+        monto: amount,
+        categoria: 'Compras',
+        fecha: date,
+        medio: MoneyMedium.digital,
+        cuentaDigitalId: accountId,
+      );
+    }
+
+    await _mountStatisticsScreen(tester, service: service);
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('statistics-accounts-title')),
+    );
+    await tester.tap(find.byKey(const ValueKey('period-last30Days')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ValueKey('statistics-account-$nequiId')), findsNothing);
+    expect(find.byKey(ValueKey('statistics-account-$emptyId')), findsNothing);
+    expect(find.byKey(ValueKey('statistics-account-$nuId')), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('statistics-account-balance-$nuId')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(ValueKey('statistics-account-balance-$nuId')),
+          )
+          .data,
+      r'$ 330',
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(ValueKey('statistics-account-spent-$nuId')))
+          .data,
+      r'$ 150',
+    );
+    expect(
+      find.byKey(ValueKey('statistics-account-trend-$nuId')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-total')),
+        matching: find.text(r'$ 1.350'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-count')),
+        matching: find.text('5'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('distingue reservas de gastos registrados y no los mezcla', (
     tester,
   ) async {

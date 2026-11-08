@@ -1177,7 +1177,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('suma sueldo, extra y préstamo desde Agregar dinero', (
+  testWidgets('suma sueldo, extra y préstamo desde Agregar ingreso', (
     tester,
   ) async {
     await _prepareTemporaryStorage(tester);
@@ -1202,7 +1202,7 @@ void main() {
       tester,
       find.byKey(const ValueKey('home-current-date')),
     );
-    expect(find.text('Agregar dinero'), findsOneWidget);
+    expect(find.text('Agregar ingreso'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await _recordIncome(tester, 'Sueldo', 'Quincena', '600000');
@@ -1640,8 +1640,8 @@ Future<void> _recordIncome(
   String description,
   String amount,
 ) async {
-  await tester.ensureVisible(find.text('Agregar dinero'));
-  await tester.tap(find.text('Agregar dinero'));
+  await tester.ensureVisible(find.text('Agregar ingreso'));
+  await tester.tap(find.text('Agregar ingreso'));
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey('income-description')),

@@ -9,6 +9,7 @@ import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 import '../../widgets/money_medium_selector.dart';
 
@@ -263,7 +264,9 @@ class _DebtsScreenState extends State<DebtsScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+            final horizontalPadding = constraints.maxWidth < 420
+                ? AppSpacing.pageHorizontal
+                : AppSpacing.pageHorizontalWide;
             return FutureBuilder<_DebtDashboardData>(
               future: _debtsFuture,
               builder: (context, snapshot) {
@@ -287,7 +290,7 @@ class _DebtsScreenState extends State<DebtsScreen> {
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    28,
+                    AppSpacing.pageTop,
                     horizontalPadding,
                     104,
                   ),
@@ -297,14 +300,10 @@ class _DebtsScreenState extends State<DebtsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Deudas',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Controla tus cuotas, abonos y saldos pendientes.',
-                            style: Theme.of(context).textTheme.bodyLarge,
+                          const AppPageHeader(
+                            title: 'Deudas',
+                            subtitle:
+                                'Controla tus cuotas, abonos y saldos pendientes.',
                           ),
                           if (debts.isNotEmpty) ...[
                             const SizedBox(height: 22),
@@ -1074,22 +1073,9 @@ class _DebtCard extends StatelessWidget {
     return Container(
       key: ValueKey('debt-${debt.id}'),
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isPaid
-              ? AppColors.accent.withValues(alpha: 0.55)
-              : AppColors.outline,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+      padding: const EdgeInsets.all(AppSpacing.card),
+      decoration: AppCardDecorations.surfaceWithBorder(
+        borderColor: isPaid ? AppColors.positive.withValues(alpha: 0.55) : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1149,7 +1135,7 @@ class _DebtCard extends StatelessWidget {
               minHeight: 7,
               backgroundColor: AppColors.surfaceRaised,
               valueColor: AlwaysStoppedAnimation(
-                isPaid ? AppColors.accent : AppColors.primary,
+                isPaid ? AppColors.positive : AppColors.primary,
               ),
             ),
           ),
@@ -1220,7 +1206,7 @@ class _DebtStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isPaid ? AppColors.accent : AppColors.primary;
+    final color = isPaid ? AppColors.positive : AppColors.warning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(

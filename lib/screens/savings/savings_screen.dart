@@ -10,6 +10,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
+import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 import '../../widgets/money_medium_selector.dart';
 
@@ -259,7 +260,9 @@ class _SavingsScreenState extends State<SavingsScreen> {
     return SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final horizontalPadding = constraints.maxWidth < 420 ? 20.0 : 36.0;
+          final horizontalPadding = constraints.maxWidth < 420
+              ? AppSpacing.pageHorizontal
+              : AppSpacing.pageHorizontalWide;
           return FutureBuilder<_SavingsData>(
             future: _dataFuture,
             builder: (context, snapshot) {
@@ -289,7 +292,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
               return SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
                   horizontalPadding,
-                  28,
+                  AppSpacing.pageTop,
                   horizontalPadding,
                   36,
                 ),
@@ -299,39 +302,18 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Ahorros',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.headlineMedium,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Un poquito hoy, un gran paso mañana.',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            AnimatedCat(
-                              asset: CatAssets.ahorros,
-                              label: 'Gato cuidando sus ahorros',
-                              width: 88,
-                              height: 68,
-                              bounceTrigger: _savingsBounceTrigger,
-                            ),
-                          ],
+                        AppPageHeader(
+                          title: 'Ahorros',
+                          subtitle: 'Un poquito hoy, un gran paso mañana.',
+                          trailing: AnimatedCat(
+                            asset: CatAssets.ahorros,
+                            label: 'Gato cuidando sus ahorros',
+                            width: 68,
+                            height: 54,
+                            bounceTrigger: _savingsBounceTrigger,
+                          ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.section),
                         _SavingsBalancePanel(
                           total: data.total,
                           available: data.available,
@@ -507,18 +489,7 @@ class _SavingsBalancePanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceRaised,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.outline),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
+      decoration: AppCardDecorations.featured,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -570,7 +541,7 @@ class _SavingsMovementTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isContribution = movement.tipo == DatabaseService.aporteAhorro;
-    final color = isContribution ? AppColors.accent : AppColors.primaryDeep;
+    final color = isContribution ? AppColors.positive : AppColors.negative;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),

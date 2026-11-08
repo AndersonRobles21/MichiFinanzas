@@ -141,6 +141,47 @@ void main() {
     }
   });
 
+  test('un gasto clasificado no puede consumir dinero sin asignar', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    final date = DateTime(2026, 11, 6);
+    try {
+      await service.agregarIngreso(monto: 500, fecha: date);
+      await expectLater(
+        service.agregarGasto(
+          nombre: 'Gasto sin efectivo asignado',
+          monto: 100,
+          categoria: 'Otros',
+          fecha: date,
+          medio: MoneyMedium.cash,
+        ),
+        throwsA(isA<DatabaseServiceException>()),
+      );
+      var balances = await service.obtenerSaldosPorMedio();
+      expect(
+        (balances.cash, balances.unclassified, balances.total),
+        (0, 500, 500),
+      );
+      expect(await service.obtenerGastos(), isEmpty);
+
+      await service.distribuirSaldoDisponible(efectivo: 500, digital: 0);
+      await service.agregarGasto(
+        nombre: 'Gasto en efectivo',
+        monto: 100,
+        categoria: 'Otros',
+        fecha: date,
+        medio: MoneyMedium.cash,
+      );
+      balances = await service.obtenerSaldosPorMedio();
+      expect(
+        (balances.cash, balances.unclassified, balances.total),
+        (400, 0, 400),
+      );
+    } finally {
+      await database.close();
+    }
+  });
+
   test('las transferencias son internas, editables y reversibles', () async {
     final database = AppDatabase(NativeDatabase.memory());
     final service = DatabaseService(database);

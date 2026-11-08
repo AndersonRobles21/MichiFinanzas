@@ -98,6 +98,19 @@ void main() {
     expect(AppSettingsService.isValidUserName('Ana2'), isFalse);
     expect(AppSettingsService.isValidUserName('Ana-Marie'), isTrue);
     expect(AppSettingsService.isValidUserName('Ana!'), isFalse);
+    expect(AppSettingsService.isValidOnboardingUserName('Ana-Marie'), isFalse);
+    expect(AppSettingsService.isValidOnboardingUserName('María José'), isTrue);
+    expect(
+      AppSettings.fromJson({'userName': 'Anderson'}).hasCompletedAccountSetup,
+      isTrue,
+    );
+    expect(
+      AppSettings.fromJson({
+        'userName': 'Anderson',
+        'hasCompletedAccountSetup': false,
+      }).hasCompletedAccountSetup,
+      isFalse,
+    );
 
     await tester.runAsync(() async {
       await settingsService.save(

@@ -1486,6 +1486,7 @@ class DatabaseService {
           medio: medio,
           monto: monto,
           cuentaDigitalId: cuentaDigitalId,
+          allowUnclassifiedReclassification: medio == null,
         );
         final id = await _database
             .into(_database.gastos)
@@ -2317,6 +2318,7 @@ class DatabaseService {
     required MoneyMedium? medio,
     required double monto,
     int? cuentaDigitalId,
+    bool allowUnclassifiedReclassification = true,
   }) async {
     final balances = await _calcularDesgloseSaldos();
     if (medio == null) {
@@ -2341,6 +2343,14 @@ class DatabaseService {
       );
     }
     final reclassified = (monto - assigned).clamp(0.0, monto);
+    if (!allowUnclassifiedReclassification && reclassified > 1e-8) {
+      throw ArgumentError.value(
+        monto,
+        'monto',
+        'No hay suficiente saldo en ${medio.label.toLowerCase()} '
+            '($assigned disponibles). Distribuye el dinero primero.',
+      );
+    }
     if (reclassified > balances.unclassified + 1e-8) {
       throw ArgumentError.value(
         monto,

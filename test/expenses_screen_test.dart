@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
 import 'package:flutter/material.dart'
     show MaterialApp, Scrollable, Size, TextFormField;
@@ -22,9 +23,11 @@ void main() {
     await tester.runAsync(() async {
       final database = AppDatabase();
       try {
-        await DatabaseService(
-          database,
-        ).agregarIngreso(monto: 2000000, fecha: DateTime.now());
+        await DatabaseService(database).agregarIngreso(
+          monto: 2000000,
+          fecha: DateTime.now(),
+          medio: MoneyMedium.cash,
+        );
       } finally {
         await database.close();
       }
@@ -171,6 +174,119 @@ void main() {
     );
     expect(find.text(r'$ 0'), findsOneWidget);
     _expectNoTestException(tester);
+  });
+
+  testWidgets('muestra saldo por origen y no permite exceder la cuenta', (
+    tester,
+  ) async {
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(service.close);
+    final date = DateTime.now();
+    late int nequiId;
+    late int bankId;
+    await service.agregarIngreso(
+      monto: 80000,
+      fecha: date,
+      medio: MoneyMedium.cash,
+    );
+    nequiId = await service.crearCuentaDigital('Nequi');
+    bankId = await service.crearCuentaDigital('Bancolombia');
+    await service.agregarIngreso(
+      monto: 150000,
+      fecha: date,
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: nequiId,
+    );
+    await service.agregarIngreso(
+      monto: 320000,
+      fecha: date,
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: bankId,
+    );
+
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _mountExpensesScreen(tester, service: service);
+    await _pumpUntilFound(tester, find.byTooltip('Agregar gasto'));
+
+    await tester.tap(find.byTooltip('Agregar gasto'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('expense-source-title')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('expense-source-cash')),
+        matching: find.text(r'$ 80.000'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('expense-source-account-$nequiId')),
+        matching: find.text(r'$ 150.000'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('expense-source-account-$bankId')),
+        matching: find.text(r'$ 320.000'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-name')),
+      'Compra desde Nequi',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-amount')),
+      '200000',
+    );
+    await tester.tap(find.byKey(const ValueKey('expense-category')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Comidaaaa').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('expense-source-account-$nequiId')));
+    await tester.tap(find.text('Guardar gasto'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('El saldo de esta cuenta es insuficiente'),
+      findsOneWidget,
+    );
+    expect(await service.obtenerGastos(), isEmpty);
+    expect(
+      (await service.obtenerCuentasDigitales())
+          .singleWhere((account) => account.account.id == nequiId)
+          .balance,
+      150000,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-amount')),
+      '150000',
+    );
+    await tester.tap(find.text('Guardar gasto'));
+    await tester.pumpAndSettle();
+    await _pumpUntilFound(tester, find.text('Compra desde Nequi'));
+
+    final expenses = await service.obtenerGastos();
+    expect(expenses, hasLength(1));
+    expect(expenses.single.cuentaDigitalId, nequiId);
+    expect(expenses.single.monto, 150000);
+    final accounts = await service.obtenerCuentasDigitales();
+    expect(
+      accounts.singleWhere((account) => account.account.id == nequiId).balance,
+      0,
+    );
+    expect(
+      accounts.singleWhere((account) => account.account.id == bankId).balance,
+      320000,
+    );
+    expect((await service.obtenerSaldosPorMedio()).total, 400000);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('ordena los gastos del más reciente al más antiguo', (
@@ -343,10 +459,16 @@ void main() {
   });
 }
 
-Future<void> _mountExpensesScreen(WidgetTester tester) async {
+Future<void> _mountExpensesScreen(
+  WidgetTester tester, {
+  DatabaseService? service,
+}) async {
   await tester.runAsync(
     () => tester.pumpWidget(
-      MaterialApp(theme: AppTheme.darkTheme, home: const ExpensesScreen()),
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: ExpensesScreen(databaseService: service),
+      ),
     ),
   );
 }

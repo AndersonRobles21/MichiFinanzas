@@ -10,6 +10,7 @@ class AppSettings {
     required this.currencyCode,
     required this.expenseCategories,
     this.userName = '',
+    this.hasCompletedAccountSetup = false,
   });
 
   factory AppSettings.defaults() {
@@ -17,22 +18,27 @@ class AppSettings {
       currencyCode: 'COP',
       expenseCategories: AppSettingsService.defaultExpenseCategories,
       userName: '',
+      hasCompletedAccountSetup: false,
     );
   }
 
   final String currencyCode;
   final List<String> expenseCategories;
   final String userName;
+  final bool hasCompletedAccountSetup;
 
   AppSettings copyWith({
     String? currencyCode,
     List<String>? expenseCategories,
     String? userName,
+    bool? hasCompletedAccountSetup,
   }) {
     return AppSettings(
       currencyCode: currencyCode ?? this.currencyCode,
       expenseCategories: expenseCategories ?? this.expenseCategories,
       userName: userName ?? this.userName,
+      hasCompletedAccountSetup:
+          hasCompletedAccountSetup ?? this.hasCompletedAccountSetup,
     );
   }
 
@@ -40,6 +46,7 @@ class AppSettings {
     'currencyCode': currencyCode,
     'expenseCategories': expenseCategories,
     'userName': userName,
+    'hasCompletedAccountSetup': hasCompletedAccountSetup,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -60,6 +67,10 @@ class AppSettings {
               AppSettingsService.isValidUserName(json['userName'] as String)
           ? AppSettingsService.normalizeUserName(json['userName'] as String)
           : '',
+      hasCompletedAccountSetup: json['hasCompletedAccountSetup'] is bool
+          ? json['hasCompletedAccountSetup'] as bool
+          : json['userName'] is String &&
+                AppSettingsService.isValidUserName(json['userName'] as String),
     );
   }
 }
@@ -86,6 +97,11 @@ class AppSettingsService {
     unicode: true,
   );
 
+  static final _onboardingUserNamePattern = RegExp(
+    r'^\p{L}+(?: \p{L}+)*$',
+    unicode: true,
+  );
+
   static String normalizeUserName(String userName) {
     return userName.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
@@ -93,6 +109,12 @@ class AppSettingsService {
   static bool isValidUserName(String userName) {
     final normalized = normalizeUserName(userName);
     return normalized.isNotEmpty && _userNamePattern.hasMatch(normalized);
+  }
+
+  static bool isValidOnboardingUserName(String userName) {
+    final normalized = normalizeUserName(userName);
+    return normalized.isNotEmpty &&
+        _onboardingUserNamePattern.hasMatch(normalized);
   }
 
   static const _foodCategoryAliases = {
