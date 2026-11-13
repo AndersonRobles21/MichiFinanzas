@@ -11,13 +11,19 @@ import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
-import '../../widgets/money_medium_selector.dart';
+import '../../widgets/money_source_selector.dart';
 
 class DebtsScreen extends StatefulWidget {
-  const DebtsScreen({super.key, this.isActive = true, this.databaseService});
+  const DebtsScreen({
+    super.key,
+    this.isActive = true,
+    this.databaseService,
+    this.creditEntityId,
+  });
 
   final bool isActive;
   final DatabaseService? databaseService;
+  final int? creditEntityId;
 
   @override
   State<DebtsScreen> createState() => _DebtsScreenState();
@@ -27,6 +33,10 @@ class _DebtsScreenState extends State<DebtsScreen> {
   late final DatabaseService _databaseService;
   late final bool _ownsDatabaseService;
   Future<_DebtDashboardData>? _debtsFuture;
+  List<DigitalAccountBalance> _digitalAccounts = const [];
+  double _cashBalance = 0;
+  double _unclassifiedBalance = 0;
+  late final StreamSubscription<void> _financialChanges;
   bool _isProcessingPayment = false;
 
   @override
@@ -35,25 +45,44 @@ class _DebtsScreenState extends State<DebtsScreen> {
     _ownsDatabaseService = widget.databaseService == null;
     _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
     if (widget.isActive) _debtsFuture = _loadDebts();
+    _financialChanges = _databaseService.observarCambiosFinancieros().listen((
+      _,
+    ) {
+      if (mounted && widget.isActive) {
+        setState(() {
+          _debtsFuture = _loadDebts();
+        });
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant DebtsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isActive && !oldWidget.isActive) {
+    if (widget.creditEntityId != oldWidget.creditEntityId ||
+        (widget.isActive && !oldWidget.isActive)) {
       _debtsFuture = _loadDebts();
     }
   }
 
   Future<_DebtDashboardData> _loadDebts() async {
-    return runWithLoggedErrors(
-      'cargar deudas',
-      () => _readDebtData(_databaseService),
-    );
+    return runWithLoggedErrors('cargar deudas', () async {
+      final results = await Future.wait<Object>([
+        _readDebtData(_databaseService, creditEntityId: widget.creditEntityId),
+        _databaseService.obtenerCuentasDigitales(),
+        _databaseService.obtenerSaldosPorMedio(),
+      ]);
+      _digitalAccounts = results[1] as List<DigitalAccountBalance>;
+      final balances = results[2] as AvailableBalanceBreakdown;
+      _cashBalance = balances.cash;
+      _unclassifiedBalance = balances.unclassified;
+      return results[0] as _DebtDashboardData;
+    });
   }
 
   @override
   void dispose() {
+    unawaited(_financialChanges.cancel());
     if (_ownsDatabaseService) unawaited(_databaseService.close());
     super.dispose();
   }
@@ -103,6 +132,9 @@ class _DebtsScreenState extends State<DebtsScreen> {
         debtName: entry.deuda.nombre,
         remainingBalance: entry.saldoRestante,
         installment: entry.deuda.cuota,
+        accounts: _digitalAccounts,
+        cashBalance: _cashBalance,
+        cashUnclassifiedAllowance: _unclassifiedBalance,
       ),
     );
     if (draft == null || !mounted || _isProcessingPayment) return;
@@ -120,6 +152,7 @@ class _DebtsScreenState extends State<DebtsScreen> {
             fecha: draft.fecha,
             operationId: draft.operationId,
             medio: draft.medio,
+            cuentaDigitalId: draft.cuentaDigitalId,
           ),
         ),
       );
@@ -362,10 +395,21 @@ class _DebtsScreenState extends State<DebtsScreen> {
   }
 }
 
-Future<_DebtDashboardData> _readDebtData(DatabaseService service) async {
+Future<_DebtDashboardData> _readDebtData(
+  DatabaseService service, {
+  int? creditEntityId,
+}) async {
   final debts = await service.obtenerDeudas();
   final payments = await service.obtenerTodosLosPagosDeuda();
-  return _DebtDashboardData.fromRecords(debts, payments);
+  if (creditEntityId == null) {
+    return _DebtDashboardData.fromRecords(debts, payments);
+  }
+  final purchases = await service.obtenerComprasCredito(creditEntityId);
+  final debtIds = purchases.map((purchase) => purchase.compra.deudaId).toSet();
+  return _DebtDashboardData.fromRecords(
+    debts.where((debt) => debtIds.contains(debt.id)).toList(),
+    payments.where((payment) => debtIds.contains(payment.deudaId)).toList(),
+  );
 }
 
 int _compareDebtEntries(_DebtEntry first, _DebtEntry second) {
@@ -462,12 +506,16 @@ class _PaymentDraft {
     required this.fecha,
     required this.operationId,
     required this.medio,
+    required this.cuentaDigitalId,
+    required this.accountName,
   });
 
   final double monto;
   final DateTime fecha;
   final String operationId;
   final MoneyMedium medio;
+  final int? cuentaDigitalId;
+  final String? accountName;
 }
 
 int _countCompletedInstallments(Deuda debt, double totalPaid) {
@@ -701,11 +749,17 @@ class _PaymentFormSheet extends StatefulWidget {
     required this.debtName,
     required this.remainingBalance,
     required this.installment,
+    required this.accounts,
+    required this.cashBalance,
+    required this.cashUnclassifiedAllowance,
   });
 
   final String debtName;
   final double remainingBalance;
   final double installment;
+  final List<DigitalAccountBalance> accounts;
+  final double cashBalance;
+  final double cashUnclassifiedAllowance;
 
   @override
   State<_PaymentFormSheet> createState() => _PaymentFormSheetState();
@@ -720,7 +774,18 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
   );
   _PaymentAmountOption _selectedOption = _PaymentAmountOption.installment;
   MoneyMedium _medium = MoneyMedium.cash;
+  int? _digitalAccountId;
   DateTime _date = DateTime.now();
+
+  double? get _selectedAvailableBalance {
+    if (_medium == MoneyMedium.cash) {
+      return widget.cashBalance + widget.cashUnclassifiedAllowance;
+    }
+    for (final account in widget.accounts) {
+      if (account.account.id == _digitalAccountId) return account.balance;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -753,8 +818,19 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
         fecha: _date,
         operationId: _newPaymentOperationId(),
         medio: _medium,
+        cuentaDigitalId: _digitalAccountId,
+        accountName: _digitalAccountName,
       ),
     );
+  }
+
+  String? get _digitalAccountName {
+    for (final account in widget.accounts) {
+      if (account.account.id == _digitalAccountId) {
+        return account.account.nombre;
+      }
+    }
+    return null;
   }
 
   void _selectAmount(_PaymentAmountOption option) {
@@ -845,6 +921,11 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
                     if (amount > widget.remainingBalance) {
                       return 'Ese abono supera lo que todavía debes.';
                     }
+                    final available = _selectedAvailableBalance;
+                    if (available == null || amount > available + 1e-8) {
+                      return 'No alcanza el saldo de esta opción '
+                          '(${formatMoney(available ?? 0)} disponibles).';
+                    }
                     return null;
                   },
                   onChanged: (_) {
@@ -862,11 +943,20 @@ class _PaymentFormSheetState extends State<_PaymentFormSheet> {
                   label: Text('Fecha del abono: ${_formatDate(_date)}'),
                 ),
                 const SizedBox(height: 8),
-                MoneyMediumSelector(
-                  selected: _medium,
-                  title: 'Medio de pago',
-                  onChanged: (medium) {
-                    if (medium != null) setState(() => _medium = medium);
+                MoneySourceSelector(
+                  selectedMedium: _medium,
+                  selectedAccountId: _digitalAccountId,
+                  digitalAccounts: widget.accounts,
+                  cashBalance: widget.cashBalance,
+                  cashUnclassifiedAllowance: widget.cashUnclassifiedAllowance,
+                  amount: _tryParseAmount(_amountController.text),
+                  title: '¿Desde dónde quieres pagar?',
+                  onChanged: (medium, accountId) {
+                    if (medium == null) return;
+                    setState(() {
+                      _medium = medium;
+                      _digitalAccountId = accountId;
+                    });
                   },
                 ),
                 const SizedBox(height: 16),
@@ -944,6 +1034,9 @@ class _PaymentReviewDialogState extends State<_PaymentReviewDialog> {
           const SizedBox(height: 6),
           Text('Monto: ${_formatMoney(widget.draft.monto)}'),
           Text('Fecha: ${_formatDate(widget.draft.fecha)}'),
+          Text(
+            'Origen: ${widget.draft.accountName ?? widget.draft.medio.label}',
+          ),
           if (_error != null) ...[
             const SizedBox(height: 12),
             Text(

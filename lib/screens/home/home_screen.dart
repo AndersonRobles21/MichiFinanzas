@@ -28,6 +28,7 @@ class HomeScreen extends StatefulWidget {
     this.onViewDebts,
     this.onViewSavings,
     this.onViewSettings,
+    this.onTransferMoney,
   });
 
   final DatabaseService? databaseService;
@@ -39,6 +40,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onViewDebts;
   final VoidCallback? onViewSavings;
   final VoidCallback? onViewSettings;
+  final VoidCallback? onTransferMoney;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -50,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<DashboardData> _dashboardFuture;
   late final StreamSubscription<void> _financialChanges;
   bool _isSavingIncome = false;
-  bool _isSavingDistribution = false;
 
   @override
   void initState() {
@@ -151,47 +152,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _editDistribution() async {
-    if (_isSavingDistribution) return;
-    try {
-      final current = await _databaseService.obtenerSaldosPorMedio();
-      if (!mounted) return;
-      final draft = await showDialog<_DistributionDraft>(
-        context: context,
-        builder: (context) => Dialog(
-          backgroundColor: AppColors.surface,
-          child: _DistributionFormSheet(
-            total: current.total,
-            cash: current.cash,
-            digital: current.digital,
-          ),
-        ),
-      );
-      if (draft == null || !mounted) return;
-      setState(() => _isSavingDistribution = true);
-      await _databaseService.distribuirSaldoDisponible(
-        efectivo: draft.cash,
-        digital: draft.digital,
-      );
-      if (!mounted) return;
-      setState(() => _dashboardFuture = _loadDashboard(_databaseService));
-      _showMessage('Distribución actualizada.', isSuccess: true);
-    } catch (error, stackTrace) {
-      logOperationFailure(
-        error,
-        stackTrace,
-        operation: 'distribuir el dinero disponible',
-      );
-      if (mounted) {
-        _showMessage(
-          friendlyOperationError(error, action: 'guardar la distribución'),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSavingDistribution = false);
-    }
-  }
-
   void _showMessage(
     String message, {
     bool isSuccess = false,
@@ -270,8 +230,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           data: snapshot.data!,
                           onAddIncome: _addIncome,
                           isSavingIncome: _isSavingIncome,
-                          onDistributeBalance: _editDistribution,
-                          isSavingDistribution: _isSavingDistribution,
                           onViewFutureExpenses: widget.onViewFutureExpenses,
                           onViewExpenses: widget.onViewExpenses,
                           onViewIncomes: widget.onViewIncomes,
@@ -279,6 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onViewDebts: widget.onViewDebts,
                           onViewSavings: widget.onViewSavings,
                           onViewSettings: widget.onViewSettings,
+                          onTransferMoney: widget.onTransferMoney,
                         );
                       },
                     ),
@@ -1261,196 +1220,11 @@ class _IncomeDestinationEditor {
   void dispose() => controller.dispose();
 }
 
-class _DistributionDraft {
-  const _DistributionDraft({required this.cash, required this.digital});
-
-  final double cash;
-  final double digital;
-}
-
-class _DistributionFormSheet extends StatefulWidget {
-  const _DistributionFormSheet({
-    required this.total,
-    required this.cash,
-    required this.digital,
-  });
-
-  final double total;
-  final double cash;
-  final double digital;
-
-  @override
-  State<_DistributionFormSheet> createState() => _DistributionFormSheetState();
-}
-
-class _DistributionFormSheetState extends State<_DistributionFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _cashController;
-  late final TextEditingController _digitalController;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _cashController = TextEditingController(text: formatAmount(widget.cash));
-    _digitalController = TextEditingController(
-      text: formatAmount(widget.digital),
-    );
-  }
-
-  @override
-  void dispose() {
-    _cashController.dispose();
-    _digitalController.dispose();
-    super.dispose();
-  }
-
-  String? _validateAmount(String? value) {
-    final amount = tryParseMoney(value);
-    return amount == null || amount < 0
-        ? 'Escribe un valor válido igual o mayor que cero.'
-        : null;
-  }
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    final cash = parseMoney(_cashController.text);
-    final digital = parseMoney(_digitalController.text);
-    if ((cash + digital - widget.total).abs() > 1e-8) {
-      setState(() {
-        _error = cash + digital < widget.total
-            ? 'Te faltan ${_formatMoney(widget.total - cash - digital)} por distribuir.'
-            : 'Sobran ${_formatMoney(cash + digital - widget.total)} en la distribución.';
-      });
-      return;
-    }
-    Navigator.pop(context, _DistributionDraft(cash: cash, digital: digital));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-      ),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(22, 22, 22, 24 + bottomInset),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Distribuir dinero disponible',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Total disponible: ${_formatMoney(widget.total)}. '
-                    'La suma de efectivo y digital debe coincidir con el total.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    key: const ValueKey('distribution-cash'),
-                    controller: _cashController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: const [ThousandsInputFormatter()],
-                    decoration: const InputDecoration(
-                      labelText: 'Dinero en efectivo',
-                      prefixText: r'$ ',
-                    ),
-                    validator: _validateAmount,
-                    onChanged: (_) => setState(() => _error = null),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    key: const ValueKey('distribution-digital'),
-                    controller: _digitalController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: const [ThousandsInputFormatter()],
-                    decoration: const InputDecoration(
-                      labelText: 'Dinero digital',
-                      prefixText: r'$ ',
-                    ),
-                    validator: _validateAmount,
-                    onChanged: (_) => setState(() => _error = null),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Total distribuido: '
-                    '${_formatMoney((tryParseMoney(_cashController.text) ?? 0) + (tryParseMoney(_digitalController.text) ?? 0))} '
-                    'de ${_formatMoney(widget.total)}',
-                  ),
-                  if (widget.total -
-                          (tryParseMoney(_cashController.text) ?? 0) -
-                          (tryParseMoney(_digitalController.text) ?? 0) >
-                      1e-8)
-                    Text(
-                      'Te faltan ${_formatMoney(widget.total - (tryParseMoney(_cashController.text) ?? 0) - (tryParseMoney(_digitalController.text) ?? 0))} por distribuir.',
-                    )
-                  else if ((tryParseMoney(_cashController.text) ?? 0) +
-                          (tryParseMoney(_digitalController.text) ?? 0) -
-                          widget.total >
-                      1e-8)
-                    Text(
-                      'Sobran ${_formatMoney((tryParseMoney(_cashController.text) ?? 0) + (tryParseMoney(_digitalController.text) ?? 0) - widget.total)} en la distribución.',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed:
-                          ((tryParseMoney(_cashController.text) ?? 0) +
-                                      (tryParseMoney(_digitalController.text) ??
-                                          0) -
-                                      widget.total)
-                                  .abs() <=
-                              1e-8
-                          ? _save
-                          : null,
-                      icon: const Icon(Icons.account_balance_wallet_outlined),
-                      label: const Text('Guardar distribución'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
-    required this.onDistributeBalance,
-    required this.isSavingDistribution,
     required this.onViewFutureExpenses,
     required this.onViewExpenses,
     required this.onViewIncomes,
@@ -1458,13 +1232,12 @@ class _DashboardContent extends StatelessWidget {
     required this.onViewDebts,
     required this.onViewSavings,
     required this.onViewSettings,
+    required this.onTransferMoney,
   });
 
   final DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
-  final VoidCallback onDistributeBalance;
-  final bool isSavingDistribution;
   final VoidCallback? onViewFutureExpenses;
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
@@ -1472,6 +1245,7 @@ class _DashboardContent extends StatelessWidget {
   final VoidCallback? onViewDebts;
   final VoidCallback? onViewSavings;
   final VoidCallback? onViewSettings;
+  final VoidCallback? onTransferMoney;
 
   @override
   Widget build(BuildContext context) {
@@ -1483,9 +1257,8 @@ class _DashboardContent extends StatelessWidget {
         _QuickActionsPanel(
           onAddIncome: onAddIncome,
           isSavingIncome: isSavingIncome,
-          onDistributeBalance: onDistributeBalance,
-          isSavingDistribution: isSavingDistribution,
           onViewExpenses: onViewExpenses,
+          onTransferMoney: onTransferMoney,
         ),
         const SizedBox(height: AppSpacing.section),
         _FinancialSummaryPanel(
@@ -1519,16 +1292,14 @@ class _QuickActionsPanel extends StatelessWidget {
   const _QuickActionsPanel({
     required this.onAddIncome,
     required this.isSavingIncome,
-    required this.onDistributeBalance,
-    required this.isSavingDistribution,
     required this.onViewExpenses,
+    required this.onTransferMoney,
   });
 
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
-  final VoidCallback onDistributeBalance;
-  final bool isSavingDistribution;
   final VoidCallback? onViewExpenses;
+  final VoidCallback? onTransferMoney;
 
   @override
   Widget build(BuildContext context) {
@@ -1548,17 +1319,11 @@ class _QuickActionsPanel extends StatelessWidget {
           icon: const Icon(Icons.north_east_rounded),
           label: const Text('Registrar gasto'),
         ),
-        OutlinedButton.icon(
-          key: const ValueKey('distribute-available-balance'),
-          onPressed: isSavingDistribution ? null : onDistributeBalance,
-          icon: isSavingDistribution
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.swap_horiz_rounded),
-          label: const Text('Distribuir dinero'),
+        FilledButton.tonalIcon(
+          key: const ValueKey('home-quick-transfer'),
+          onPressed: onTransferMoney,
+          icon: const Icon(Icons.swap_horiz_rounded),
+          label: const Text('Transferir dinero'),
         ),
       ],
     );
@@ -1804,6 +1569,13 @@ class _AvailableBalanceCard extends StatelessWidget {
             icon: Icons.payments_outlined,
             valueKey: const ValueKey('home-cash-balance'),
           ),
+          const SizedBox(height: 8),
+          _BalanceMediumLine(
+            label: 'Digital',
+            amount: data.balanceBreakdown.digital,
+            icon: Icons.account_balance_wallet_outlined,
+            valueKey: const ValueKey('home-digital-balance'),
+          ),
           for (final account in data.digitalAccounts) ...[
             const SizedBox(height: 8),
             _DigitalAccountBalanceLine(account: account),
@@ -1833,7 +1605,7 @@ class _AvailableBalanceCard extends StatelessWidget {
               key: const ValueKey('home-view-accounts'),
               onPressed: onViewSettings,
               icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: const Text('Cuentas y transferencias'),
+              label: const Text('Administrar cuentas'),
             ),
           ),
         ],

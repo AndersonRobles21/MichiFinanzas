@@ -19,13 +19,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('muestra estado vacío cuando no hay gastos', (tester) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await _mountStatisticsScreen(tester);
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(service.close);
+    await _mountStatisticsScreen(tester, service: service);
     await _pumpUntilFound(
       tester,
       find.text(
@@ -49,21 +50,21 @@ void main() {
     tester,
   ) async {
     final expenses = <_ExpenseFixture>[];
-    await _prepareTemporaryDatabaseDirectory(tester);
     final now = DateTime.now();
     expenses.addAll([
       _ExpenseFixture('Comida', 100, now),
       _ExpenseFixture('Comida', 50, now),
       _ExpenseFixture('Transporte', 50, now),
     ]);
-    await _seedExpenses(tester, expenses);
+    final service = await _seedExpenses(tester, expenses);
+    addTearDown(service.close);
 
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await _mountStatisticsScreen(tester);
+    await _mountStatisticsScreen(tester, service: service);
     await _pumpUntilFound(
       tester,
       find.byKey(const ValueKey('statistics-total')),
@@ -204,6 +205,72 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cuenta solo los pagos de una compra financiada', (tester) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    addTearDown(service.close);
+    final now = DateTime.now();
+    final accountId = await service.crearCuentaDigital('Billetera');
+    await service.agregarIngreso(
+      monto: 500,
+      fecha: now,
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: accountId,
+    );
+    final entityId = await service.crearEntidadCredito(
+      nombre: 'Entidad de prueba',
+      cupoAprobado: 200,
+      fecha: now,
+    );
+    final purchaseId = await service.registrarCompraCredito(
+      entidadId: entityId,
+      descripcion: 'Compra financiada',
+      monto: 100,
+      categoria: 'Compras',
+      fecha: now,
+      cuotasTotales: 2,
+      valorCuota: 50,
+      primerVencimiento: now,
+    );
+    final purchase = (await service.obtenerComprasCredito(entityId)).single;
+    expect(purchase.compra.id, purchaseId);
+    await service.registrarPagoDeuda(
+      deudaId: purchase.compra.deudaId,
+      monto: 50,
+      fecha: now,
+      operationId: 'statistics-credit-payment',
+      medio: MoneyMedium.digital,
+      cuentaDigitalId: accountId,
+    );
+
+    await _mountStatisticsScreen(tester, service: service);
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('statistics-total')),
+    );
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-total')),
+        matching: find.text(r'$ 50'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statistics-count')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Pagos de deudas'), findsAtLeastNWidgets(1));
+    final expenses = await service.obtenerGastos();
+    expect(expenses, hasLength(1));
+    expect(expenses.single.pagoDeudaId, isNotNull);
+    expect(await service.obtenerTodosLosPagosDeuda(), hasLength(1));
     expect(tester.takeException(), isNull);
   });
 
@@ -578,10 +645,10 @@ void main() {
         now.subtract(const Duration(days: 45)),
       ),
     ];
-    await _prepareTemporaryDatabaseDirectory(tester);
-    await _seedExpenses(tester, expenses);
+    final service = await _seedExpenses(tester, expenses);
+    addTearDown(service.close);
 
-    await _mountStatisticsScreen(tester);
+    await _mountStatisticsScreen(tester, service: service);
     await _pumpUntilFound(
       tester,
       find.text(
@@ -645,31 +712,27 @@ Future<void> _mountStatisticsScreen(
   );
 }
 
-Future<void> _seedExpenses(
+Future<DatabaseService> _seedExpenses(
   WidgetTester tester,
   List<_ExpenseFixture> expenses,
 ) async {
+  final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
   await tester.runAsync(() async {
-    final database = AppDatabase();
-    try {
-      final service = DatabaseService(database);
-      await service.agregarIngreso(
-        monto: 100000000,
-        fecha: expenses.isEmpty ? DateTime.now() : expenses.first.date,
+    await service.agregarIngreso(
+      monto: 100000000,
+      fecha: expenses.isEmpty ? DateTime.now() : expenses.first.date,
+    );
+    for (var index = 0; index < expenses.length; index++) {
+      final expense = expenses[index];
+      await service.agregarGasto(
+        nombre: 'Gasto ${index + 1}',
+        monto: expense.amount,
+        categoria: expense.category,
+        fecha: expense.date,
       );
-      for (var index = 0; index < expenses.length; index++) {
-        final expense = expenses[index];
-        await service.agregarGasto(
-          nombre: 'Gasto ${index + 1}',
-          monto: expense.amount,
-          categoria: expense.category,
-          fecha: expense.date,
-        );
-      }
-    } finally {
-      await database.close();
     }
   });
+  return service;
 }
 
 Future<void> _prepareTemporaryDatabaseDirectory(

@@ -17,13 +17,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('navega con el menú lateral entre las secciones', (tester) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(() => tester.runAsync(() => service.close()));
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.runAsync(() async => app.main());
+    await tester.pumpWidget(app.FinanzasApp(databaseService: service));
     await _completeWelcome(tester);
 
     expect(find.text('Tus movimientos aparecerán aquí.'), findsOneWidget);
@@ -187,7 +188,7 @@ void main() {
     expect(tester.widget<Text>(availableBalance).data, r'$ 750');
     expect(find.byKey(const ValueKey('home-monthly-received')), findsOneWidget);
     expect(find.text(r'$ 1.000'), findsOneWidget);
-    expect(find.text(r'$ 200'), findsOneWidget);
+    expect(find.text(r'$ 250'), findsOneWidget);
     expect(find.text('25,0%'), findsOneWidget);
     expect(find.text(r'$ 450'), findsOneWidget);
     expect(find.text('Deuda de prueba'), findsOneWidget);

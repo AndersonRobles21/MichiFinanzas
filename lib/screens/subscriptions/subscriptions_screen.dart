@@ -12,6 +12,7 @@ import '../../utils/user_messages.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 import '../../widgets/money_medium_selector.dart';
+import '../../widgets/money_source_selector.dart';
 
 class SubscriptionsScreen extends StatefulWidget {
   const SubscriptionsScreen({super.key, required this.databaseService});
@@ -25,6 +26,8 @@ class SubscriptionsScreen extends StatefulWidget {
 class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   List<Suscripcion> _subscriptions = const [];
   List<DigitalAccountBalance> _digitalAccounts = const [];
+  AvailableBalanceBreakdown? _balanceBreakdown;
+  late final StreamSubscription<void> _financialChanges;
   Object? _loadError;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -33,6 +36,15 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   void initState() {
     super.initState();
     unawaited(_refreshSubscriptions());
+    _financialChanges = widget.databaseService
+        .observarCambiosFinancieros()
+        .listen((_) => unawaited(_refreshSubscriptions()));
+  }
+
+  @override
+  void dispose() {
+    unawaited(_financialChanges.cancel());
+    super.dispose();
   }
 
   Future<List<Suscripcion>> _loadSubscriptions() {
@@ -50,11 +62,16 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           'cargar cuentas para suscripciones',
           widget.databaseService.obtenerCuentasDigitales,
         ),
+        runWithLoggedErrors(
+          'cargar saldos para suscripciones',
+          widget.databaseService.obtenerSaldosPorMedio,
+        ),
       ]);
       if (!mounted) return;
       setState(() {
         _subscriptions = values[0] as List<Suscripcion>;
         _digitalAccounts = values[1] as List<DigitalAccountBalance>;
+        _balanceBreakdown = values[2] as AvailableBalanceBreakdown;
         _loadError = null;
         _isLoading = false;
       });
@@ -203,7 +220,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       context: context,
       builder: (context) => _SubscriptionPaymentConfirmation(
         subscription: subscription,
-        accounts: _digitalAccounts.map((item) => item.account).toList(),
+        accounts: _digitalAccounts,
+        cashBalance: _balanceBreakdown?.cash ?? 0,
+        cashUnclassifiedAllowance: _balanceBreakdown?.unclassified ?? 0,
       ),
     );
     if (draft == null || !mounted) return;
@@ -909,10 +928,14 @@ class _SubscriptionPaymentConfirmation extends StatefulWidget {
   const _SubscriptionPaymentConfirmation({
     required this.subscription,
     required this.accounts,
+    required this.cashBalance,
+    required this.cashUnclassifiedAllowance,
   });
 
   final Suscripcion subscription;
-  final List<CuentasDigitale> accounts;
+  final List<DigitalAccountBalance> accounts;
+  final double cashBalance;
+  final double cashUnclassifiedAllowance;
 
   @override
   State<_SubscriptionPaymentConfirmation> createState() =>
@@ -932,9 +955,20 @@ class _SubscriptionPaymentConfirmationState
     _accountId = widget.subscription.cuentaDigitalId;
   }
 
-  bool get _canConfirm =>
-      _medium != MoneyMedium.digital ||
-      widget.accounts.any((account) => account.id == _accountId);
+  double? get _selectedBalance {
+    if (_medium == MoneyMedium.cash) {
+      return widget.cashBalance + widget.cashUnclassifiedAllowance;
+    }
+    for (final account in widget.accounts) {
+      if (account.account.id == _accountId) return account.balance;
+    }
+    return null;
+  }
+
+  bool get _canConfirm {
+    final balance = _selectedBalance;
+    return balance != null && widget.subscription.precio <= balance + 1e-8;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -954,29 +988,23 @@ class _SubscriptionPaymentConfirmationState
               'Próximo pago · ${_formatDate(widget.subscription.proximoPago)}',
             ),
             const SizedBox(height: 16),
-            MoneyMediumSelector(
-              selected: _medium,
+            MoneySourceSelector(
+              selectedMedium: _medium,
+              selectedAccountId: _accountId,
+              digitalAccounts: widget.accounts,
+              cashBalance: widget.cashBalance,
+              cashUnclassifiedAllowance: widget.cashUnclassifiedAllowance,
+              amount: widget.subscription.precio,
               title: '¿Desde dónde pagas?',
-              onChanged: (value) {
-                if (value != null) {
+              onChanged: (medium, accountId) {
+                if (medium != null) {
                   setState(() {
-                    _medium = value;
-                    if (value != MoneyMedium.digital) _accountId = null;
+                    _medium = medium;
+                    _accountId = accountId;
                   });
                 }
               },
             ),
-            if (_medium == MoneyMedium.digital) ...[
-              const SizedBox(height: 12),
-              if (widget.accounts.isEmpty)
-                const Text('Agrega una cuenta digital en Configuración.')
-              else
-                DigitalAccountSelector(
-                  accounts: widget.accounts,
-                  selectedId: _accountId,
-                  onChanged: (id) => setState(() => _accountId = id),
-                ),
-            ],
           ],
         ),
       ),

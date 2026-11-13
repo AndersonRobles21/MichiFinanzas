@@ -7,6 +7,7 @@ import '../models/future_expense.dart';
 import '../models/income_type.dart';
 import '../models/money_medium.dart';
 import '../models/subscription.dart';
+import '../utils/credit_installments.dart';
 
 class DatabaseService {
   DatabaseService(this._database);
@@ -35,13 +36,17 @@ class DatabaseService {
         await _database.delete(_database.suscripciones).go();
         await _database.delete(_database.transferenciasDinero).go();
         await _database.delete(_database.pagosDeuda).go();
+        await _database.delete(_database.cuotasCredito).go();
+        await _database.delete(_database.comprasCredito).go();
+        await _database.delete(_database.gastos).go();
+        await _database.delete(_database.historialCupoCredito).go();
+        await _database.delete(_database.entidadesCredito).go();
         await _database.delete(_database.deudas).go();
         await _database.delete(_database.movimientosPrestamo).go();
         await _database.delete(_database.prestamosTerceros).go();
         await _database.delete(_database.movimientosReservaGastoFuturo).go();
         await _database.delete(_database.gastosFuturos).go();
         await _database.delete(_database.movimientosAhorro).go();
-        await _database.delete(_database.gastos).go();
         await _database.delete(_database.ingresos).go();
         await _database.delete(_database.asignacionesDinero).go();
       }),
@@ -1433,6 +1438,381 @@ class DatabaseService {
 
   Stream<void> observarCambiosFinancieros() => _financialChanges.stream;
 
+  Future<int> crearEntidadCredito({
+    required String nombre,
+    required double cupoAprobado,
+    DateTime? fecha,
+  }) {
+    return _modificar(
+      'crear entidad de crédito',
+      () => _database.transaction(() async {
+        final cleanName = nombre.trim();
+        if (cleanName.isEmpty) {
+          throw ArgumentError('Escribe el nombre de la entidad.');
+        }
+        _validarCupoCredito(cupoAprobado);
+        final id = await _database
+            .into(_database.entidadesCredito)
+            .insert(
+              EntidadesCreditoCompanion.insert(
+                nombre: cleanName,
+                cupoAprobado: cupoAprobado,
+              ),
+            );
+        await _database
+            .into(_database.historialCupoCredito)
+            .insert(
+              HistorialCupoCreditoCompanion.insert(
+                entidadId: id,
+                cupoAnterior: 0,
+                cupoNuevo: cupoAprobado,
+                fecha: fecha ?? DateTime.now(),
+              ),
+            );
+        return id;
+      }),
+    );
+  }
+
+  Future<List<CreditEntitySummary>> obtenerEntidadesCredito({
+    bool incluirRetiradas = false,
+  }) {
+    return _ejecutar('obtener entidades de crédito', () async {
+      final entities =
+          await (_database.select(_database.entidadesCredito)
+                ..where(
+                  (entity) => incluirRetiradas
+                      ? const Constant(true)
+                      : entity.activa.equals(true),
+                )
+                ..orderBy([(entity) => OrderingTerm.asc(entity.nombre)]))
+              .get();
+      final purchases = await _database.select(_database.comprasCredito).get();
+      final payments = await _database.select(_database.pagosDeuda).get();
+      final debts = await _database.select(_database.deudas).get();
+      final debtById = {for (final debt in debts) debt.id: debt};
+      final paidByDebt = <int, double>{};
+      for (final payment in payments) {
+        paidByDebt.update(
+          payment.deudaId,
+          (amount) => amount + payment.monto,
+          ifAbsent: () => payment.monto,
+        );
+      }
+      final purchasesByEntity = <int, List<CompraCredito>>{};
+      for (final purchase in purchases) {
+        purchasesByEntity
+            .putIfAbsent(purchase.entidadId, () => [])
+            .add(purchase);
+      }
+      return entities.map((entity) {
+        final entityPurchases = purchasesByEntity[entity.id] ?? const [];
+        final utilized = entityPurchases.fold<double>(
+          0,
+          (total, purchase) => total + purchase.monto,
+        );
+        final outstanding = entityPurchases.fold<double>(0, (total, purchase) {
+          final debt = debtById[purchase.deudaId];
+          if (debt == null) {
+            throw StateError('Una compra financiada no tiene deuda asociada.');
+          }
+          return total +
+              (debt.montoOriginal - (paidByDebt[debt.id] ?? 0)).clamp(
+                0.0,
+                double.infinity,
+              );
+        });
+        return CreditEntitySummary(
+          entidad: entity,
+          cupoUtilizado: utilized,
+          cupoDisponible: entity.cupoAprobado - utilized,
+          deudaPendiente: outstanding,
+        );
+      }).toList();
+    });
+  }
+
+  Future<void> actualizarCupoCredito({
+    required int entidadId,
+    required double nuevoCupo,
+    required DateTime fecha,
+  }) {
+    return _modificar(
+      'actualizar cupo de crédito',
+      () => _database.transaction(() async {
+        _validarCupoCredito(nuevoCupo);
+        final entity = await (_database.select(
+          _database.entidadesCredito,
+        )..where((item) => item.id.equals(entidadId))).getSingleOrNull();
+        if (entity == null || !entity.activa) {
+          throw StateError('La entidad ya no está disponible.');
+        }
+        final purchases = await (_database.select(
+          _database.comprasCredito,
+        )..where((purchase) => purchase.entidadId.equals(entidadId))).get();
+        final utilized = purchases.fold<double>(
+          0,
+          (total, purchase) => total + purchase.monto,
+        );
+        if (nuevoCupo + 1e-8 < utilized) {
+          throw ArgumentError.value(
+            nuevoCupo,
+            'nuevoCupo',
+            'El cupo no puede ser menor al cupo utilizado '
+                '(${utilized.toStringAsFixed(2)}).',
+          );
+        }
+        await (_database.update(_database.entidadesCredito)
+              ..where((item) => item.id.equals(entidadId)))
+            .write(EntidadesCreditoCompanion(cupoAprobado: Value(nuevoCupo)));
+        await _database
+            .into(_database.historialCupoCredito)
+            .insert(
+              HistorialCupoCreditoCompanion.insert(
+                entidadId: entidadId,
+                cupoAnterior: entity.cupoAprobado,
+                cupoNuevo: nuevoCupo,
+                fecha: fecha,
+              ),
+            );
+      }),
+    );
+  }
+
+  Future<List<CambioCupoCredito>> obtenerHistorialCupoCredito(int entidadId) {
+    return _ejecutar(
+      'obtener historial de cupo',
+      () =>
+          (_database.select(_database.historialCupoCredito)
+                ..where((change) => change.entidadId.equals(entidadId))
+                ..orderBy([(change) => OrderingTerm.desc(change.fecha)]))
+              .get(),
+    );
+  }
+
+  Future<List<CreditPurchaseDetails>> obtenerComprasCredito(int entidadId) {
+    return _ejecutar('obtener compras de crédito', () async {
+      final purchases =
+          await (_database.select(_database.comprasCredito)
+                ..where((purchase) => purchase.entidadId.equals(entidadId))
+                ..orderBy([(purchase) => OrderingTerm.desc(purchase.fecha)]))
+              .get();
+      final details = <CreditPurchaseDetails>[];
+      for (final purchase in purchases) {
+        final installments =
+            await (_database.select(_database.cuotasCredito)
+                  ..where(
+                    (installment) => installment.compraId.equals(purchase.id),
+                  )
+                  ..orderBy([
+                    (installment) => OrderingTerm.asc(installment.numero),
+                  ]))
+                .get();
+        final payments =
+            await (_database.select(_database.pagosDeuda)
+                  ..where((payment) => payment.deudaId.equals(purchase.deudaId))
+                  ..orderBy([(payment) => OrderingTerm.desc(payment.fecha)]))
+                .get();
+        final debt = await (_database.select(
+          _database.deudas,
+        )..where((item) => item.id.equals(purchase.deudaId))).getSingleOrNull();
+        if (debt == null) {
+          throw StateError('Una compra financiada no tiene deuda asociada.');
+        }
+        final totalPaid = payments.fold<double>(
+          0,
+          (total, payment) => total + payment.monto,
+        );
+        details.add(
+          CreditPurchaseDetails(
+            compra: purchase,
+            cuotas: installments,
+            pagos: payments,
+            deudaPendiente: (debt.montoOriginal - totalPaid).clamp(
+              0.0,
+              double.infinity,
+            ),
+          ),
+        );
+      }
+      return details;
+    });
+  }
+
+  Future<List<CambioCupoCredito>> obtenerHistorialCupoCreditoTodos() {
+    return _ejecutar(
+      'obtener movimientos de cupo',
+      () => _database.select(_database.historialCupoCredito).get(),
+    );
+  }
+
+  Future<Set<int>> obtenerDeudasCreditoIds() {
+    return _ejecutar('obtener deudas de compras financiadas', () async {
+      final purchases = await _database.select(_database.comprasCredito).get();
+      return purchases.map((purchase) => purchase.deudaId).toSet();
+    });
+  }
+
+  Future<Set<int>> obtenerGastosCreditoIds() {
+    return _ejecutar('obtener gastos de compras financiadas', () async {
+      final purchases = await _database.select(_database.comprasCredito).get();
+      return purchases
+          .map((purchase) => purchase.gastoId)
+          .whereType<int>()
+          .toSet();
+    });
+  }
+
+  Future<void> retirarEntidadCredito(int entidadId) {
+    return _modificar(
+      'retirar entidad de crédito',
+      () => _database.transaction(() async {
+        final entity = await (_database.select(
+          _database.entidadesCredito,
+        )..where((item) => item.id.equals(entidadId))).getSingleOrNull();
+        if (entity == null) throw StateError('La entidad no existe.');
+        final purchases = await (_database.select(
+          _database.comprasCredito,
+        )..where((purchase) => purchase.entidadId.equals(entidadId))).get();
+        final debts = await _database.select(_database.deudas).get();
+        final debtById = {for (final debt in debts) debt.id: debt};
+        for (final purchase in purchases) {
+          final debt = debtById[purchase.deudaId];
+          if (debt == null) {
+            throw StateError('Una compra financiada no tiene deuda asociada.');
+          }
+          final payments = await (_database.select(
+            _database.pagosDeuda,
+          )..where((payment) => payment.deudaId.equals(debt.id))).get();
+          final paid = payments.fold<double>(
+            0,
+            (total, payment) => total + payment.monto,
+          );
+          if (debt.montoOriginal - paid > 1e-8) {
+            throw StateError(
+              'No puedes retirar esta entidad mientras tenga deudas pendientes.',
+            );
+          }
+        }
+        await (_database.update(_database.entidadesCredito)
+              ..where((item) => item.id.equals(entidadId)))
+            .write(const EntidadesCreditoCompanion(activa: Value(false)));
+      }),
+    );
+  }
+
+  Future<int> registrarCompraCredito({
+    required int entidadId,
+    required String descripcion,
+    required double monto,
+    required String categoria,
+    required DateTime fecha,
+    required int cuotasTotales,
+    required double valorCuota,
+    required DateTime primerVencimiento,
+  }) {
+    return _modificar(
+      'registrar compra financiada',
+      () => _database.transaction(() async {
+        final cleanDescription = descripcion.trim();
+        final cleanCategory = categoria.trim();
+        if (cleanDescription.isEmpty || cleanCategory.isEmpty) {
+          throw ArgumentError(
+            'La descripción y la categoría son obligatorias.',
+          );
+        }
+        _validarMonto(monto);
+        if (!_hasCentPrecision(monto)) {
+          throw ArgumentError('El valor debe tener máximo dos decimales.');
+        }
+        if (cuotasTotales < 1 || cuotasTotales > 600) {
+          throw ArgumentError('El número de cuotas no es válido.');
+        }
+        _validarMonto(valorCuota);
+        if (!_hasCentPrecision(valorCuota)) {
+          throw ArgumentError(
+            'El valor de la cuota debe tener máximo dos decimales.',
+          );
+        }
+        final amountCents = (monto * 100).round();
+        final installmentCents = (valorCuota * 100).round();
+        final finalInstallmentCents =
+            amountCents - installmentCents * (cuotasTotales - 1);
+        if (finalInstallmentCents < 1) {
+          throw ArgumentError(
+            'El valor de las primeras cuotas supera el total de la compra.',
+          );
+        }
+        final entity = await (_database.select(
+          _database.entidadesCredito,
+        )..where((item) => item.id.equals(entidadId))).getSingleOrNull();
+        if (entity == null || !entity.activa) {
+          throw StateError('La entidad ya no está disponible.');
+        }
+        final existingPurchases = await (_database.select(
+          _database.comprasCredito,
+        )..where((purchase) => purchase.entidadId.equals(entidadId))).get();
+        final utilized = existingPurchases.fold<double>(
+          0,
+          (total, purchase) => total + purchase.monto,
+        );
+        final available = entity.cupoAprobado - utilized;
+        if (monto > available + 1e-8) {
+          throw StateError(
+            'No hay suficiente cupo disponible. '
+            'Tienes ${available.toStringAsFixed(2)} disponibles.',
+          );
+        }
+        final debtId = await _database
+            .into(_database.deudas)
+            .insert(
+              DeudasCompanion.insert(
+                nombre: 'Crédito · ${entity.nombre} · $cleanDescription',
+                montoOriginal: monto,
+                cuota: valorCuota,
+                cuotasTotales: cuotasTotales,
+                fechaProximoPago: Value(primerVencimiento),
+              ),
+            );
+        final purchaseId = await _database
+            .into(_database.comprasCredito)
+            .insert(
+              ComprasCreditoCompanion.insert(
+                entidadId: entidadId,
+                deudaId: debtId,
+                descripcion: cleanDescription,
+                monto: monto,
+                categoria: cleanCategory,
+                fecha: fecha,
+                cuotasTotales: cuotasTotales,
+                valorCuota: valorCuota,
+                primerVencimiento: primerVencimiento,
+              ),
+            );
+        final dueDates = monthlyInstallmentDates(
+          primerVencimiento,
+          cuotasTotales,
+        );
+        for (var index = 0; index < cuotasTotales; index++) {
+          final cents = index == cuotasTotales - 1
+              ? finalInstallmentCents
+              : installmentCents;
+          await _database
+              .into(_database.cuotasCredito)
+              .insert(
+                CuotasCreditoCompanion.insert(
+                  compraId: purchaseId,
+                  numero: index + 1,
+                  monto: cents / 100,
+                  vencimiento: dueDates[index],
+                ),
+              );
+        }
+        return purchaseId;
+      }),
+    );
+  }
+
   Future<int> eliminarIngreso(int id) {
     return _modificar(
       'eliminar ingreso',
@@ -1515,10 +1895,19 @@ class DatabaseService {
   }
 
   Future<List<Gasto>> obtenerGastos() {
-    return _ejecutar(
-      'obtener gastos',
-      () => _database.select(_database.gastos).get(),
-    );
+    return _ejecutar('obtener gastos', () async {
+      final results = await Future.wait<Object>([
+        _database.select(_database.gastos).get(),
+        _database.select(_database.comprasCredito).get(),
+      ]);
+      final creditPurchaseExpenseIds = (results[1] as List<CompraCredito>)
+          .map((purchase) => purchase.gastoId)
+          .whereType<int>()
+          .toSet();
+      return (results[0] as List<Gasto>)
+          .where((expense) => !creditPurchaseExpenseIds.contains(expense.id))
+          .toList();
+    });
   }
 
   Future<int> eliminarGasto(int id) {
@@ -1531,6 +1920,19 @@ class DatabaseService {
         if (expense?.suscripcionId != null) {
           throw StateError(
             'Los pagos de suscripción se conservan en el historial financiero.',
+          );
+        }
+        if (expense?.pagoDeudaId != null) {
+          throw StateError('Los pagos de deudas se conservan en el historial.');
+        }
+        final creditPurchase = expense == null
+            ? null
+            : await (_database.select(_database.comprasCredito)
+                    ..where((purchase) => purchase.gastoId.equals(id)))
+                  .getSingleOrNull();
+        if (creditPurchase != null) {
+          throw StateError(
+            'Las compras financiadas se conservan en el historial.',
           );
         }
         await _eliminarImpactoMovimiento(origen: 'gasto', origenId: id);
@@ -1560,9 +1962,16 @@ class DatabaseService {
           'No puede estar vacío.',
         );
       }
-      return (_database.update(_database.gastos)
-            ..where((gasto) => gasto.categoria.equals(nombreAnterior)))
-          .write(GastosCompanion(categoria: Value(cleanName)));
+      return _database.transaction(() async {
+        final updatedExpenses =
+            await (_database.update(_database.gastos)
+                  ..where((gasto) => gasto.categoria.equals(nombreAnterior)))
+                .write(GastosCompanion(categoria: Value(cleanName)));
+        await (_database.update(_database.comprasCredito)
+              ..where((purchase) => purchase.categoria.equals(nombreAnterior)))
+            .write(ComprasCreditoCompanion(categoria: Value(cleanName)));
+        return updatedExpenses;
+      });
     });
   }
 
@@ -1586,11 +1995,22 @@ class DatabaseService {
           _database.gastos,
         )..where((expense) => expense.id.equals(id))).getSingleOrNull();
         if (current == null) throw StateError('El gasto ya no existe.');
+        if (current.pagoDeudaId != null) {
+          throw StateError('Los pagos de deudas se conservan en el historial.');
+        }
         if (current.suscripcionId != null &&
             categoria.trim().toLowerCase() !=
                 subscriptionCategory.toLowerCase()) {
           throw StateError(
             'Los pagos de suscripción deben conservar su categoría.',
+          );
+        }
+        final creditPurchase = await (_database.select(
+          _database.comprasCredito,
+        )..where((purchase) => purchase.gastoId.equals(id))).getSingleOrNull();
+        if (creditPurchase != null) {
+          throw StateError(
+            'Las compras financiadas se conservan en el historial.',
           );
         }
         await _validarCuentaDigital(medio, cuentaDigitalId);
@@ -1674,6 +2094,7 @@ class DatabaseService {
     required DateTime fecha,
     required String operationId,
     MoneyMedium? medio,
+    int? cuentaDigitalId,
   }) {
     return _modificar(
       'registrar pago de deuda',
@@ -1696,7 +2117,8 @@ class DatabaseService {
           if (previousPayment.deudaId != deudaId ||
               previousPayment.monto != monto ||
               previousPayment.fecha != fecha ||
-              previousPayment.medio != medio?.storageValue) {
+              previousPayment.medio != medio?.storageValue ||
+              previousPayment.cuentaDigitalId != cuentaDigitalId) {
             throw ArgumentError.value(
               operationId,
               'operationId',
@@ -1735,9 +2157,11 @@ class DatabaseService {
           );
         }
 
+        await _validarCuentaDigital(medio, cuentaDigitalId);
         final reclassified = await _validarCanalDisponible(
           medio: medio,
           monto: monto,
+          cuentaDigitalId: cuentaDigitalId,
         );
         final paymentId = await _database
             .into(_database.pagosDeuda)
@@ -1748,6 +2172,7 @@ class DatabaseService {
                 fecha: fecha,
                 operationId: Value(operationId),
                 medio: Value(medio?.storageValue),
+                cuentaDigitalId: Value(cuentaDigitalId),
               ),
             );
         await _guardarImpactoMovimiento(
@@ -1756,7 +2181,22 @@ class DatabaseService {
           medio: medio,
           monto: -monto,
           reclassified: reclassified,
+          cuentaDigitalId: cuentaDigitalId,
         );
+        await _database
+            .into(_database.gastos)
+            .insert(
+              GastosCompanion.insert(
+                nombre: 'Pago de deuda · ${deuda.nombre}',
+                monto: monto,
+                categoria: 'Pagos de deudas',
+                fecha: fecha,
+                nota: Value('Abono registrado desde el módulo Deudas.'),
+                medio: Value(medio?.storageValue),
+                cuentaDigitalId: Value(cuentaDigitalId),
+                pagoDeudaId: Value(paymentId),
+              ),
+            );
 
         final totalAbonadoDespues = totalAbonadoAntes + monto;
         final nuevoSaldo = deuda.montoOriginal - totalAbonadoDespues;
@@ -1809,6 +2249,14 @@ class DatabaseService {
     return _modificar(
       'eliminar deuda',
       () => _database.transaction(() async {
+        final linkedPurchase = await (_database.select(
+          _database.comprasCredito,
+        )..where((purchase) => purchase.deudaId.equals(id))).getSingleOrNull();
+        if (linkedPurchase != null) {
+          throw StateError(
+            'Las deudas de compras financiadas se conservan en el historial.',
+          );
+        }
         final payments = await (_database.select(
           _database.pagosDeuda,
         )..where((payment) => payment.deudaId.equals(id))).get();
@@ -1989,6 +2437,7 @@ class DatabaseService {
       _database.select(_database.movimientosPrestamo).get(),
       _database.select(_database.movimientosAhorro).get(),
       _database.select(_database.movimientosReservaGastoFuturo).get(),
+      _database.select(_database.comprasCredito).get(),
     ]);
     final ingresos = results[0] as List<Ingreso>;
     final gastos = results[1] as List<Gasto>;
@@ -1996,15 +2445,21 @@ class DatabaseService {
     final movimientosPrestamos = results[3] as List<MovimientosPrestamoData>;
     final movimientos = results[4] as List<MovimientosAhorroData>;
     final reservas = results[5] as List<MovimientosReservaGastoFuturoData>;
+    final creditExpenseIds = (results[6] as List<CompraCredito>)
+        .map((purchase) => purchase.gastoId)
+        .whereType<int>()
+        .toSet();
 
     final totalIngresos = ingresos.fold<double>(
       0,
       (total, ingreso) => total + ingreso.monto,
     );
-    final totalGastos = gastos.fold<double>(
-      0,
-      (total, gasto) => total + gasto.monto,
-    );
+    final totalGastos = gastos
+        .where(
+          (gasto) =>
+              !creditExpenseIds.contains(gasto.id) && gasto.pagoDeudaId == null,
+        )
+        .fold<double>(0, (total, gasto) => total + gasto.monto);
     final totalPagos = pagos.fold<double>(
       0,
       (total, pago) => total + pago.monto,
@@ -2476,6 +2931,19 @@ class DatabaseService {
       throw ArgumentError.value(monto, 'monto', 'Debe ser mayor que cero.');
     }
   }
+
+  void _validarCupoCredito(double cupo) {
+    if (!cupo.isFinite || cupo <= 0 || !_hasCentPrecision(cupo)) {
+      throw ArgumentError.value(
+        cupo,
+        'cupoAprobado',
+        'El cupo debe ser mayor que cero y tener máximo dos decimales.',
+      );
+    }
+  }
+
+  bool _hasCentPrecision(double amount) =>
+      (amount * 100 - (amount * 100).round()).abs() <= 1e-8;
 }
 
 class DatabaseServiceException implements Exception {
@@ -2507,6 +2975,34 @@ class DigitalAccountBalance {
 
   final CuentasDigitale account;
   final double balance;
+}
+
+class CreditEntitySummary {
+  const CreditEntitySummary({
+    required this.entidad,
+    required this.cupoUtilizado,
+    required this.cupoDisponible,
+    required this.deudaPendiente,
+  });
+
+  final EntidadCredito entidad;
+  final double cupoUtilizado;
+  final double cupoDisponible;
+  final double deudaPendiente;
+}
+
+class CreditPurchaseDetails {
+  const CreditPurchaseDetails({
+    required this.compra,
+    required this.cuotas,
+    required this.pagos,
+    required this.deudaPendiente,
+  });
+
+  final CompraCredito compra;
+  final List<CuotaCredito> cuotas;
+  final List<PagosDeudaData> pagos;
+  final double deudaPendiente;
 }
 
 class IncomeDestination {

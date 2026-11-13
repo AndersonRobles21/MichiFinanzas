@@ -83,6 +83,13 @@ void main() {
     final service = DatabaseService(database);
     try {
       expect((await service.obtenerIngresos()).single.monto, 500);
+      final expensesTable = await database
+          .customSelect(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'gastos'",
+          )
+          .getSingleOrNull();
+      expect(expensesTable, isNotNull);
       await service.agregarSuscripcion(
         nombre: 'Servicio anual',
         precio: 1200,

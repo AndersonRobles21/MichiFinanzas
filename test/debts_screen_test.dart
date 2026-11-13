@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
 import 'package:flutter/material.dart'
@@ -11,7 +9,6 @@ import 'package:flutter/material.dart'
         Size,
         SizedBox,
         TextFormField;
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
@@ -26,7 +23,6 @@ void main() {
   testWidgets('muestra el estado vacío en una pantalla de 360 px', (
     tester,
   ) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
     _setMobileSize(tester);
     await _mountDebtsScreen(tester);
     await _pumpUntilFound(tester, find.text('Todavía no hay deudas por aquí.'));
@@ -39,19 +35,11 @@ void main() {
   testWidgets(
     'crea deudas, registra abonos y elimina el historial en cascada',
     (tester) async {
-      await _prepareTemporaryDatabaseDirectory(tester);
-      await tester.runAsync(() async {
-        final database = AppDatabase();
-        try {
-          await DatabaseService(
-            database,
-          ).agregarIngreso(monto: 10000, fecha: DateTime.now());
-        } finally {
-          await database.close();
-        }
-      });
+      final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+      addTearDown(service.close);
+      await service.agregarIngreso(monto: 10000, fecha: DateTime.now());
       _setMobileSize(tester);
-      await _mountDebtsScreen(tester);
+      await _mountDebtsScreen(tester, service: service);
       await _pumpUntilFound(
         tester,
         find.text('Todavía no hay deudas por aquí.'),
@@ -159,17 +147,11 @@ void main() {
         ),
       );
       await tester.runAsync(() async {
-        final database = AppDatabase();
-        try {
-          final service = DatabaseService(database);
-          final debt = (await service.obtenerDeudas()).single;
-          final payments = await service.obtenerPagosDeuda(debt.id);
-          expect(payments, hasLength(1));
-          expect(debt.cuotasPagadas, 0);
-          expect(debt.cuotasPagadasDeclaradas, 2);
-        } finally {
-          await database.close();
-        }
+        final debt = (await service.obtenerDeudas()).single;
+        final payments = await service.obtenerPagosDeuda(debt.id);
+        expect(payments, hasLength(1));
+        expect(debt.cuotasPagadas, 0);
+        expect(debt.cuotasPagadasDeclaradas, 2);
       });
       await _pumpUntilFound(tester, find.text(r'$ 960'));
       expect(find.text(r'$ 960'), findsNWidgets(2));
@@ -223,14 +205,8 @@ void main() {
       );
 
       await tester.runAsync(() async {
-        final database = AppDatabase();
-        try {
-          final service = DatabaseService(database);
-          expect(await service.obtenerDeudas(), isEmpty);
-          expect(await service.obtenerTodosLosPagosDeuda(), isEmpty);
-        } finally {
-          await database.close();
-        }
+        expect(await service.obtenerDeudas(), isEmpty);
+        expect(await service.obtenerTodosLosPagosDeuda(), isEmpty);
       });
       expect(tester.takeException(), isNull);
     },
@@ -422,10 +398,19 @@ Future<void> _confirmPayment(WidgetTester tester) async {
   );
 }
 
-Future<void> _mountDebtsScreen(WidgetTester tester) async {
+Future<void> _mountDebtsScreen(
+  WidgetTester tester, {
+  DatabaseService? service,
+}) async {
+  final screenService =
+      service ?? DatabaseService(AppDatabase(NativeDatabase.memory()));
+  if (service == null) addTearDown(screenService.close);
   await tester.runAsync(
     () => tester.pumpWidget(
-      MaterialApp(theme: AppTheme.darkTheme, home: const DebtsScreen()),
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: DebtsScreen(databaseService: screenService),
+      ),
     ),
   );
 }
@@ -435,32 +420,6 @@ void _setMobileSize(WidgetTester tester) {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-}
-
-Future<void> _prepareTemporaryDatabaseDirectory(WidgetTester tester) async {
-  late Directory directory;
-  await tester.runAsync(() async {
-    directory = await Directory.systemTemp.createTemp(
-      'finanzas_app_debts_test_',
-    );
-  });
-  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(pathProviderChannel, (call) async {
-        switch (call.method) {
-          case 'getApplicationDocumentsDirectory':
-          case 'getTemporaryDirectory':
-            return directory.path;
-          default:
-            throw MissingPluginException('Método no esperado: ${call.method}');
-        }
-      });
-
-  addTearDown(() async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(pathProviderChannel, null);
-    await tester.runAsync(() => directory.delete(recursive: true));
-  });
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {

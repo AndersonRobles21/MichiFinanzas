@@ -114,7 +114,14 @@ class DashboardData {
       0,
       (total, gasto) => total + gasto.monto,
     );
-    final totalPagosDeuda = pagos.fold<double>(
+    final expensesWithDebtPayment = gastos
+        .map((expense) => expense.pagoDeudaId)
+        .whereType<int>()
+        .toSet();
+    final unrepresentedPayments = pagos
+        .where((payment) => !expensesWithDebtPayment.contains(payment.id))
+        .toList();
+    final totalPagosDeuda = unrepresentedPayments.fold<double>(
       0,
       (total, pago) => total + pago.monto,
     );
@@ -190,7 +197,7 @@ class DashboardData {
           amount: expense.monto,
           date: expense.fecha,
         ),
-      for (final payment in pagos)
+      for (final payment in unrepresentedPayments)
         DashboardActivity(
           kind: DashboardActivityKind.debtPayment,
           title: 'Abono · ${debtNames[payment.deudaId] ?? 'Deuda'}',
@@ -247,7 +254,7 @@ class DashboardData {
       cantidadIngresos: ingresos.length,
       cantidadGastos: gastos.length,
       cantidadGastosDelMes: gastosDelMes.length,
-      cantidadPagosDeuda: pagos.length,
+      cantidadPagosDeuda: unrepresentedPayments.length,
       cantidadDeudas: deudas.length,
       deudasPendientes: pagosProximos.length,
       totalDeudaPendiente: pagosProximos.fold<double>(

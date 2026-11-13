@@ -79,17 +79,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         _databaseService.obtenerTodosLosMovimientosReservaGastoFuturo(),
         _databaseService.obtenerTodosLosPagosDeuda(),
         _databaseService.obtenerCuentasDigitales(),
+        _databaseService.obtenerGastosCreditoIds(),
       ]);
+      final expenses = results[1] as List<Gasto>;
+      final representedPaymentIds = expenses
+          .map((expense) => expense.pagoDeudaId)
+          .whereType<int>()
+          .toSet();
       return _StatisticsData(
         incomes: results[0] as List<Ingreso>,
-        expenses: results[1] as List<Gasto>,
+        expenses: expenses,
         savingsMovements: results[2] as List<MovimientosAhorroData>,
         availableBalance: results[3] as double,
         futureExpenses: _netFutureExpenseReservations(
           results[4] as List<MovimientosReservaGastoFuturoData>,
         ),
-        debtPayments: results[5] as List<PagosDeudaData>,
+        debtPayments: (results[5] as List<PagosDeudaData>)
+            .where((payment) => !representedPaymentIds.contains(payment.id))
+            .toList(),
         digitalAccounts: results[6] as List<DigitalAccountBalance>,
+        creditExpenseIds: results[7] as Set<int>,
       );
     });
   }
@@ -160,6 +169,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   futureExpenses: periodFutureExpenses,
                   savingsMovements: periodSavings,
                   availableBalance: data.availableBalance,
+                  creditExpenseIds: data.creditExpenseIds,
                 );
 
                 return SingleChildScrollView(
@@ -380,6 +390,7 @@ class _StatisticsData {
     required this.futureExpenses,
     required this.debtPayments,
     required this.digitalAccounts,
+    required this.creditExpenseIds,
   });
 
   final List<Ingreso> incomes;
@@ -389,6 +400,7 @@ class _StatisticsData {
   final List<_FutureExpenseReservation> futureExpenses;
   final List<PagosDeudaData> debtPayments;
   final List<DigitalAccountBalance> digitalAccounts;
+  final Set<int> creditExpenseIds;
 }
 
 class _DigitalAccountPeriodSummary {
@@ -704,6 +716,7 @@ class _StatisticsSummary {
     required List<_FutureExpenseReservation> futureExpenses,
     required List<MovimientosAhorroData> savingsMovements,
     required double availableBalance,
+    required Set<int> creditExpenseIds,
   }) {
     final categoryAmounts = <String, double>{};
     final cashCategoryAmounts = <String, double>{};
@@ -738,7 +751,9 @@ class _StatisticsSummary {
           digitalExpenses += expense.monto;
           addCategory(digitalCategoryAmounts, expense.categoria, expense.monto);
         case null:
-          unclassifiedExpenses += expense.monto;
+          if (!creditExpenseIds.contains(expense.id)) {
+            unclassifiedExpenses += expense.monto;
+          }
       }
     }
     for (final payment in debtPayments) {

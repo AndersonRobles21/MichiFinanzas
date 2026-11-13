@@ -64,11 +64,13 @@ class DigitalAccountSelector extends StatelessWidget {
     required this.accounts,
     required this.selectedId,
     required this.onChanged,
+    this.allowUnassigned = true,
   });
 
   final List<CuentasDigitale> accounts;
   final int? selectedId;
   final ValueChanged<int?> onChanged;
+  final bool allowUnassigned;
 
   @override
   Widget build(BuildContext context) {
@@ -87,10 +89,11 @@ class DigitalAccountSelector extends StatelessWidget {
         prefixIcon: Icon(Icons.account_balance_wallet_outlined),
       ),
       items: [
-        const DropdownMenuItem<int?>(
-          value: null,
-          child: Text('Sin cuenta asignada'),
-        ),
+        if (allowUnassigned)
+          const DropdownMenuItem<int?>(
+            value: null,
+            child: Text('Sin cuenta asignada'),
+          ),
         for (final account in accounts)
           DropdownMenuItem<int?>(
             value: account.id,

@@ -237,4 +237,66 @@ void main() {
       await database.close();
     }
   });
+
+  test('transfiere entre cuentas digitales sin cambiar el total', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    final service = DatabaseService(database);
+    final date = DateTime(2026, 11, 10);
+    try {
+      final sourceId = await service.crearCuentaDigital('Nequi');
+      final destinationId = await service.crearCuentaDigital('Davivienda');
+      await service.agregarIngreso(
+        monto: 350000,
+        fecha: date,
+        medio: MoneyMedium.digital,
+        cuentaDigitalId: sourceId,
+      );
+
+      await service.transferirDinero(
+        medioOrigen: MoneyMedium.digital,
+        cuentaOrigenId: sourceId,
+        medioDestino: MoneyMedium.digital,
+        cuentaDestinoId: destinationId,
+        monto: 50000,
+        fecha: date,
+      );
+
+      final accounts = await service.obtenerCuentasDigitales();
+      expect(
+        {for (final item in accounts) item.account.nombre: item.balance},
+        {'Davivienda': 50000, 'Nequi': 300000},
+      );
+      final balance = await service.obtenerSaldosPorMedio();
+      expect((balance.digital, balance.total), (350000, 350000));
+      expect(await service.obtenerIngresos(), hasLength(1));
+      expect(await service.obtenerGastos(), isEmpty);
+
+      await expectLater(
+        service.transferirDinero(
+          medioOrigen: MoneyMedium.digital,
+          cuentaOrigenId: sourceId,
+          medioDestino: MoneyMedium.digital,
+          cuentaDestinoId: destinationId,
+          monto: 300001,
+          fecha: date,
+        ),
+        throwsA(isA<DatabaseServiceException>()),
+      );
+      await expectLater(
+        service.transferirDinero(
+          medioOrigen: MoneyMedium.digital,
+          cuentaOrigenId: sourceId,
+          medioDestino: MoneyMedium.digital,
+          cuentaDestinoId: sourceId,
+          monto: 1,
+          fecha: date,
+        ),
+        throwsA(isA<DatabaseServiceException>()),
+      );
+      expect(await service.obtenerTransferencias(), hasLength(1));
+      expect((await service.obtenerSaldosPorMedio()).total, 350000);
+    } finally {
+      await database.close();
+    }
+  });
 }

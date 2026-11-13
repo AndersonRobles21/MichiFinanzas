@@ -12,6 +12,7 @@ import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/transfer_money_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -34,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final bool _ownsDatabaseService;
   Future<_SettingsData>? _settingsFuture;
   _SettingsData? _loadedData;
+  late final StreamSubscription<void> _financialChanges;
   final _nameFormKey = GlobalKey<FormState>();
   final _userNameController = TextEditingController();
   bool _isSaving = false;
@@ -44,6 +46,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _ownsDatabaseService = widget.databaseService == null;
     _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
     if (widget.isActive) _settingsFuture = _loadSettings();
+    _financialChanges = _databaseService.observarCambiosFinancieros().listen(
+      (_) => unawaited(_refreshAfterMovement()),
+    );
   }
 
   @override
@@ -56,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    unawaited(_financialChanges.cancel());
     _userNameController.dispose();
     if (_ownsDatabaseService) unawaited(_databaseService.close());
     super.dispose();
@@ -380,14 +386,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  Future<void> _refreshAfterMovement() async {
+    try {
+      await _refreshSettingsData();
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'actualizar cuentas y transferencias',
+      );
+    }
+  }
+
   Future<void> _saveTransfer([TransferenciasDineroData? transfer]) async {
     if (_isSaving) return;
     final data = _loadedData;
     if (data == null) return;
-    final draft = await showDialog<_TransferDraft>(
+    final values = await Future.wait<Object>([
+      _databaseService.obtenerCuentasDigitales(),
+      _databaseService.obtenerSaldosPorMedio(),
+    ]);
+    if (!mounted) return;
+    final draft = await showDialog<TransferMoneyDraft>(
       context: context,
-      builder: (context) => _TransferDialog(
-        accounts: data.accounts.map((item) => item.account).toList(),
+      builder: (context) => TransferMoneyDialog(
+        accounts: values[0] as List<DigitalAccountBalance>,
+        balances: values[1] as AvailableBalanceBreakdown,
         transfer: transfer,
       ),
     );
@@ -1048,233 +1072,6 @@ class _DigitalAccountTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TransferEndpoint {
-  const _TransferEndpoint({
-    required this.key,
-    required this.label,
-    required this.medium,
-    this.accountId,
-  });
-
-  final String key;
-  final String label;
-  final MoneyMedium medium;
-  final int? accountId;
-}
-
-class _TransferDraft {
-  const _TransferDraft({
-    required this.origin,
-    required this.destination,
-    required this.amount,
-    required this.date,
-    required this.note,
-  });
-
-  final _TransferEndpoint origin;
-  final _TransferEndpoint destination;
-  final double amount;
-  final DateTime date;
-  final String? note;
-}
-
-class _TransferDialog extends StatefulWidget {
-  const _TransferDialog({required this.accounts, this.transfer});
-
-  final List<CuentasDigitale> accounts;
-  final TransferenciasDineroData? transfer;
-
-  @override
-  State<_TransferDialog> createState() => _TransferDialogState();
-}
-
-class _TransferDialogState extends State<_TransferDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _amountController;
-  late final TextEditingController _noteController;
-  late final List<_TransferEndpoint> _endpoints;
-  late String _originKey;
-  late String _destinationKey;
-  late DateTime _date;
-
-  @override
-  void initState() {
-    super.initState();
-    _endpoints = [
-      const _TransferEndpoint(
-        key: 'cash',
-        label: 'Efectivo',
-        medium: MoneyMedium.cash,
-      ),
-      const _TransferEndpoint(
-        key: 'digital-unassigned',
-        label: 'Digital sin cuenta',
-        medium: MoneyMedium.digital,
-      ),
-      for (final account in widget.accounts)
-        _TransferEndpoint(
-          key: 'account-${account.id}',
-          label: account.nombre,
-          medium: MoneyMedium.digital,
-          accountId: account.id,
-        ),
-    ];
-    final transfer = widget.transfer;
-    _originKey = _endpointKey(transfer?.medioOrigen, transfer?.cuentaOrigenId);
-    _destinationKey = _endpointKey(
-      transfer?.medioDestino,
-      transfer?.cuentaDestinoId,
-    );
-    if (_originKey == _destinationKey) {
-      _originKey = 'cash';
-      _destinationKey = 'digital-unassigned';
-    }
-    _amountController = TextEditingController(
-      text: transfer == null ? '' : formatAmount(transfer.monto),
-    );
-    _noteController = TextEditingController(text: transfer?.nota ?? '');
-    _date = transfer?.fecha ?? DateTime.now();
-  }
-
-  String _endpointKey(String? medium, int? accountId) {
-    if (accountId != null &&
-        _endpoints.any((item) => item.accountId == accountId)) {
-      return 'account-$accountId';
-    }
-    return medium == MoneyMedium.cash.storageValue
-        ? 'cash'
-        : 'digital-unassigned';
-  }
-
-  _TransferEndpoint _endpoint(String key) =>
-      _endpoints.firstWhere((item) => item.key == key);
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _noteController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _selectDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (date != null && mounted) setState(() => _date = date);
-  }
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    Navigator.pop(
-      context,
-      _TransferDraft(
-        origin: _endpoint(_originKey),
-        destination: _endpoint(_destinationKey),
-        amount: parseMoney(_amountController.text),
-        date: _date,
-        note: _noteController.text.trim().isEmpty
-            ? null
-            : _noteController.text.trim(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(
-        widget.transfer == null
-            ? 'Nueva transferencia'
-            : 'Editar transferencia',
-      ),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: _originKey,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Desde'),
-                items: [
-                  for (final endpoint in _endpoints)
-                    DropdownMenuItem(
-                      value: endpoint.key,
-                      child: Text(endpoint.label),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _originKey = value);
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _destinationKey,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Hacia'),
-                items: [
-                  for (final endpoint in _endpoints)
-                    DropdownMenuItem(
-                      value: endpoint.key,
-                      child: Text(endpoint.label),
-                    ),
-                ],
-                validator: (value) => value == _originKey
-                    ? 'Elige un destino distinto al origen.'
-                    : null,
-                onChanged: (value) {
-                  if (value != null) setState(() => _destinationKey = value);
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const ValueKey('transfer-amount'),
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: const [ThousandsInputFormatter()],
-                decoration: const InputDecoration(
-                  labelText: 'Monto',
-                  prefixText: r'$ ',
-                ),
-                validator: (value) {
-                  final amount = tryParseMoney(value);
-                  return amount == null || amount <= 0
-                      ? 'Escribe un monto mayor que cero.'
-                      : null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _noteController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Nota (opcional)'),
-              ),
-              TextButton.icon(
-                onPressed: _selectDate,
-                icon: const Icon(Icons.calendar_today_outlined),
-                label: Text(formatSpanishLongDate(_date)),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(onPressed: _save, child: const Text('Guardar')),
-      ],
     );
   }
 }

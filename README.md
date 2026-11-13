@@ -33,7 +33,7 @@ MichiFinanzas reúne diferentes herramientas para administrar las finanzas perso
 
 ### 1. Inicio
 
-Es la pantalla principal de MichiFinanzas. Presenta el total junto con efectivo y digital, resume las primeras cuentas digitales, y muestra ingresos del mes, gastos recientes, próximas suscripciones y gastos futuros. También ofrece accesos a registrar ingresos y gastos, consultar el historial, distribuir fondos y administrar las cuentas.
+Es la pantalla principal de MichiFinanzas. Presenta el total junto con efectivo y digital, resume las primeras cuentas digitales, y muestra ingresos del mes, gastos recientes, próximas suscripciones y gastos futuros. También ofrece accesos a registrar ingresos y gastos, transferir dinero entre medios y cuentas, consultar el historial y administrar las cuentas.
 
 Su propósito es ofrecer una visión general del dinero registrado y facilitar el acceso a las funciones más utilizadas.
 
@@ -74,6 +74,8 @@ Permite organizar información relacionada con el valor de una deuda, el dinero 
 También contempla información como las fechas de vencimiento y el número de cuotas, de acuerdo con los datos registrados para cada obligación.
 
 Cuando se registra dinero recibido mediante un préstamo desde el módulo de ingresos, la aplicación también crea el registro correspondiente en deudas para facilitar su seguimiento.
+
+Las compras con entidades de crédito se guardan como compras y deudas, sin crear un gasto ni descontar dinero al registrarlas. Cada abono confirmado desde Deudas descuenta el medio elegido y se contabiliza como gasto solo por el valor efectivamente pagado.
 
 ### 5. Gastos futuros
 

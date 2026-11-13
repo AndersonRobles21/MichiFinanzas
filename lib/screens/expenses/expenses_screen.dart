@@ -11,6 +11,7 @@ import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/money_source_selector.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key, this.isActive = true, this.databaseService});
@@ -79,15 +80,23 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       _databaseService.obtenerDeudas(),
       _databaseService.obtenerCuentasDigitales(),
       _databaseService.obtenerSaldosPorMedio(),
+      _databaseService.obtenerGastosCreditoIds(),
     ]);
     final digitalAccounts = results[2] as List<DigitalAccountBalance>;
     final balances = results[3] as AvailableBalanceBreakdown;
+    final expensesWithPayments = sortedExpenses
+        .map((expense) => expense.pagoDeudaId)
+        .whereType<int>()
+        .toSet();
     final data = _ExpensesData(
       expenses: sortedExpenses,
-      debtPayments: results[0] as List<PagosDeudaData>,
+      debtPayments: (results[0] as List<PagosDeudaData>)
+          .where((payment) => !expensesWithPayments.contains(payment.id))
+          .toList(),
       debts: results[1] as List<Deuda>,
       digitalAccounts: digitalAccounts,
       balances: balances,
+      creditExpenseIds: results[4] as Set<int>,
     );
     final digitalAccountsTotal = digitalAccounts.fold<double>(
       0,
@@ -391,7 +400,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                           entry.expense!.medio,
                                           entry.expense!.cuentaDigitalId,
                                           _loadedAccounts,
+                                          isCreditPurchase: data
+                                              .creditExpenseIds
+                                              .contains(entry.expense!.id),
                                         ),
+                                        isCreditPurchase: data.creditExpenseIds
+                                            .contains(entry.expense!.id),
+                                        isDebtPayment:
+                                            entry.expense!.pagoDeudaId != null,
                                         onEdit: () =>
                                             _editExpense(entry.expense!),
                                         onDelete: () =>
@@ -400,6 +416,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                     : _DebtPaymentTile(
                                         payment: entry.payment!,
                                         debtName: entry.debtName!,
+                                        mediumLabel: _moneyMediumLabel(
+                                          entry.payment!.medio,
+                                          entry.payment!.cuentaDigitalId,
+                                          _loadedAccounts,
+                                        ),
                                       ),
                               ),
                             ),
@@ -444,6 +465,7 @@ class _ExpensesData {
     required this.debts,
     required this.digitalAccounts,
     required this.balances,
+    required this.creditExpenseIds,
   });
 
   final List<Gasto> expenses;
@@ -451,6 +473,7 @@ class _ExpensesData {
   final List<Deuda> debts;
   final List<DigitalAccountBalance> digitalAccounts;
   final AvailableBalanceBreakdown balances;
+  final Set<int> creditExpenseIds;
 
   List<CuentasDigitale> get accounts =>
       digitalAccounts.map((account) => account.account).toList();
@@ -634,15 +657,18 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                       : null,
                 ),
                 const SizedBox(height: 14),
-                _ExpenseSourceSelector(
-                  medium: _medium,
-                  accountId: _digitalAccountId,
+                MoneySourceSelector(
+                  selectedMedium: _medium,
+                  selectedAccountId: _digitalAccountId,
                   cashBalance: _cashBalanceForForm,
                   digitalWithoutAccount:
                       widget.digitalWithoutAccount +
                       _unassignedDigitalAllowance,
-                  accounts: widget.accounts,
+                  digitalAccounts: widget.accounts,
+                  amount: tryParseMoney(_amountController.text),
                   allowUnclassified: widget.expense != null,
+                  allowUnassignedDigital: widget.expense != null,
+                  title: '¿De dónde sale el dinero?',
                   onChanged: (medium, accountId) => setState(() {
                     _medium = medium;
                     _digitalAccountId = accountId;
@@ -673,6 +699,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                     }
                     return null;
                   },
+                  onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 14),
                 FormField<String>(
@@ -815,160 +842,6 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
   }
 }
 
-class _ExpenseSourceSelector extends StatelessWidget {
-  const _ExpenseSourceSelector({
-    required this.medium,
-    required this.accountId,
-    required this.cashBalance,
-    required this.digitalWithoutAccount,
-    required this.accounts,
-    required this.allowUnclassified,
-    required this.onChanged,
-  });
-
-  final MoneyMedium? medium;
-  final int? accountId;
-  final double cashBalance;
-  final double digitalWithoutAccount;
-  final List<DigitalAccountBalance> accounts;
-  final bool allowUnclassified;
-  final void Function(MoneyMedium? medium, int? accountId) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '¿De dónde sale el dinero?',
-          key: const ValueKey('expense-source-title'),
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 8),
-        _ExpenseSourceTile(
-          key: const ValueKey('expense-source-cash'),
-          name: 'Efectivo',
-          balance: cashBalance,
-          icon: Icons.payments_outlined,
-          selected: medium == MoneyMedium.cash,
-          onTap: () => onChanged(MoneyMedium.cash, null),
-        ),
-        for (final account in accounts) ...[
-          const SizedBox(height: 8),
-          _ExpenseSourceTile(
-            key: ValueKey('expense-source-account-${account.account.id}'),
-            name: account.account.nombre,
-            balance: account.balance,
-            icon: Icons.account_balance_wallet_outlined,
-            selected:
-                medium == MoneyMedium.digital &&
-                accountId == account.account.id,
-            onTap: () => onChanged(MoneyMedium.digital, account.account.id),
-          ),
-        ],
-        if (allowUnclassified &&
-            medium == MoneyMedium.digital &&
-            accountId == null) ...[
-          const SizedBox(height: 8),
-          _ExpenseSourceTile(
-            key: const ValueKey('expense-source-digital-unassigned'),
-            name: 'Digital sin cuenta',
-            balance: digitalWithoutAccount,
-            icon: Icons.account_balance_wallet_outlined,
-            selected: true,
-            onTap: () => onChanged(MoneyMedium.digital, null),
-          ),
-        ],
-        if (allowUnclassified && medium == null) ...[
-          const SizedBox(height: 8),
-          _ExpenseSourceTile(
-            key: const ValueKey('expense-source-unclassified'),
-            name: 'Sin clasificar',
-            balance: 0,
-            icon: Icons.help_outline_rounded,
-            selected: true,
-            onTap: () => onChanged(null, null),
-          ),
-        ],
-        if (accounts.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              'Agrega una cuenta digital desde Configuración para seleccionarla aquí.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ExpenseSourceTile extends StatelessWidget {
-  const _ExpenseSourceTile({
-    super.key,
-    required this.name,
-    required this.balance,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String name;
-  final double balance;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.12)
-          : AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadii.small),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.small),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadii.small),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.outline,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: selected ? AppColors.accent : AppColors.textSecondary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                formatMoney(balance),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 20,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _MonthlySummary extends StatelessWidget {
   const _MonthlySummary({required this.total, required this.count});
 
@@ -1049,12 +922,16 @@ class _ExpenseTile extends StatelessWidget {
   const _ExpenseTile({
     required this.expense,
     required this.mediumLabel,
+    required this.isCreditPurchase,
+    required this.isDebtPayment,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Gasto expense;
   final String mediumLabel;
+  final bool isCreditPurchase;
+  final bool isDebtPayment;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -1110,22 +987,36 @@ class _ExpenseTile extends StatelessWidget {
               ],
             ),
           ),
-          Column(
-            children: [
-              IconButton(
-                tooltip: 'Editar gasto',
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
+          if (isCreditPurchase || isDebtPayment)
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(
+                isCreditPurchase
+                    ? Icons.credit_card_outlined
+                    : Icons.payments_outlined,
+                semanticLabel: isCreditPurchase
+                    ? 'Compra financiada'
+                    : 'Pago de deuda',
                 color: AppColors.primary,
               ),
-              IconButton(
-                tooltip: 'Eliminar gasto',
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: AppColors.textSecondary,
-              ),
-            ],
-          ),
+            )
+          else
+            Column(
+              children: [
+                IconButton(
+                  tooltip: 'Editar gasto',
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  color: AppColors.primary,
+                ),
+                IconButton(
+                  tooltip: 'Eliminar gasto',
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -1133,14 +1024,18 @@ class _ExpenseTile extends StatelessWidget {
 }
 
 class _DebtPaymentTile extends StatelessWidget {
-  const _DebtPaymentTile({required this.payment, required this.debtName});
+  const _DebtPaymentTile({
+    required this.payment,
+    required this.debtName,
+    required this.mediumLabel,
+  });
 
   final PagosDeudaData payment;
   final String debtName;
+  final String mediumLabel;
 
   @override
   Widget build(BuildContext context) {
-    final medium = MoneyMedium.fromStorage(payment.medio);
     return Container(
       key: ValueKey('debt-payment-expense-${payment.id}'),
       width: double.infinity,
@@ -1164,7 +1059,7 @@ class _DebtPaymentTile extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(_formatDate(payment.fecha)),
                 const SizedBox(height: 4),
-                Text(medium?.label ?? 'Medio sin clasificar'),
+                Text(mediumLabel),
               ],
             ),
           ),
@@ -1208,8 +1103,10 @@ class _CategoryTag extends StatelessWidget {
 String _moneyMediumLabel(
   String? storageValue,
   int? accountId,
-  List<CuentasDigitale> accounts,
-) {
+  List<CuentasDigitale> accounts, {
+  bool isCreditPurchase = false,
+}) {
+  if (isCreditPurchase) return 'Compra financiada';
   final medium = MoneyMedium.fromStorage(storageValue);
   if (accountId != null) {
     for (final account in accounts) {

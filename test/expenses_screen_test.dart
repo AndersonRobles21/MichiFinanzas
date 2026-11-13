@@ -1,10 +1,7 @@
-import 'dart:io';
-
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
 import 'package:flutter/material.dart'
     show MaterialApp, Scrollable, Size, TextFormField;
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
@@ -19,25 +16,19 @@ void main() {
   testWidgets('valida, crea, muestra y elimina gastos en 360 px', (
     tester,
   ) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
-    await tester.runAsync(() async {
-      final database = AppDatabase();
-      try {
-        await DatabaseService(database).agregarIngreso(
-          monto: 2000000,
-          fecha: DateTime.now(),
-          medio: MoneyMedium.cash,
-        );
-      } finally {
-        await database.close();
-      }
-    });
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(service.close);
+    await service.agregarIngreso(
+      monto: 2000000,
+      fecha: DateTime.now(),
+      medio: MoneyMedium.cash,
+    );
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await _mountExpensesScreen(tester);
+    await _mountExpensesScreen(tester, service: service);
     await _pumpUntilFound(
       tester,
       find.text(
@@ -213,24 +204,24 @@ void main() {
 
     await tester.tap(find.byTooltip('Agregar gasto'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('expense-source-title')), findsOneWidget);
+    expect(find.text('¿De dónde sale el dinero?'), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('expense-source-cash')),
+        of: find.byKey(const ValueKey('money-source-cash')),
         matching: find.text(r'$ 80.000'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: find.byKey(ValueKey('expense-source-account-$nequiId')),
+        of: find.byKey(ValueKey('money-source-account-$nequiId')),
         matching: find.text(r'$ 150.000'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: find.byKey(ValueKey('expense-source-account-$bankId')),
+        of: find.byKey(ValueKey('money-source-account-$bankId')),
         matching: find.text(r'$ 320.000'),
       ),
       findsOneWidget,
@@ -248,7 +239,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Comidaaaa').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey('expense-source-account-$nequiId')));
+    await tester.tap(find.byKey(ValueKey('money-source-account-$nequiId')));
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
 
@@ -292,33 +283,29 @@ void main() {
   testWidgets('ordena los gastos del más reciente al más antiguo', (
     tester,
   ) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
-    await tester.runAsync(() async {
-      final database = AppDatabase();
-      final service = DatabaseService(database);
-      final now = DateTime.now();
-      await service.agregarIngreso(monto: 100, fecha: now);
-      await service.agregarGasto(
-        nombre: 'Gasto anterior',
-        monto: 10,
-        categoria: 'Otros',
-        fecha: now.subtract(const Duration(days: 2)),
-      );
-      await service.agregarGasto(
-        nombre: 'Gasto reciente',
-        monto: 20,
-        categoria: 'Otros',
-        fecha: now,
-      );
-      await database.close();
-    });
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(service.close);
+    final now = DateTime.now();
+    await service.agregarIngreso(monto: 100, fecha: now);
+    await service.agregarGasto(
+      nombre: 'Gasto anterior',
+      monto: 10,
+      categoria: 'Otros',
+      fecha: now.subtract(const Duration(days: 2)),
+    );
+    await service.agregarGasto(
+      nombre: 'Gasto reciente',
+      monto: 20,
+      categoria: 'Otros',
+      fecha: now,
+    );
 
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await _mountExpensesScreen(tester);
+    await _mountExpensesScreen(tester, service: service);
     await _pumpUntilFound(tester, find.text('Gasto reciente'));
 
     final recentPosition = tester.getTopLeft(find.text('Gasto reciente')).dy;
@@ -330,41 +317,34 @@ void main() {
   testWidgets('no revive alias de comida desde gastos históricos', (
     tester,
   ) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
-    await tester.runAsync(() async {
-      final database = AppDatabase();
-      final service = DatabaseService(database);
-      try {
-        await service.agregarIngreso(monto: 100, fecha: DateTime(2026, 10, 1));
-        await service.agregarGasto(
-          nombre: 'Compra anterior',
-          monto: 20,
-          categoria: 'Comidas',
-          fecha: DateTime(2026, 10, 1),
-        );
-        await service.agregarGasto(
-          nombre: 'Alimento anterior',
-          monto: 30,
-          categoria: 'Comida para gatos',
-          fecha: DateTime(2026, 10, 2),
-        );
-        await service.agregarGasto(
-          nombre: 'Arena',
-          monto: 40,
-          categoria: 'Mascotas',
-          fecha: DateTime(2026, 10, 3),
-        );
-      } finally {
-        await database.close();
-      }
-    });
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(service.close);
+    await service.agregarIngreso(monto: 100, fecha: DateTime(2026, 10, 1));
+    await service.agregarGasto(
+      nombre: 'Compra anterior',
+      monto: 20,
+      categoria: 'Comidas',
+      fecha: DateTime(2026, 10, 1),
+    );
+    await service.agregarGasto(
+      nombre: 'Alimento anterior',
+      monto: 30,
+      categoria: 'Comida para gatos',
+      fecha: DateTime(2026, 10, 2),
+    );
+    await service.agregarGasto(
+      nombre: 'Arena',
+      monto: 40,
+      categoria: 'Mascotas',
+      fecha: DateTime(2026, 10, 3),
+    );
 
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await _mountExpensesScreen(tester);
+    await _mountExpensesScreen(tester, service: service);
     await _pumpUntilFound(tester, find.text('Compra anterior'));
     await tester.tap(find.byTooltip('Agregar gasto'));
     await tester.pumpAndSettle();
@@ -412,33 +392,26 @@ void main() {
   testWidgets('muestra los abonos de deuda como movimientos de solo lectura', (
     tester,
   ) async {
-    await _prepareTemporaryDatabaseDirectory(tester);
-    await tester.runAsync(() async {
-      final database = AppDatabase();
-      try {
-        final service = DatabaseService(database);
-        final now = DateTime.now();
-        await service.agregarIngreso(monto: 300, fecha: now);
-        await service.distribuirSaldoDisponible(efectivo: 300, digital: 0);
-        final debtId = await service.agregarDeuda(
-          nombre: 'Préstamo del celular',
-          montoOriginal: 100,
-          cuota: 50,
-          cuotasTotales: 2,
-        );
-        await service.registrarPagoDeuda(
-          deudaId: debtId,
-          monto: 50,
-          fecha: now,
-          operationId: 'expenses-screen-debt-payment',
-          medio: MoneyMedium.cash,
-        );
-      } finally {
-        await database.close();
-      }
-    });
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(service.close);
+    final now = DateTime.now();
+    await service.agregarIngreso(monto: 300, fecha: now);
+    await service.distribuirSaldoDisponible(efectivo: 300, digital: 0);
+    final debtId = await service.agregarDeuda(
+      nombre: 'Préstamo del celular',
+      montoOriginal: 100,
+      cuota: 50,
+      cuotasTotales: 2,
+    );
+    await service.registrarPagoDeuda(
+      deudaId: debtId,
+      monto: 50,
+      fecha: now,
+      operationId: 'expenses-screen-debt-payment',
+      medio: MoneyMedium.cash,
+    );
 
-    await _mountExpensesScreen(tester);
+    await _mountExpensesScreen(tester, service: service);
     await _pumpUntilFound(
       tester,
       find.text('Pago de deuda · Préstamo del celular'),
@@ -447,8 +420,8 @@ void main() {
     expect(find.text('Efectivo'), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('debt-payment-expense-1')),
-        matching: find.byKey(const ValueKey('debt-payment-amount-1')),
+        of: find.byKey(const ValueKey('expense-1')),
+        matching: find.text(r'$ 50'),
       ),
       findsOneWidget,
     );
@@ -471,32 +444,6 @@ Future<void> _mountExpensesScreen(
       ),
     ),
   );
-}
-
-Future<void> _prepareTemporaryDatabaseDirectory(WidgetTester tester) async {
-  late Directory directory;
-  await tester.runAsync(() async {
-    directory = await Directory.systemTemp.createTemp(
-      'finanzas_app_expenses_test_',
-    );
-  });
-  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(pathProviderChannel, (call) async {
-        switch (call.method) {
-          case 'getApplicationDocumentsDirectory':
-          case 'getTemporaryDirectory':
-            return directory.path;
-          default:
-            throw MissingPluginException('Método no esperado: ${call.method}');
-        }
-      });
-
-  addTearDown(() async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(pathProviderChannel, null);
-    await tester.runAsync(() => directory.delete(recursive: true));
-  });
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {

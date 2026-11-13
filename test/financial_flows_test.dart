@@ -530,7 +530,7 @@ void main() {
     await tester.runAsync(() => service.close());
   });
 
-  testWidgets('distribuye el saldo desde Inicio y persiste la asignación', (
+  testWidgets('Inicio ofrece transferencias y oculta distribuir dinero', (
     tester,
   ) async {
     await _prepareTemporaryStorage(tester);
@@ -549,74 +549,13 @@ void main() {
       ),
     );
     await _pumpUntilFound(tester, find.text('Dinero disponible'));
-    await _recordIncome(tester, 'Sueldo', 'Quincena', '600');
-    await _pumpUntilMonthlyReceived(tester, 600);
-    expect(find.text('Medio de recepción'), findsNothing);
-
-    final distributeButton = find.byKey(
-      const ValueKey('distribute-available-balance'),
-    );
-    await tester.ensureVisible(distributeButton);
-    await tester.tap(distributeButton);
-    await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Distribuir dinero disponible'));
-    await tester.enterText(
-      find.byKey(const ValueKey('distribution-cash')),
-      '601',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('distribution-digital')),
-      '0',
-    );
-    await tester.ensureVisible(find.text('Guardar distribución'));
-    await tester.tap(find.text('Guardar distribución'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.textContaining('Sobran'), findsOneWidget);
+    expect(find.text('Distribuir dinero'), findsNothing);
     expect(
-      tester
-          .widget<FilledButton>(
-            find.ancestor(
-              of: find.text('Guardar distribución'),
-              matching: find.byType(FilledButton),
-            ),
-          )
-          .onPressed,
-      isNull,
+      find.byKey(const ValueKey('distribute-available-balance')),
+      findsNothing,
     );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('distribution-cash')),
-      '400',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('distribution-digital')),
-      '200',
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Guardar distribución'));
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.ancestor(
-              of: find.text('Guardar distribución'),
-              matching: find.byType(FilledButton),
-            ),
-          )
-          .onPressed,
-      isNotNull,
-    );
-    await tester.tap(find.text('Guardar distribución'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.runAsync(() async {
-      final balances = await service.obtenerSaldosPorMedio();
-      expect(balances.cash, 400);
-      expect(balances.digital, 200);
-      expect(balances.unclassified, 0);
-      expect(await service.obtenerIngresos(), hasLength(1));
-      expect(await service.obtenerGastos(), isEmpty);
-    });
+    expect(find.byKey(const ValueKey('home-quick-transfer')), findsOneWidget);
+    expect(find.text('Transferir dinero'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(() => service.close());
     expect(tester.takeException(), isNull);
@@ -1527,7 +1466,12 @@ void main() {
           throwsA(isA<DatabaseServiceException>()),
         );
         expect(await service.obtenerIngresos(), hasLength(1));
-        expect(await service.obtenerGastos(), hasLength(1));
+        final expenses = await service.obtenerGastos();
+        expect(expenses, hasLength(2));
+        expect(
+          expenses.where((expense) => expense.pagoDeudaId != null),
+          hasLength(1),
+        );
         expect(await service.obtenerTodosLosPagosDeuda(), hasLength(1));
         expect(await service.obtenerMovimientosAhorro(), hasLength(2));
         expect(
@@ -1546,7 +1490,12 @@ void main() {
         expect(await reopenedService.obtenerTotalAhorros(), 200);
         expect(await reopenedService.obtenerSaldoDisponible(), 500);
         expect(await reopenedService.obtenerIngresos(), hasLength(1));
-        expect(await reopenedService.obtenerGastos(), hasLength(1));
+        final reopenedExpenses = await reopenedService.obtenerGastos();
+        expect(reopenedExpenses, hasLength(2));
+        expect(
+          reopenedExpenses.where((expense) => expense.pagoDeudaId != null),
+          hasLength(1),
+        );
 
         await reopenedService.borrarDatosFinancieros();
         expect(await reopenedService.obtenerMovimientosAhorro(), isEmpty);

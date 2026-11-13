@@ -8,7 +8,9 @@ import '../services/database_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/user_messages.dart';
 import '../widgets/cat_illustration.dart';
+import '../widgets/transfer_money_dialog.dart';
 import 'debts/debts_screen.dart';
+import 'credits/credits_screen.dart';
 import 'expenses/expenses_screen.dart';
 import 'future_expenses/future_expenses_screen.dart';
 import 'home/home_screen.dart';
@@ -32,6 +34,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late final DatabaseService _databaseService;
   late final bool _ownsDatabaseService;
   int _selectedIndex = 0;
+  int? _creditDebtEntityId;
+  bool _isTransferring = false;
   late Future<AppSettings> _settingsFuture;
   String _userName = '';
 
@@ -53,7 +57,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       onViewSubscriptions: () => _selectDestination(4),
       onViewDebts: () => _selectDestination(6),
       onViewSavings: () => _selectDestination(5),
-      onViewSettings: () => _selectDestination(8),
+      onViewSettings: () => _selectDestination(9),
+      onTransferMoney: _transferMoney,
     ),
     IncomesScreen(
       databaseService: _databaseService,
@@ -72,14 +77,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     DebtsScreen(
       databaseService: _databaseService,
       isActive: _selectedIndex == 6,
+      creditEntityId: _creditDebtEntityId,
+    ),
+    CreditsScreen(
+      databaseService: _databaseService,
+      onViewDebts: _viewCreditDebts,
     ),
     StatisticsScreen(
       databaseService: _databaseService,
-      isActive: _selectedIndex == 7,
+      isActive: _selectedIndex == 8,
     ),
     SettingsScreen(
       databaseService: _databaseService,
-      isActive: _selectedIndex == 8,
+      isActive: _selectedIndex == 9,
       onUserNameChanged: (name) => setState(() {
         _userName = name;
         _settingsFuture = const AppSettingsService().load();
@@ -97,7 +107,66 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _scaffoldKey.currentState?.closeDrawer();
     setState(() {
       _selectedIndex = destination;
+      if (destination == 6) _creditDebtEntityId = null;
     });
+  }
+
+  void _viewCreditDebts(int entityId) {
+    _scaffoldKey.currentState?.closeDrawer();
+    setState(() {
+      _creditDebtEntityId = entityId;
+      _selectedIndex = 6;
+    });
+  }
+
+  Future<void> _transferMoney() async {
+    if (_isTransferring) return;
+    setState(() => _isTransferring = true);
+    try {
+      final values = await Future.wait<Object>([
+        _databaseService.obtenerCuentasDigitales(),
+        _databaseService.obtenerSaldosPorMedio(),
+      ]);
+      if (!mounted) return;
+      final draft = await showDialog<TransferMoneyDraft>(
+        context: context,
+        builder: (context) => TransferMoneyDialog(
+          accounts: values[0] as List<DigitalAccountBalance>,
+          balances: values[1] as AvailableBalanceBreakdown,
+        ),
+      );
+      if (draft == null || !mounted) return;
+      await _databaseService.transferirDinero(
+        medioOrigen: draft.origin.medium,
+        cuentaOrigenId: draft.origin.accountId,
+        medioDestino: draft.destination.medium,
+        cuentaDestinoId: draft.destination.accountId,
+        monto: draft.amount,
+        fecha: draft.date,
+        nota: draft.note,
+      );
+      if (mounted) {
+        showCatMessage(
+          context,
+          'Transferencia lista. Tus saldos ya están actualizados.',
+          isSuccess: true,
+        );
+      }
+    } catch (error, stackTrace) {
+      logOperationFailure(
+        error,
+        stackTrace,
+        operation: 'transferir dinero desde el acceso rápido',
+      );
+      if (mounted) {
+        showCatMessage(
+          context,
+          friendlyOperationError(error, action: 'guardar la transferencia'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTransferring = false);
+    }
   }
 
   void _handleBackNavigation() {
@@ -105,6 +174,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _scaffoldKey.currentState?.closeDrawer();
       return;
     }
+
     if (_selectedIndex != 0) _selectDestination(0);
   }
 
@@ -175,6 +245,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                 icon: const Icon(Icons.menu_rounded),
               ),
+              actions: [
+                IconButton(
+                  key: const ValueKey('navigation-transfer-money'),
+                  tooltip: 'Transferir dinero',
+                  onPressed: _isTransferring ? null : _transferMoney,
+                  icon: _isTransferring
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.swap_horiz_rounded),
+                ),
+              ],
             ),
             drawer: _NavigationDrawer(
               selectedIndex: _selectedIndex,
@@ -516,9 +600,12 @@ const _navigationGroups = <_NavigationGroup>[
     ),
   ]),
   _NavigationGroup('ANÁLISIS', [
-    _NavigationDestination(7, 'Estadísticas', Icons.insights_outlined),
+    _NavigationDestination(8, 'Estadísticas', Icons.insights_outlined),
+  ]),
+  _NavigationGroup('CRÉDITOS', [
+    _NavigationDestination(7, 'Créditos', Icons.credit_card_outlined),
   ]),
   _NavigationGroup('PREFERENCIAS', [
-    _NavigationDestination(8, 'Configuración', Icons.tune_outlined),
+    _NavigationDestination(9, 'Configuración', Icons.tune_outlined),
   ]),
 ];

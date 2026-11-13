@@ -51,6 +51,12 @@ class Gastos extends Table {
   )();
 
   DateTimeColumn get suscripcionPeriodo => dateTime().nullable()();
+
+  IntColumn get pagoDeudaId => integer().nullable().references(
+    PagosDeuda,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
 }
 
 class Deudas extends Table {
@@ -94,6 +100,12 @@ class PagosDeuda extends Table {
   TextColumn get operationId => text().nullable()();
 
   TextColumn get medio => text().nullable()();
+
+  IntColumn get cuentaDigitalId => integer().nullable().references(
+    CuentasDigitales,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 }
 
 class MovimientosAhorro extends Table {
@@ -276,6 +288,87 @@ class Suscripciones extends Table {
   BoolColumn get activa => boolean().withDefault(const Constant(true))();
 }
 
+@DataClassName('EntidadCredito')
+class EntidadesCredito extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get nombre => text()();
+
+  RealColumn get cupoAprobado => real()();
+
+  BoolColumn get activa => boolean().withDefault(const Constant(true))();
+}
+
+@DataClassName('CambioCupoCredito')
+class HistorialCupoCredito extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get entidadId => integer().references(
+    EntidadesCredito,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
+
+  RealColumn get cupoAnterior => real()();
+
+  RealColumn get cupoNuevo => real()();
+
+  DateTimeColumn get fecha => dateTime()();
+}
+
+@DataClassName('CompraCredito')
+class ComprasCredito extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get entidadId => integer().references(
+    EntidadesCredito,
+    #id,
+    onDelete: KeyAction.restrict,
+  )();
+
+  IntColumn get deudaId =>
+      integer().references(Deudas, #id, onDelete: KeyAction.restrict)();
+
+  IntColumn get gastoId => integer().nullable().unique().references(
+    Gastos,
+    #id,
+    onDelete: KeyAction.restrict,
+  )();
+
+  TextColumn get descripcion => text()();
+
+  RealColumn get monto => real()();
+
+  TextColumn get categoria => text()();
+
+  DateTimeColumn get fecha => dateTime()();
+
+  IntColumn get cuotasTotales => integer()();
+
+  RealColumn get valorCuota => real()();
+
+  DateTimeColumn get primerVencimiento => dateTime()();
+}
+
+@DataClassName('CuotaCredito')
+class CuotasCredito extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get compraId =>
+      integer().references(ComprasCredito, #id, onDelete: KeyAction.cascade)();
+
+  IntColumn get numero => integer()();
+
+  RealColumn get monto => real()();
+
+  DateTimeColumn get vencimiento => dateTime()();
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {compraId, numero},
+  ];
+}
+
 @DriftDatabase(
   tables: [
     Ingresos,
@@ -292,13 +385,17 @@ class Suscripciones extends Table {
     IngresoDistribuciones,
     TransferenciasDinero,
     Suscripciones,
+    EntidadesCredito,
+    HistorialCupoCredito,
+    ComprasCredito,
+    CuotasCredito,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -319,8 +416,20 @@ class AppDatabase extends _$AppDatabase {
         'WHERE suscripcion_id IS NOT NULL AND suscripcion_periodo IS NOT NULL',
       );
       await customStatement(
+        'CREATE UNIQUE INDEX gastos_pago_deuda_unique '
+        'ON gastos (pago_deuda_id) WHERE pago_deuda_id IS NOT NULL',
+      );
+      await customStatement(
         'CREATE INDEX ingreso_distribuciones_ingreso_id '
         'ON ingreso_distribuciones (ingreso_id)',
+      );
+      await customStatement(
+        'CREATE INDEX compras_credito_entidad_id '
+        'ON compras_credito (entidad_id)',
+      );
+      await customStatement(
+        'CREATE INDEX compras_credito_deuda_id '
+        'ON compras_credito (deuda_id)',
       );
     },
     onUpgrade: (migrator, from, to) async {
@@ -490,6 +599,73 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX ingreso_distribuciones_ingreso_id '
           'ON ingreso_distribuciones (ingreso_id)',
+        );
+      }
+      if (from < 17) {
+        await migrator.createTable(entidadesCredito);
+        await migrator.createTable(historialCupoCredito);
+        await migrator.createTable(comprasCredito);
+        await migrator.createTable(cuotasCredito);
+        final paymentsTable = await customSelect(
+          "SELECT name FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'pagos_deuda'",
+        ).getSingleOrNull();
+        if (paymentsTable != null) {
+          final paymentColumns = await customSelect(
+            "PRAGMA table_info('pagos_deuda')",
+          ).get();
+          final paymentColumnNames = paymentColumns
+              .map((row) => row.read<String>('name'))
+              .toSet();
+          if (!paymentColumnNames.contains('cuenta_digital_id')) {
+            await migrator.addColumn(pagosDeuda, pagosDeuda.cuentaDigitalId);
+          }
+        }
+        await customStatement(
+          'CREATE INDEX compras_credito_entidad_id '
+          'ON compras_credito (entidad_id)',
+        );
+        await customStatement(
+          'CREATE INDEX compras_credito_deuda_id '
+          'ON compras_credito (deuda_id)',
+        );
+      }
+      if (from < 18) {
+        final expensesTable = await customSelect(
+          "SELECT name FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'gastos'",
+        ).getSingleOrNull();
+        if (expensesTable == null) {
+          await migrator.createTable(gastos);
+          await customStatement(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'gastos_suscripcion_periodo_unique '
+            'ON gastos (suscripcion_id, suscripcion_periodo) '
+            'WHERE suscripcion_id IS NOT NULL AND suscripcion_periodo IS NOT NULL',
+          );
+        } else {
+          final expenseColumns = await customSelect(
+            "PRAGMA table_info('gastos')",
+          ).get();
+          final expenseColumnNames = expenseColumns
+              .map((row) => row.read<String>('name'))
+              .toSet();
+          if (!expenseColumnNames.contains('pago_deuda_id')) {
+            await migrator.addColumn(gastos, gastos.pagoDeudaId);
+          }
+        }
+        await migrator.alterTable(TableMigration(comprasCredito));
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS compras_credito_entidad_id '
+          'ON compras_credito (entidad_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS compras_credito_deuda_id '
+          'ON compras_credito (deuda_id)',
+        );
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS gastos_pago_deuda_unique '
+          'ON gastos (pago_deuda_id) WHERE pago_deuda_id IS NOT NULL',
         );
       }
     },
