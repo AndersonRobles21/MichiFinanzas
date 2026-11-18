@@ -1116,7 +1116,7 @@ class _AvailableFutureFunds extends StatelessWidget {
         builder: (context, constraints) {
           final balance = Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.account_balance_wallet_outlined,
                 color: AppColors.primary,
               ),

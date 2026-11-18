@@ -1398,7 +1398,7 @@ class _PaymentHistorySheet extends StatelessWidget {
                         final payment = payments[index];
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.payments_outlined,
                             color: AppColors.primary,
                           ),
@@ -1479,7 +1479,7 @@ class _DebtError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, color: AppColors.primary),
+            Icon(Icons.cloud_off_outlined, color: AppColors.primary),
             const SizedBox(height: 12),
             Text(
               'Ups, tus deudas no cargaron esta vez.',

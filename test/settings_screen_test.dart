@@ -3,7 +3,14 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
 import 'package:flutter/material.dart'
-    show InputDecorator, MaterialApp, Size, SizedBox, TextFormField;
+    show
+        InputDecorator,
+        MaterialApp,
+        SegmentedButton,
+        Size,
+        SizedBox,
+        TextFormField,
+        ThemeMode;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,6 +24,49 @@ import 'package:finanzas_app/theme/app_theme.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('persiste el tema y notifica el cambio de apariencia', (
+    tester,
+  ) async {
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    await _prepareTemporaryStorage(tester);
+    _setMobileSize(tester);
+    ThemeMode? selectedTheme;
+    await tester.runAsync(
+      () => tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          home: SettingsScreen(
+            databaseService: service,
+            onThemeModeChanged: (mode) => selectedTheme = mode,
+          ),
+        ),
+      ),
+    );
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('settings-theme-mode')),
+    );
+
+    await tester.tap(find.text('Oscuro'));
+    await _pumpUntilSettings(
+      tester,
+      (settings) => settings.themeMode == 'dark',
+    );
+    expect(selectedTheme, ThemeMode.dark);
+    expect(
+      tester
+          .widget<SegmentedButton<String>>(
+            find.byKey(const ValueKey('settings-theme-mode')),
+          )
+          .selected,
+      {'dark'},
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() => service.close());
+  });
 
   testWidgets('valida el nombre en Ajustes y lo recupera al reabrir', (
     tester,

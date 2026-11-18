@@ -20,11 +20,13 @@ class SettingsScreen extends StatefulWidget {
     this.isActive = true,
     this.databaseService,
     this.onUserNameChanged,
+    this.onThemeModeChanged,
   });
 
   final bool isActive;
   final DatabaseService? databaseService;
   final ValueChanged<String>? onUserNameChanged;
+  final ValueChanged<ThemeMode>? onThemeModeChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -119,6 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool validateUserName = false,
   }) async {
     if (_isSaving) return;
+    final previousThemeMode = _loadedData?.settings.themeMode;
     setState(() => _isSaving = true);
     try {
       if (validateUserName) {
@@ -147,6 +150,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
       if (validateUserName) {
         widget.onUserNameChanged?.call(settings.userName);
+      }
+      if (previousThemeMode != settings.themeMode) {
+        widget.onThemeModeChanged?.call(
+          settings.themeMode == 'dark' ? ThemeMode.dark : ThemeMode.light,
+        );
       }
       _showMessage(message);
     } catch (error, stackTrace) {
@@ -602,7 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const AppPageHeader(
-                            title: 'Ajustes',
+                            title: 'Configuración',
                             subtitle: 'Personaliza tus preferencias locales.',
                             trailing: AnimatedCat(
                               asset: CatAssets.icono,
@@ -612,6 +620,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.section),
+                          _SettingsSection(
+                            title: 'Tema de la aplicación',
+                            icon: Icons.palette_outlined,
+                            child: SegmentedButton<String>(
+                              key: const ValueKey('settings-theme-mode'),
+                              segments: const [
+                                ButtonSegment(
+                                  value: 'light',
+                                  icon: Icon(Icons.light_mode_outlined),
+                                  label: Text('Claro'),
+                                ),
+                                ButtonSegment(
+                                  value: 'dark',
+                                  icon: Icon(Icons.dark_mode_outlined),
+                                  label: Text('Oscuro'),
+                                ),
+                              ],
+                              selected: {data.settings.themeMode},
+                              onSelectionChanged: _isSaving
+                                  ? null
+                                  : (selection) {
+                                      final mode = selection.first;
+                                      _saveSettings(
+                                        data.settings.copyWith(themeMode: mode),
+                                        'Tema actualizado.',
+                                      );
+                                    },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           _SettingsSection(
                             title: 'Tu nombre',
                             icon: Icons.person_outline_rounded,
@@ -1159,7 +1197,7 @@ class _SettingsError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, color: AppColors.primary),
+            Icon(Icons.cloud_off_outlined, color: AppColors.primary),
             const SizedBox(height: 12),
             Text(
               'Ups, tus ajustes no cargaron esta vez.',

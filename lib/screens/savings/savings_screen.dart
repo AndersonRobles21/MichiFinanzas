@@ -520,7 +520,7 @@ class _SavingsBalancePanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.pets_rounded,
                 color: AppColors.primary,
                 size: 22,

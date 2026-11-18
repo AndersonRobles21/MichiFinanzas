@@ -563,7 +563,7 @@ class _SubscriptionCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.autorenew_rounded,
                     color: AppColors.primary,
                   ),

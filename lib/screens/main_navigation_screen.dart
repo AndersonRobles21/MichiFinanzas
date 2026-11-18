@@ -11,9 +11,9 @@ import '../widgets/cat_illustration.dart';
 import '../widgets/transfer_money_dialog.dart';
 import 'debts/debts_screen.dart';
 import 'credits/credits_screen.dart';
-import 'expenses/expenses_screen.dart';
 import 'future_expenses/future_expenses_screen.dart';
 import 'home/home_screen.dart';
+import 'navigation_hubs.dart';
 import 'onboarding/digital_accounts_setup_screen.dart';
 import 'savings/savings_screen.dart';
 import 'settings/settings_screen.dart';
@@ -21,19 +21,26 @@ import 'statistics/statistics_screen.dart';
 import 'subscriptions/subscriptions_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key, this.databaseService});
+  const MainNavigationScreen({
+    super.key,
+    this.databaseService,
+    this.onThemeModeChanged,
+  });
 
   final DatabaseService? databaseService;
+  final ValueChanged<ThemeMode>? onThemeModeChanged;
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
   late final DatabaseService _databaseService;
   late final bool _ownsDatabaseService;
   int _selectedIndex = 0;
+  int _movementTab = 0;
+  int _expenseRegisterRequestId = 0;
+  int _incomeRegisterRequestId = 0;
   int? _creditDebtEntityId;
   bool _isTransferring = false;
   late Future<AppSettings> _settingsFuture;
@@ -44,7 +51,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     _ownsDatabaseService = widget.databaseService == null;
     _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
-    _settingsFuture = const AppSettingsService().load();
+    _settingsFuture = _loadSettings();
+  }
+
+  Future<AppSettings> _loadSettings() async {
+    final settings = await const AppSettingsService().load();
+    widget.onThemeModeChanged?.call(
+      settings.themeMode == 'dark' ? ThemeMode.dark : ThemeMode.light,
+    );
+    return settings;
   }
 
   List<Widget> get _screens => [
@@ -52,21 +67,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       databaseService: _databaseService,
       isActive: _selectedIndex == 0,
       onViewFutureExpenses: () => _selectDestination(3),
-      onViewExpenses: () => _selectDestination(2),
-      onViewIncomes: () => _selectDestination(1),
+      onViewExpenses: () => _openMovements(0),
+      onViewIncomes: () => _openMovements(1),
+      onRegisterExpense: () => _openMovements(0, register: true),
       onViewSubscriptions: () => _selectDestination(4),
       onViewDebts: () => _selectDestination(6),
       onViewSavings: () => _selectDestination(5),
-      onViewSettings: () => _selectDestination(9),
+      onViewAccounts: () => _selectDestination(11),
       onTransferMoney: _transferMoney,
     ),
-    IncomesScreen(
+    MovementsScreen(
       databaseService: _databaseService,
-      isActive: _selectedIndex == 1,
+      initialTab: _movementTab,
+      expenseRegisterRequestId: _expenseRegisterRequestId,
+      incomeRegisterRequestId: _incomeRegisterRequestId,
     ),
-    ExpensesScreen(
-      databaseService: _databaseService,
-      isActive: _selectedIndex == 2,
+    CommitmentsHubScreen(
+      onSubscriptions: () => _selectDestination(4),
+      onFutureExpenses: () => _selectDestination(3),
+      onDebts: () => _selectDestination(6),
+      onCredits: () => _selectDestination(7),
     ),
     FutureExpensesScreen(databaseService: _databaseService),
     SubscriptionsScreen(databaseService: _databaseService),
@@ -90,33 +110,116 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     SettingsScreen(
       databaseService: _databaseService,
       isActive: _selectedIndex == 9,
+      onThemeModeChanged: widget.onThemeModeChanged,
       onUserNameChanged: (name) => setState(() {
         _userName = name;
         _settingsFuture = const AppSettingsService().load();
       }),
     ),
+    MoreHubScreen(
+      onAccounts: () => _selectDestination(11),
+      onStatistics: () => _selectDestination(8),
+      onSavings: () => _selectDestination(5),
+      onSettings: () => _selectDestination(9),
+    ),
+    AccountsScreen(
+      databaseService: _databaseService,
+      onTransfer: _transferMoney,
+      onSettings: () => _selectDestination(9),
+    ),
   ];
 
   void _selectDestination(int destination) {
-    final isKnownDestination = _navigationGroups.any(
-      (group) => group.destinations.any((item) => item.index == destination),
-    );
-    if (!isKnownDestination) {
-      return;
-    }
-    _scaffoldKey.currentState?.closeDrawer();
+    if (destination < 0 || destination > 11) return;
     setState(() {
       _selectedIndex = destination;
       if (destination == 6) _creditDebtEntityId = null;
     });
   }
 
+  void _openMovements(int tab, {bool register = false}) {
+    setState(() {
+      _movementTab = tab;
+      _selectedIndex = 1;
+      if (register && tab == 0) _expenseRegisterRequestId++;
+      if (register && tab == 1) _incomeRegisterRequestId++;
+    });
+  }
+
   void _viewCreditDebts(int entityId) {
-    _scaffoldKey.currentState?.closeDrawer();
     setState(() {
       _creditDebtEntityId = entityId;
       _selectedIndex = 6;
     });
+  }
+
+  void _selectBottomDestination(int destination) {
+    switch (destination) {
+      case 0:
+        _selectDestination(0);
+        break;
+      case 1:
+        _selectDestination(1);
+        break;
+      case 2:
+        _showRegisterSheet();
+        break;
+      case 3:
+        _selectDestination(2);
+        break;
+      case 4:
+        _selectDestination(10);
+        break;
+    }
+  }
+
+  Future<void> _showRegisterSheet() async {
+    final action = await showModalBottomSheet<_RegisterAction>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Qué quieres registrar?',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _RegisterActionTile(
+              icon: Icons.south_west_rounded,
+              title: 'Ingreso',
+              onTap: () => Navigator.pop(context, _RegisterAction.income),
+            ),
+            _RegisterActionTile(
+              icon: Icons.receipt_long_outlined,
+              title: 'Gasto',
+              onTap: () => Navigator.pop(context, _RegisterAction.expense),
+            ),
+            _RegisterActionTile(
+              icon: Icons.swap_horiz_rounded,
+              title: 'Transferencia',
+              onTap: () => Navigator.pop(context, _RegisterAction.transfer),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _RegisterAction.income:
+        _openMovements(1, register: true);
+        break;
+      case _RegisterAction.expense:
+        _openMovements(0, register: true);
+        break;
+      case _RegisterAction.transfer:
+        await _transferMoney();
+        break;
+    }
   }
 
   Future<void> _transferMoney() async {
@@ -170,11 +273,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _handleBackNavigation() {
-    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-      _scaffoldKey.currentState?.closeDrawer();
-      return;
-    }
-
     if (_selectedIndex != 0) _selectDestination(0);
   }
 
@@ -198,7 +296,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   const Text('No pudimos cargar tus ajustes locales.'),
                   TextButton(
                     onPressed: () => setState(
-                      () => _settingsFuture = const AppSettingsService().load(),
+                      () => _settingsFuture = _loadSettings(),
                     ),
                     child: const Text('Intentar de nuevo'),
                   ),
@@ -235,40 +333,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             if (!didPop) _handleBackNavigation();
           },
           child: Scaffold(
-            key: _scaffoldKey,
             body: IndexedStack(index: _selectedIndex, children: _screens),
-            appBar: AppBar(
-              backgroundColor: AppColors.background,
-              elevation: 0,
-              leading: IconButton(
-                tooltip: 'Abrir menú',
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                icon: const Icon(Icons.menu_rounded),
-              ),
-              actions: [
-                IconButton(
-                  key: const ValueKey('navigation-transfer-money'),
-                  tooltip: 'Transferir dinero',
-                  onPressed: _isTransferring ? null : _transferMoney,
-                  icon: _isTransferring
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.swap_horiz_rounded),
-                ),
-              ],
-            ),
-            drawer: _NavigationDrawer(
-              selectedIndex: _selectedIndex,
-              userName: _userName,
-              onSelected: _selectDestination,
+            bottomNavigationBar: _AppBottomNavigationBar(
+              selectedIndex: _bottomNavigationIndex,
+              onSelected: _selectBottomDestination,
             ),
           ),
         );
       },
     );
+  }
+
+  int get _bottomNavigationIndex {
+    if (_selectedIndex == 0) return 0;
+    if (_selectedIndex == 1) return 1;
+    if (_selectedIndex == 2 ||
+        _selectedIndex == 3 ||
+        _selectedIndex == 4 ||
+        _selectedIndex == 6 ||
+        _selectedIndex == 7) {
+      return 3;
+    }
+    return 4;
   }
 
   Future<void> _completeAccountSetup() async {
@@ -396,6 +482,150 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 }
 
+enum _RegisterAction { income, expense, transfer }
+
+class _RegisterActionTile extends StatelessWidget {
+  const _RegisterActionTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      minVerticalPadding: 12,
+      leading: CircleAvatar(
+        backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+        child: Icon(icon, color: AppColors.primary),
+      ),
+      title: Text(title),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    );
+  }
+}
+
+class _AppBottomNavigationBar extends StatelessWidget {
+  const _AppBottomNavigationBar({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final destinations = [
+      (label: 'Inicio', icon: Icons.home_outlined),
+      (label: 'Movimientos', icon: Icons.swap_vert_rounded),
+      (label: 'Registrar', icon: Icons.add_rounded),
+      (label: 'Compromisos', icon: Icons.event_note_outlined),
+      (label: 'Más', icon: Icons.grid_view_rounded),
+    ];
+
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: 8,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 66,
+          child: Row(
+            children: [
+              for (var index = 0; index < destinations.length; index++)
+                Expanded(
+                  child: _BottomNavigationItem(
+                    label: destinations[index].label,
+                    icon: destinations[index].icon,
+                    selected: selectedIndex == index,
+                    isAction: index == 2,
+                    key: ValueKey(
+                      'bottom-navigation-${destinations[index].label}',
+                    ),
+                    onTap: () => onSelected(index),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomNavigationItem extends StatelessWidget {
+  const _BottomNavigationItem({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.isAction,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool isAction;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : AppColors.textSecondary;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox.expand(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isAction)
+                Container(
+                  width: 40,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryAction,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.actionForeground,
+                    size: 23,
+                  ),
+                )
+              else
+                Icon(icon, color: color, size: 22),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: isAction ? AppColors.primary : color,
+                  fontSize: 10,
+                  fontWeight: selected || isAction
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NavigationDrawer extends StatelessWidget {
   const _NavigationDrawer({
     required this.selectedIndex,
@@ -419,7 +649,7 @@ class _NavigationDrawer extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 22, 16, 20),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [AppColors.surfaceRaised, AppColors.surface],
                   begin: Alignment.topLeft,
@@ -529,7 +759,7 @@ class _NavigationTile extends StatelessWidget {
           ),
         ),
         trailing: selected
-            ? const Icon(Icons.chevron_right_rounded, color: AppColors.accent)
+            ? Icon(Icons.chevron_right_rounded, color: AppColors.accent)
             : null,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.small),

@@ -24,10 +24,11 @@ class HomeScreen extends StatefulWidget {
     this.onViewFutureExpenses,
     this.onViewExpenses,
     this.onViewIncomes,
+    this.onRegisterExpense,
     this.onViewSubscriptions,
     this.onViewDebts,
     this.onViewSavings,
-    this.onViewSettings,
+    this.onViewAccounts,
     this.onTransferMoney,
   });
 
@@ -36,10 +37,11 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onViewFutureExpenses;
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
+  final VoidCallback? onRegisterExpense;
   final VoidCallback? onViewSubscriptions;
   final VoidCallback? onViewDebts;
   final VoidCallback? onViewSavings;
-  final VoidCallback? onViewSettings;
+  final VoidCallback? onViewAccounts;
   final VoidCallback? onTransferMoney;
 
   @override
@@ -233,10 +235,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           onViewFutureExpenses: widget.onViewFutureExpenses,
                           onViewExpenses: widget.onViewExpenses,
                           onViewIncomes: widget.onViewIncomes,
+                          onRegisterExpense: widget.onRegisterExpense,
                           onViewSubscriptions: widget.onViewSubscriptions,
                           onViewDebts: widget.onViewDebts,
                           onViewSavings: widget.onViewSavings,
-                          onViewSettings: widget.onViewSettings,
+                          onViewAccounts: widget.onViewAccounts,
                           onTransferMoney: widget.onTransferMoney,
                         );
                       },
@@ -253,10 +256,16 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class IncomesScreen extends StatefulWidget {
-  const IncomesScreen({super.key, this.databaseService, this.isActive = true});
+  const IncomesScreen({
+    super.key,
+    this.databaseService,
+    this.isActive = true,
+    this.registerRequestId = 0,
+  });
 
   final DatabaseService? databaseService;
   final bool isActive;
+  final int registerRequestId;
 
   @override
   State<IncomesScreen> createState() => _IncomesScreenState();
@@ -268,12 +277,14 @@ class _IncomesScreenState extends State<IncomesScreen> {
   late Future<_IncomeHistoryData> _historyFuture;
   late final StreamSubscription<void> _changes;
   bool _saving = false;
+  late int _lastRegisterRequestId;
 
   @override
   void initState() {
     super.initState();
     _ownsDatabaseService = widget.databaseService == null;
     _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
+    _lastRegisterRequestId = widget.registerRequestId;
     _historyFuture = _load();
     _changes = _databaseService.observarCambiosFinancieros().listen((_) {
       if (mounted) {
@@ -290,6 +301,14 @@ class _IncomesScreenState extends State<IncomesScreen> {
     if (widget.isActive && !oldWidget.isActive) {
       setState(() {
         _historyFuture = _load();
+      });
+    }
+    if (widget.registerRequestId != oldWidget.registerRequestId &&
+        widget.registerRequestId != _lastRegisterRequestId) {
+      _lastRegisterRequestId = widget.registerRequestId;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final data = await _historyFuture;
+        if (mounted) await _addIncome(data.accounts);
       });
     }
   }
@@ -638,7 +657,7 @@ class _IncomeHistoryTile extends StatelessWidget {
       decoration: AppCardDecorations.surface,
       child: Row(
         children: [
-          const Icon(Icons.south_west_rounded, color: AppColors.primary),
+          Icon(Icons.south_west_rounded, color: AppColors.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1228,10 +1247,11 @@ class _DashboardContent extends StatelessWidget {
     required this.onViewFutureExpenses,
     required this.onViewExpenses,
     required this.onViewIncomes,
+    required this.onRegisterExpense,
     required this.onViewSubscriptions,
     required this.onViewDebts,
     required this.onViewSavings,
-    required this.onViewSettings,
+    required this.onViewAccounts,
     required this.onTransferMoney,
   });
 
@@ -1241,10 +1261,11 @@ class _DashboardContent extends StatelessWidget {
   final VoidCallback? onViewFutureExpenses;
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
+  final VoidCallback? onRegisterExpense;
   final VoidCallback? onViewSubscriptions;
   final VoidCallback? onViewDebts;
   final VoidCallback? onViewSavings;
-  final VoidCallback? onViewSettings;
+  final VoidCallback? onViewAccounts;
   final VoidCallback? onTransferMoney;
 
   @override
@@ -1252,12 +1273,12 @@ class _DashboardContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AvailableBalanceCard(data: data, onViewSettings: onViewSettings),
+        _AvailableBalanceCard(data: data, onViewAccounts: onViewAccounts),
         const SizedBox(height: 16),
         _QuickActionsPanel(
           onAddIncome: onAddIncome,
           isSavingIncome: isSavingIncome,
-          onViewExpenses: onViewExpenses,
+          onRegisterExpense: onRegisterExpense,
           onTransferMoney: onTransferMoney,
         ),
         const SizedBox(height: AppSpacing.section),
@@ -1272,7 +1293,7 @@ class _DashboardContent extends StatelessWidget {
           onViewIncomes: onViewIncomes,
           onViewExpenses: onViewExpenses,
           onViewSavings: onViewSavings,
-          onViewSettings: onViewSettings,
+          onViewAccounts: onViewAccounts,
         ),
         const SizedBox(height: AppSpacing.section),
         _RemindersPanel(
@@ -1292,13 +1313,13 @@ class _QuickActionsPanel extends StatelessWidget {
   const _QuickActionsPanel({
     required this.onAddIncome,
     required this.isSavingIncome,
-    required this.onViewExpenses,
+    required this.onRegisterExpense,
     required this.onTransferMoney,
   });
 
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
-  final VoidCallback? onViewExpenses;
+  final VoidCallback? onRegisterExpense;
   final VoidCallback? onTransferMoney;
 
   @override
@@ -1315,7 +1336,7 @@ class _QuickActionsPanel extends StatelessWidget {
         ),
         OutlinedButton.icon(
           key: const ValueKey('home-quick-expense'),
-          onPressed: onViewExpenses,
+          onPressed: onRegisterExpense,
           icon: const Icon(Icons.north_east_rounded),
           label: const Text('Registrar gasto'),
         ),
@@ -1498,11 +1519,11 @@ class _SummaryMetric extends StatelessWidget {
 class _AvailableBalanceCard extends StatelessWidget {
   const _AvailableBalanceCard({
     required this.data,
-    required this.onViewSettings,
+    required this.onViewAccounts,
   });
 
   final DashboardData data;
-  final VoidCallback? onViewSettings;
+  final VoidCallback? onViewAccounts;
 
   @override
   Widget build(BuildContext context) {
@@ -1519,7 +1540,21 @@ class _AvailableBalanceCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: AppCardDecorations.featured,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.brand, AppColors.primaryDeep],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brand.withValues(alpha: 0.18),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1528,7 +1563,10 @@ class _AvailableBalanceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Dinero disponible',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const AnimatedCat(
@@ -1547,20 +1585,35 @@ class _AvailableBalanceCard extends StatelessWidget {
             key: const ValueKey('home-available-balance'),
             style: Theme.of(
               context,
-            ).textTheme.headlineMedium?.copyWith(fontSize: 32),
+            ).textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+              fontSize: 38,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Nunito',
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Total disponible · no incluye deudas ni planes futuros',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.86),
+            ),
           ),
           const SizedBox(height: 12),
-          Text(description, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            description,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
           const SizedBox(height: 16),
           Text(
             '¿Dónde está mi dinero?',
             key: const ValueKey('home-money-location-title'),
-            style: Theme.of(context).textTheme.titleSmall,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 8),
           _BalanceMediumLine(
@@ -1568,6 +1621,7 @@ class _AvailableBalanceCard extends StatelessWidget {
             amount: data.balanceBreakdown.cash,
             icon: Icons.payments_outlined,
             valueKey: const ValueKey('home-cash-balance'),
+            contrast: true,
           ),
           const SizedBox(height: 8),
           _BalanceMediumLine(
@@ -1575,10 +1629,11 @@ class _AvailableBalanceCard extends StatelessWidget {
             amount: data.balanceBreakdown.digital,
             icon: Icons.account_balance_wallet_outlined,
             valueKey: const ValueKey('home-digital-balance'),
+            contrast: true,
           ),
           for (final account in data.digitalAccounts) ...[
             const SizedBox(height: 8),
-            _DigitalAccountBalanceLine(account: account),
+            _DigitalAccountBalanceLine(account: account, contrast: true),
           ],
           if (digitalWithoutAccount > 1e-8) ...[
             const SizedBox(height: 8),
@@ -1587,6 +1642,7 @@ class _AvailableBalanceCard extends StatelessWidget {
               amount: digitalWithoutAccount,
               icon: Icons.account_balance_wallet_outlined,
               valueKey: const ValueKey('home-unassigned-digital-balance'),
+              contrast: true,
             ),
           ],
           if (data.balanceBreakdown.unclassified > 1e-8) ...[
@@ -1596,6 +1652,7 @@ class _AvailableBalanceCard extends StatelessWidget {
               amount: data.balanceBreakdown.unclassified,
               icon: Icons.help_outline_rounded,
               valueKey: const ValueKey('home-unclassified-balance'),
+              contrast: true,
             ),
           ],
           const SizedBox(height: 8),
@@ -1603,7 +1660,8 @@ class _AvailableBalanceCard extends StatelessWidget {
             alignment: AlignmentDirectional.centerEnd,
             child: TextButton.icon(
               key: const ValueKey('home-view-accounts'),
-              onPressed: onViewSettings,
+              onPressed: onViewAccounts,
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               icon: const Icon(Icons.account_balance_wallet_outlined),
               label: const Text('Administrar cuentas'),
             ),
@@ -1620,32 +1678,51 @@ class _BalanceMediumLine extends StatelessWidget {
     required this.amount,
     this.icon,
     this.valueKey,
+    this.contrast = false,
   });
 
   final String label;
   final double amount;
   final IconData? icon;
   final Key? valueKey;
+  final bool contrast;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 18, color: AppColors.accent),
+          Icon(
+            icon,
+            size: 18,
+            color: contrast ? AppColors.accent : AppColors.primary,
+          ),
           const SizedBox(width: 8),
         ],
-        Expanded(child: Text(label)),
-        Text(_formatMoney(amount), key: valueKey),
+        Expanded(
+          child: Text(
+            label,
+            style: contrast ? const TextStyle(color: Colors.white) : null,
+          ),
+        ),
+        Text(
+          _formatMoney(amount),
+          key: valueKey,
+          style: contrast ? const TextStyle(color: Colors.white) : null,
+        ),
       ],
     );
   }
 }
 
 class _DigitalAccountBalanceLine extends StatelessWidget {
-  const _DigitalAccountBalanceLine({required this.account});
+  const _DigitalAccountBalanceLine({
+    required this.account,
+    this.contrast = false,
+  });
 
   final DigitalAccountBalance account;
+  final bool contrast;
 
   @override
   Widget build(BuildContext context) {
@@ -1654,7 +1731,9 @@ class _DigitalAccountBalanceLine extends StatelessWidget {
       key: ValueKey('home-account-balance-${account.account.id}'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceRaised.withValues(alpha: 0.62),
+        color: contrast
+            ? Colors.white.withValues(alpha: 0.12)
+            : AppColors.surfaceRaised.withValues(alpha: 0.62),
         borderRadius: BorderRadius.circular(AppRadii.small),
       ),
       child: Row(
@@ -1666,17 +1745,28 @@ class _DigitalAccountBalanceLine extends StatelessWidget {
               name.substring(0, 1).toUpperCase(),
               style: Theme.of(
                 context,
-              ).textTheme.labelSmall?.copyWith(color: AppColors.accent),
+              ).textTheme.labelSmall?.copyWith(
+                color: contrast ? Colors.white : AppColors.accent,
+              ),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: contrast ? const TextStyle(color: Colors.white) : null,
+            ),
           ),
           Text(
             _formatMoney(account.balance),
             key: ValueKey('home-account-balance-value-${account.account.id}'),
-            style: Theme.of(context).textTheme.titleSmall,
+            style: contrast
+                ? Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Colors.white,
+                  )
+                : Theme.of(context).textTheme.titleSmall,
           ),
         ],
       ),
@@ -1690,14 +1780,14 @@ class _RecentActivityPanel extends StatelessWidget {
     required this.onViewIncomes,
     required this.onViewExpenses,
     required this.onViewSavings,
-    required this.onViewSettings,
+    required this.onViewAccounts,
   });
 
   final List<DashboardActivity> activities;
   final VoidCallback? onViewIncomes;
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewSavings;
-  final VoidCallback? onViewSettings;
+  final VoidCallback? onViewAccounts;
 
   @override
   Widget build(BuildContext context) {
@@ -1733,7 +1823,7 @@ class _RecentActivityPanel extends StatelessWidget {
                   child: const Text('Gastos'),
                 ),
                 TextButton(
-                  onPressed: onViewSettings,
+                  onPressed: onViewAccounts,
                   child: const Text('Transferencias'),
                 ),
               ],
@@ -1749,7 +1839,7 @@ class _RecentActivityPanel extends StatelessWidget {
       DashboardActivityKind.income => onViewIncomes,
       DashboardActivityKind.expense ||
       DashboardActivityKind.debtPayment => onViewExpenses,
-      DashboardActivityKind.transfer => onViewSettings,
+      DashboardActivityKind.transfer => onViewAccounts,
       DashboardActivityKind.savingsContribution ||
       DashboardActivityKind.savingsWithdrawal => onViewSavings,
     };
@@ -1830,27 +1920,27 @@ class _ActivityStyle {
 
 _ActivityStyle _activityStyle(DashboardActivityKind kind) {
   return switch (kind) {
-    DashboardActivityKind.income => const _ActivityStyle(
+    DashboardActivityKind.income => _ActivityStyle(
       Icons.south_west_rounded,
       AppColors.positive,
     ),
-    DashboardActivityKind.expense => const _ActivityStyle(
+    DashboardActivityKind.expense => _ActivityStyle(
       Icons.north_east_rounded,
       AppColors.negative,
     ),
-    DashboardActivityKind.debtPayment => const _ActivityStyle(
+    DashboardActivityKind.debtPayment => _ActivityStyle(
       Icons.payments_outlined,
       AppColors.warning,
     ),
-    DashboardActivityKind.transfer => const _ActivityStyle(
+    DashboardActivityKind.transfer => _ActivityStyle(
       Icons.swap_horiz_rounded,
       AppColors.primary,
     ),
-    DashboardActivityKind.savingsContribution => const _ActivityStyle(
+    DashboardActivityKind.savingsContribution => _ActivityStyle(
       Icons.savings_outlined,
       AppColors.accent,
     ),
-    DashboardActivityKind.savingsWithdrawal => const _ActivityStyle(
+    DashboardActivityKind.savingsWithdrawal => _ActivityStyle(
       Icons.savings_outlined,
       AppColors.positive,
     ),
@@ -2043,7 +2133,7 @@ class _AdvicePanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb_outline_rounded, color: AppColors.accent),
+          Icon(Icons.lightbulb_outline_rounded, color: AppColors.accent),
           const SizedBox(height: 12),
           Text(
             'CONSEJO FINANCIERO',

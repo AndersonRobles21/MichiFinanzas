@@ -1318,7 +1318,7 @@ class _RemainingLegendRow extends StatelessWidget {
           Container(
             width: 9,
             height: 9,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.outline,
               shape: BoxShape.circle,
             ),
@@ -1406,7 +1406,7 @@ class _TrendChart extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Wrap(
+                Wrap(
                   spacing: 18,
                   runSpacing: 8,
                   children: [
@@ -1536,7 +1536,7 @@ class _TrendChart extends StatelessWidget {
                                   final date = points[group.x].date;
                                   return BarTooltipItem(
                                     '${rodIndex == 0 ? 'Ingreso' : 'Gasto'} · ${date.day}/${date.month}\n${_formatMoney(rod.toY)}',
-                                    const TextStyle(
+                                    TextStyle(
                                       color: AppColors.textPrimary,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1678,7 +1678,7 @@ class _StatisticsError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, color: AppColors.primary),
+            Icon(Icons.cloud_off_outlined, color: AppColors.primary),
             const SizedBox(height: 12),
             Text(
               'Ups, tus estadísticas no cargaron esta vez.',

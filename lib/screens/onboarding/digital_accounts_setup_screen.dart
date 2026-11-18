@@ -346,7 +346,7 @@ class _SelectedAccountsPanel extends StatelessWidget {
               ListTile(
                 key: ValueKey('onboarding-selected-$name'),
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(
+                leading: Icon(
                   Icons.account_balance_wallet_outlined,
                   color: AppColors.primary,
                 ),

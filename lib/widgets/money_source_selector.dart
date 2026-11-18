@@ -209,7 +209,7 @@ class _SourceOption extends StatelessWidget {
               ),
               if (selected) ...[
                 const SizedBox(width: 6),
-                const Icon(Icons.check_circle, color: AppColors.primary),
+                Icon(Icons.check_circle, color: AppColors.primary),
               ],
             ],
           ),

@@ -14,10 +14,16 @@ import '../../widgets/cat_illustration.dart';
 import '../../widgets/money_source_selector.dart';
 
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key, this.isActive = true, this.databaseService});
+  const ExpensesScreen({
+    super.key,
+    this.isActive = true,
+    this.databaseService,
+    this.registerRequestId = 0,
+  });
 
   final bool isActive;
   final DatabaseService? databaseService;
+  final int registerRequestId;
 
   @override
   State<ExpensesScreen> createState() => _ExpensesScreenState();
@@ -33,12 +39,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   List<DigitalAccountBalance> _loadedAccountBalances = const [];
   double _cashBalance = 0;
   double _digitalWithoutAccount = 0;
+  late int _lastRegisterRequestId;
 
   @override
   void initState() {
     super.initState();
     _ownsDatabaseService = widget.databaseService == null;
     _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
+    _lastRegisterRequestId = widget.registerRequestId;
     if (widget.isActive) {
       _expensesFuture = _loadExpenses();
     }
@@ -50,6 +58,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     if (widget.isActive && !oldWidget.isActive) {
       setState(() {
         _expensesFuture = _loadExpenses();
+      });
+    }
+    if (widget.registerRequestId != oldWidget.registerRequestId &&
+        widget.registerRequestId != _lastRegisterRequestId) {
+      _lastRegisterRequestId = widget.registerRequestId;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final future = _expensesFuture;
+        if (future != null) await future;
+        if (mounted) await _addExpense();
       });
     }
   }
@@ -744,7 +761,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                                       ),
                                       title: Text(category),
                                       trailing: _category == category
-                                          ? const Icon(
+                                          ? Icon(
                                               Icons.check_rounded,
                                               color: AppColors.primary,
                                             )
@@ -1043,7 +1060,7 @@ class _DebtPaymentTile extends StatelessWidget {
       decoration: AppCardDecorations.surface,
       child: Row(
         children: [
-          const Icon(Icons.payments_outlined, color: AppColors.primary),
+          Icon(Icons.payments_outlined, color: AppColors.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

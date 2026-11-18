@@ -11,6 +11,7 @@ class AppSettings {
     required this.expenseCategories,
     this.userName = '',
     this.hasCompletedAccountSetup = false,
+    this.themeMode = 'light',
   });
 
   factory AppSettings.defaults() {
@@ -19,6 +20,7 @@ class AppSettings {
       expenseCategories: AppSettingsService.defaultExpenseCategories,
       userName: '',
       hasCompletedAccountSetup: false,
+      themeMode: 'light',
     );
   }
 
@@ -26,12 +28,14 @@ class AppSettings {
   final List<String> expenseCategories;
   final String userName;
   final bool hasCompletedAccountSetup;
+  final String themeMode;
 
   AppSettings copyWith({
     String? currencyCode,
     List<String>? expenseCategories,
     String? userName,
     bool? hasCompletedAccountSetup,
+    String? themeMode,
   }) {
     return AppSettings(
       currencyCode: currencyCode ?? this.currencyCode,
@@ -39,6 +43,7 @@ class AppSettings {
       userName: userName ?? this.userName,
       hasCompletedAccountSetup:
           hasCompletedAccountSetup ?? this.hasCompletedAccountSetup,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -47,6 +52,7 @@ class AppSettings {
     'expenseCategories': expenseCategories,
     'userName': userName,
     'hasCompletedAccountSetup': hasCompletedAccountSetup,
+    'themeMode': themeMode,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -71,6 +77,7 @@ class AppSettings {
           ? json['hasCompletedAccountSetup'] as bool
           : json['userName'] is String &&
                 AppSettingsService.isValidUserName(json['userName'] as String),
+      themeMode: json['themeMode'] == 'dark' ? 'dark' : 'light',
     );
   }
 }

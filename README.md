@@ -23,8 +23,8 @@ MichiFinanzas reúne diferentes herramientas para administrar las finanzas perso
 - **Estadísticas financieras:** presenta información visual para comprender cómo se distribuyen los gastos y cómo se utiliza el dinero.
 - **Seguimiento del ahorro:** ofrece herramientas para visualizar y organizar el dinero disponible para ahorrar.
 - **Suscripciones:** administra servicios recurrentes y permite confirmar pagos reales. Cada pago se guarda como gasto en la categoría protegida “Suscripción”, descuenta el medio elegido y actualiza el próximo vencimiento en una operación atómica.
-- **Configuración:** permite gestionar las opciones disponibles de la aplicación.
-- **Navegación lateral:** permite acceder desde un solo menú a todas las secciones de la aplicación.
+- **Configuración:** permite gestionar categorías, cuentas digitales y el tema claro u oscuro.
+- **Navegación inferior:** agrupa Inicio, Movimientos, Registrar, Compromisos y Más; los módulos existentes siguen usando la misma base de datos local.
 - **Formato de dinero:** utiliza puntos como separadores de miles para facilitar la lectura de cantidades grandes, por ejemplo, `$ 50.000`.
 - **Interfaz adaptable:** está desarrollada con Flutter para ofrecer una experiencia de uso en dispositivos compatibles.
 - **Persistencia local:** conserva los registros en el almacenamiento local del dispositivo.
@@ -117,7 +117,7 @@ Los datos de suscripciones y pagos se almacenan en SQLite local y se conservan a
 
 ### 9. Configuración
 
-Permite guardar o cambiar el nombre local del usuario, administrar las categorías de gastos y crear o renombrar cuentas digitales. Las cuentas con historial no se eliminan; las transferencias internas se pueden consultar, editar o revertir desde esta sección.
+Permite guardar o cambiar el nombre local del usuario, administrar las categorías de gastos, crear o renombrar cuentas digitales y elegir entre tema claro y oscuro. Las cuentas con historial no se eliminan; las transferencias internas se pueden consultar, editar o revertir desde esta sección.
 
 ---
 

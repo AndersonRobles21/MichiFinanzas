@@ -160,7 +160,7 @@ class _AnimatedCatState extends State<AnimatedCat>
                 fit: BoxFit.contain,
                 semanticLabel: widget.label,
                 errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.pets_rounded, color: AppColors.primary),
+                    Icon(Icons.pets_rounded, color: AppColors.primary),
               ),
             ),
           ),

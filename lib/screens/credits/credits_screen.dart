@@ -414,7 +414,7 @@ class _CreditEntityDetailScreenState extends State<CreditEntityDetailScreen> {
                 AppPageHeader(
                   title: summary.entidad.nombre,
                   subtitle: 'Crédito de compra',
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.credit_card_rounded,
                     size: 40,
                     color: AppColors.primary,
@@ -604,7 +604,7 @@ class _CreditLimitCard extends StatelessWidget {
               value: progress,
               minHeight: 8,
               backgroundColor: AppColors.surfaceRaised,
-              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+              valueColor: AlwaysStoppedAnimation(AppColors.primary),
             ),
           ),
           const SizedBox(height: 6),
@@ -650,7 +650,7 @@ class _CreditEntityCard extends StatelessWidget {
                       color: AppColors.primary.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.credit_card_rounded,
                       color: AppColors.primary,
                     ),
@@ -682,7 +682,7 @@ class _CreditEntityCard extends StatelessWidget {
                   value: progress,
                   minHeight: 7,
                   backgroundColor: AppColors.surfaceRaised,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
                 ),
               ),
               const SizedBox(height: 8),
@@ -811,7 +811,7 @@ class _LimitHistoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: const Icon(Icons.history_rounded, color: AppColors.primary),
+      leading: Icon(Icons.history_rounded, color: AppColors.primary),
       title: Text(
         '${formatMoney(change.cupoAnterior)}  →  ${formatMoney(change.cupoNuevo)}',
       ),
