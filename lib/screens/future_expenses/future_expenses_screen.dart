@@ -374,17 +374,6 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey('future-expense-add'),
-        onPressed: _isSaving
-            ? null
-            : () async {
-                final data = await _dataFuture;
-                if (mounted) await _openPlanForm(data);
-              },
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Nuevo plan'),
-      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -402,6 +391,15 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
                 final visiblePlans = data.plans
                     .where((item) => item.plan.status == _selectedStatus)
                     .toList();
+                final reserved = data.plans
+                    .where(
+                      (item) =>
+                          item.plan.status == FutureExpenseStatus.active,
+                    )
+                    .fold<double>(
+                      0,
+                      (total, item) => total + item.reservedAmount,
+                    );
                 return Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 900),
@@ -420,16 +418,16 @@ class _FutureExpensesScreenState extends State<FutureExpensesScreen> {
                                 title: 'Gastos futuros',
                                 subtitle:
                                     'Organiza con tiempo lo que vas a necesitar.',
-                                trailing: AnimatedCat(
-                                  asset: CatAssets.gastos,
-                                  label: 'Gato organizando sus gastos',
-                                  width: 60,
-                                  height: 52,
-                                ),
                               ),
                               const SizedBox(height: AppSpacing.section),
-                              _AvailableFutureFunds(available: data.available),
-                              const SizedBox(height: 20),
+                              _AvailableFutureFunds(
+                                available: data.available,
+                                reserved: reserved,
+                                onAdd: _isSaving
+                                    ? null
+                                    : () => _openPlanForm(data),
+                              ),
+                              const SizedBox(height: 16),
                               SegmentedButton<FutureExpenseStatus>(
                                 segments: const [
                                   ButtonSegment(
@@ -1102,9 +1100,15 @@ class _ReviewValue extends StatelessWidget {
 }
 
 class _AvailableFutureFunds extends StatelessWidget {
-  const _AvailableFutureFunds({required this.available});
+  const _AvailableFutureFunds({
+    required this.available,
+    required this.reserved,
+    required this.onAdd,
+  });
 
   final double available;
+  final double reserved;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -1112,54 +1116,67 @@ class _AvailableFutureFunds extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: AppCardDecorations.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final balance = Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                color: AppColors.primary,
+              Expanded(
+                child: _FutureMoneyValue(
+                  label: 'Dinero disponible',
+                  amount: available,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Dinero disponible',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      formatMoney(available),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
+                child: _FutureMoneyValue(
+                  label: 'Reservado en planes',
+                  amount: reserved,
                 ),
               ),
             ],
-          );
-          if (constraints.maxWidth < 460) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                balance,
-                const SizedBox(height: 8),
-                const Text('El saldo cambia al confirmar una reserva.'),
-              ],
-            );
-          }
-          return Row(
-            children: [
-              Expanded(child: balance),
-              const SizedBox(width: 16),
-              const Flexible(
-                child: Text('El saldo cambia al confirmar una reserva.'),
-              ),
-            ],
-          );
-        },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'El saldo cambia al confirmar una reserva.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: const ValueKey('future-expense-add'),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Nuevo plan'),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _FutureMoneyValue extends StatelessWidget {
+  const _FutureMoneyValue({required this.label, required this.amount});
+
+  final String label;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 3),
+        Text(
+          formatMoney(amount),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+      ],
     );
   }
 }

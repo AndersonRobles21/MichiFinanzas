@@ -9,11 +9,11 @@ import '../../models/money_medium.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
+import '../../widgets/month_navigator.dart';
 import 'dashboard_data.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,6 +21,8 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.databaseService,
     this.isActive = true,
+    this.onViewStatistics,
+    this.onViewCommitments,
     this.onViewFutureExpenses,
     this.onViewExpenses,
     this.onViewIncomes,
@@ -34,6 +36,8 @@ class HomeScreen extends StatefulWidget {
 
   final DatabaseService? databaseService;
   final bool isActive;
+  final VoidCallback? onViewStatistics;
+  final VoidCallback? onViewCommitments;
   final VoidCallback? onViewFutureExpenses;
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
@@ -204,17 +208,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           title: 'Inicio',
                           subtitleKey: const ValueKey('home-user-greeting'),
                           subtitle: name.isEmpty
-                              ? 'Aquí ves cómo va tu dinero, sin enredos.'
-                              : 'Hola, $name. Aquí ves cómo va tu dinero.',
-                          caption: formatSpanishLongDate(DateTime.now()),
-                          captionKey: const ValueKey('home-current-date'),
-                          trailing: AnimatedCat(
-                            asset: CatAssets.inicio,
-                            label: 'Gato de inicio',
-                            width: 64,
-                            height: 54,
-                            floating: widget.isActive,
-                          ),
+                              ? 'Hola. Así va tu dinero hoy.'
+                              : 'Hola, $name. Así va tu dinero hoy.',
                         );
                       },
                     ),
@@ -232,6 +227,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           data: snapshot.data!,
                           onAddIncome: _addIncome,
                           isSavingIncome: _isSavingIncome,
+                          onViewStatistics: widget.onViewStatistics,
+                          onViewCommitments: widget.onViewCommitments,
                           onViewFutureExpenses: widget.onViewFutureExpenses,
                           onViewExpenses: widget.onViewExpenses,
                           onViewIncomes: widget.onViewIncomes,
@@ -278,6 +275,7 @@ class _IncomesScreenState extends State<IncomesScreen> {
   late final StreamSubscription<void> _changes;
   bool _saving = false;
   late int _lastRegisterRequestId;
+  late DateTime _selectedMonth;
 
   @override
   void initState() {
@@ -285,6 +283,8 @@ class _IncomesScreenState extends State<IncomesScreen> {
     _ownsDatabaseService = widget.databaseService == null;
     _databaseService = widget.databaseService ?? DatabaseService(AppDatabase());
     _lastRegisterRequestId = widget.registerRequestId;
+    final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
     _historyFuture = _load();
     _changes = _databaseService.observarCambiosFinancieros().listen((_) {
       if (mounted) {
@@ -329,6 +329,16 @@ class _IncomesScreenState extends State<IncomesScreen> {
       destinations:
           values[2] as List<({int ingresoId, IncomeDestination destino})>,
     );
+  }
+
+  void _changeMonth(int offset) {
+    final candidate = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + offset,
+    );
+    final now = DateTime.now();
+    if (candidate.isAfter(DateTime(now.year, now.month))) return;
+    setState(() => _selectedMonth = candidate);
   }
 
   @override
@@ -515,10 +525,26 @@ class _IncomesScreenState extends State<IncomesScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final data = snapshot.data!;
-          final total = data.incomes.fold<double>(
+          final incomes = data.incomes
+              .where(
+                (income) =>
+                    income.fecha.year == _selectedMonth.year &&
+                    income.fecha.month == _selectedMonth.month,
+              )
+              .toList();
+          final total = incomes.fold<double>(
             0,
             (sum, income) => sum + income.monto,
           );
+          final totalsByType = <String, double>{};
+          for (final income in incomes) {
+            final type = IncomeType.fromStorage(income.tipo).label;
+            totalsByType.update(
+              type,
+              (amount) => amount + income.monto,
+              ifAbsent: () => income.monto,
+            );
+          }
           return LayoutBuilder(
             builder: (context, constraints) {
               final padding = constraints.maxWidth < 420
@@ -532,43 +558,96 @@ class _IncomesScreenState extends State<IncomesScreen> {
                   100,
                 ),
                 children: [
-                  const AppPageHeader(
-                    title: 'Ingresos',
-                    subtitle:
-                        'Aquí tienes el historial de todo el dinero que has recibido.',
+                  MonthNavigator(
+                    month: _selectedMonth,
+                    onPrevious: () => _changeMonth(-1),
+                    onNext: () => _changeMonth(1),
                   ),
-                  const SizedBox(height: AppSpacing.section),
+                  const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: AppCardDecorations.featured,
+                    padding: const EdgeInsets.all(16),
+                    decoration: AppCardDecorations.surface,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Ingresos registrados',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          'Total recibido',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 1),
                         Text(
                           formatMoney(total),
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(color: AppColors.positive),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: AppColors.positive,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                              ),
                         ),
-                        Text('${data.incomes.length} movimientos'),
+                        if (totalsByType.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              for (final entry in totalsByType.entries)
+                                Text(
+                                  '${entry.key} ${formatMoney(entry.value)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: _saving
+                              ? null
+                              : () => _addIncome(data.accounts),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Agregar ingreso'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 18),
-                  if (data.incomes.isEmpty)
+                  if (incomes.isEmpty)
                     Container(
-                      padding: const EdgeInsets.all(22),
+                      padding: const EdgeInsets.all(18),
                       decoration: AppCardDecorations.surface,
-                      child: const Text(
-                        'Todavía no hay ingresos por aquí. Registra tu sueldo, un extra o un préstamo recibido.',
+                      child: Column(
+                        children: [
+                          const AnimatedCat(
+                            asset: CatAssets.vacio,
+                            label: 'Gato descansando, sin ingresos',
+                            width: 96,
+                            height: 88,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sin ingresos este mes',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Cuando recibas dinero, regístralo y repártelo entre efectivo y tus cuentas.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton(
+                            onPressed: _saving
+                                ? null
+                                : () => _addIncome(data.accounts),
+                            child: const Text('Agregar ingreso'),
+                          ),
+                        ],
                       ),
                     )
                   else
-                    for (final income in data.incomes)
+                    for (final income in incomes)
                       _IncomeHistoryTile(
                         income: income,
                         destinations: data.destinationLabel(income),
@@ -576,12 +655,6 @@ class _IncomesScreenState extends State<IncomesScreen> {
                         onEdit: () => _editIncome(income, data.accounts),
                         onDelete: () => _deleteIncome(income),
                       ),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    onPressed: _saving ? null : () => _addIncome(data.accounts),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Registrar ingreso'),
-                  ),
                 ],
               );
             },
@@ -1244,6 +1317,8 @@ class _DashboardContent extends StatelessWidget {
     required this.data,
     required this.onAddIncome,
     required this.isSavingIncome,
+    required this.onViewStatistics,
+    required this.onViewCommitments,
     required this.onViewFutureExpenses,
     required this.onViewExpenses,
     required this.onViewIncomes,
@@ -1258,6 +1333,8 @@ class _DashboardContent extends StatelessWidget {
   final DashboardData data;
   final VoidCallback onAddIncome;
   final bool isSavingIncome;
+  final VoidCallback? onViewStatistics;
+  final VoidCallback? onViewCommitments;
   final VoidCallback? onViewFutureExpenses;
   final VoidCallback? onViewExpenses;
   final VoidCallback? onViewIncomes;
@@ -1284,8 +1361,16 @@ class _DashboardContent extends StatelessWidget {
         const SizedBox(height: AppSpacing.section),
         _FinancialSummaryPanel(
           data: data,
-          onViewDebts: onViewDebts,
+          onViewStatistics: onViewStatistics,
           onViewSavings: onViewSavings,
+        ),
+        const SizedBox(height: AppSpacing.section),
+        _RemindersPanel(
+          data: data,
+          onViewCommitments: onViewCommitments,
+          onViewFutureExpenses: onViewFutureExpenses,
+          onViewSubscriptions: onViewSubscriptions,
+          onViewDebts: onViewDebts,
         ),
         const SizedBox(height: AppSpacing.section),
         _RecentActivityPanel(
@@ -1294,13 +1379,6 @@ class _DashboardContent extends StatelessWidget {
           onViewExpenses: onViewExpenses,
           onViewSavings: onViewSavings,
           onViewAccounts: onViewAccounts,
-        ),
-        const SizedBox(height: AppSpacing.section),
-        _RemindersPanel(
-          data: data,
-          onViewFutureExpenses: onViewFutureExpenses,
-          onViewSubscriptions: onViewSubscriptions,
-          onViewDebts: onViewDebts,
         ),
         const SizedBox(height: AppSpacing.section),
         _AdvicePanel(advice: data.consejo),
@@ -1324,29 +1402,98 @@ class _QuickActionsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Row(
       children: [
-        FilledButton.icon(
-          key: const ValueKey('home-quick-income'),
-          onPressed: isSavingIncome ? null : onAddIncome,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Agregar ingreso'),
+        Expanded(
+          child: _QuickActionTile(
+            icon: Icons.south_west_rounded,
+            label: 'Agregar ingreso',
+            color: AppColors.positive,
+            background: AppColors.positive.withValues(alpha: 0.12),
+            onTap: isSavingIncome ? null : onAddIncome,
+          ),
         ),
-        OutlinedButton.icon(
-          key: const ValueKey('home-quick-expense'),
-          onPressed: onRegisterExpense,
-          icon: const Icon(Icons.north_east_rounded),
-          label: const Text('Registrar gasto'),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickActionTile(
+            icon: Icons.north_east_rounded,
+            label: 'Registrar gasto',
+            color: AppColors.negative,
+            background: AppColors.negative.withValues(alpha: 0.12),
+            onTap: onRegisterExpense,
+          ),
         ),
-        FilledButton.tonalIcon(
-          key: const ValueKey('home-quick-transfer'),
-          onPressed: onTransferMoney,
-          icon: const Icon(Icons.swap_horiz_rounded),
-          label: const Text('Transferir dinero'),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickActionTile(
+            icon: Icons.swap_horiz_rounded,
+            label: 'Transferir',
+            color: AppColors.primary,
+            background: AppColors.primary.withValues(alpha: 0.12),
+            onTap: onTransferMoney,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickActionTile extends StatelessWidget {
+  const _QuickActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color background;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 84),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+          decoration: AppCardDecorations.surface,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1354,52 +1501,65 @@ class _QuickActionsPanel extends StatelessWidget {
 class _FinancialSummaryPanel extends StatelessWidget {
   const _FinancialSummaryPanel({
     required this.data,
-    required this.onViewDebts,
+    required this.onViewStatistics,
     required this.onViewSavings,
   });
 
   final DashboardData data;
-  final VoidCallback? onViewDebts;
+  final VoidCallback? onViewStatistics;
   final VoidCallback? onViewSavings;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final month = '${_monthName(now.month)} ${now.year}';
+    final month =
+        '${_monthName(now.month)[0].toUpperCase()}'
+        '${_monthName(now.month).substring(1)} ${now.year}';
+    final ratio = data.totalRecibidoDelMes > 0
+        ? (data.totalGastosDelMes / data.totalRecibidoDelMes)
+              .clamp(0.0, 1.0)
+              .toDouble()
+        : 0.0;
+    final percentage = data.totalRecibidoDelMes > 0
+        ? (data.totalGastosDelMes / data.totalRecibidoDelMes * 100).round()
+        : null;
 
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Resumen financiero',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 3),
-          Text(month, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 12.0;
-              final itemWidth = (constraints.maxWidth - spacing) / 2;
-              return Wrap(
-                spacing: spacing,
-                runSpacing: 16,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(month, style: Theme.of(context).textTheme.titleLarge),
+            ),
+            TextButton.icon(
+              onPressed: onViewStatistics,
+              icon: const Icon(Icons.chevron_right_rounded, size: 18),
+              iconAlignment: IconAlignment.end,
+              label: const Text('Estadísticas'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: AppCardDecorations.surface,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  SizedBox(
-                    width: itemWidth,
+                  Expanded(
                     child: _SummaryMetric(
                       label: 'Ingresos del mes',
                       value: data.totalRecibidoDelMes,
                       color: AppColors.positive,
                       valueKey: const ValueKey('home-monthly-received'),
-                      footnote: data.totalPrestamosDelMes > 0
-                          ? 'Incluye préstamos'
-                          : 'Sueldo y dinero extra',
                     ),
                   ),
-                  SizedBox(
-                    width: itemWidth,
+                  const SizedBox(width: 14),
+                  Expanded(
                     child: _SummaryMetric(
                       label: 'Gastos del mes',
                       value: data.totalGastosDelMes,
@@ -1407,55 +1567,48 @@ class _FinancialSummaryPanel extends StatelessWidget {
                       valueKey: const ValueKey('home-monthly-expenses'),
                     ),
                   ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _SummaryMetric(
-                      label: 'Ahorro acumulado',
-                      value: data.totalAhorros,
-                      color: AppColors.accent,
-                      valueKey: const ValueKey('home-total-savings'),
-                      footnote: 'Total registrado',
-                      onTap: onViewSavings,
-                    ),
-                  ),
-                  if (data.deudasPendientes > 0)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _SummaryMetric(
-                        label: 'Deuda pendiente',
-                        value: data.totalDeudaPendiente,
-                        color: AppColors.warning,
-                        valueKey: const ValueKey('home-outstanding-debt'),
-                        footnote: _recordCount(
-                          data.deudasPendientes,
-                          'deuda',
-                          'deudas',
-                        ),
-                        onTap: onViewDebts,
-                      ),
-                    ),
                 ],
-              );
-            },
+              ),
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+                child: LinearProgressIndicator(
+                  value: ratio,
+                  minHeight: 10,
+                  backgroundColor: AppColors.surfaceRaised,
+                  color: AppColors.negative,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                percentage == null
+                    ? 'Aún no registras ingresos este mes.'
+                    : 'Has gastado el $percentage % de lo que recibiste este mes.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                key: const ValueKey('home-total-savings'),
+                onTap: onViewSavings,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.savings_outlined, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Text('Ahorro acumulado')),
+                      Text(
+                        formatMoney(data.totalAhorros),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          if (data.porcentajeGastado != null) ...[
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 5,
-              children: [
-                Text(
-                  '${_formatPercent(data.porcentajeGastado!)}%',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                Text(
-                  'de tus ingresos se han usado en gastos y pagos de deuda.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1516,7 +1669,7 @@ class _SummaryMetric extends StatelessWidget {
   }
 }
 
-class _AvailableBalanceCard extends StatelessWidget {
+class _AvailableBalanceCard extends StatefulWidget {
   const _AvailableBalanceCard({
     required this.data,
     required this.onViewAccounts,
@@ -1526,144 +1679,172 @@ class _AvailableBalanceCard extends StatelessWidget {
   final VoidCallback? onViewAccounts;
 
   @override
+  State<_AvailableBalanceCard> createState() => _AvailableBalanceCardState();
+}
+
+class _AvailableBalanceCardState extends State<_AvailableBalanceCard> {
+  bool _showDigitalAccounts = false;
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
     final digitalAccountTotal = data.digitalAccounts.fold<double>(
       0,
       (total, account) => total + account.balance,
     );
     final digitalWithoutAccount =
         data.balanceBreakdown.digital - digitalAccountTotal;
-    final description = data.cantidadIngresos == 0
-        ? 'Agrega un ingreso para comenzar a organizar tu dinero.'
-        : 'Saldo real después de gastos, pagos, ahorros y reservas.';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.brand, AppColors.primaryDeep],
-        ),
+        color: AppColors.brand,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brand.withValues(alpha: 0.18),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: AppColors.isDark
+            ? const []
+            : [
+                BoxShadow(
+                  color: AppColors.brand.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.only(right: 100),
                 child: Text(
                   'Dinero disponible',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.isDark
+                        ? const Color(0xFFD9C7EE)
+                        : const Color(0xFFE6D6F2),
                   ),
                 ),
               ),
-              const AnimatedCat(
-                asset: CatAssets.inicio,
-                label: 'Gato de MichiFinanzas',
-                width: 42,
-                height: 38,
+              const SizedBox(height: 4),
+              Text(
+                _formatMoney(data.dineroDisponible),
+                key: const ValueKey('home-available-balance'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: AppColors.isDark
+                      ? const Color(0xFFFFF4E6)
+                      : const Color(0xFFFFF8EF),
+                  fontSize: 38,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Nunito',
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _BalanceSplitButton(
+                      label: 'Efectivo',
+                      amount: data.balanceBreakdown.cash,
+                      dotColor: const Color(0xFFF6C744),
+                      onTap: widget.onViewAccounts,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _BalanceSplitButton(
+                      key: const ValueKey('home-digital-balance'),
+                      label: 'Digital',
+                      amount: data.balanceBreakdown.digital,
+                      dotColor: AppColors.isDark
+                          ? const Color(0xFFC9A7F0)
+                          : const Color(0xFFB48AD8),
+                      expanded: _showDigitalAccounts,
+                      onTap: () => setState(
+                        () => _showDigitalAccounts = !_showDigitalAccounts,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (_showDigitalAccounts) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.16),
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final account in data.digitalAccounts)
+                        _DigitalBalanceRow(
+                          key: ValueKey(
+                            'home-account-balance-${account.account.id}',
+                          ),
+                          label: account.account.nombre,
+                          amount: account.balance,
+                        ),
+                      if (digitalWithoutAccount > 1e-8)
+                        _DigitalBalanceRow(
+                          label: 'Sin cuenta asignada',
+                          amount: digitalWithoutAccount,
+                        ),
+                      if (data.digitalAccounts.isEmpty &&
+                          digitalWithoutAccount <= 1e-8)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Text(
+                            'Aún no tienes cuentas digitales.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              TextButton.icon(
+                key: const ValueKey('home-view-accounts'),
+                onPressed: widget.onViewAccounts,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.isDark
+                      ? const Color(0xFFFFF4E6)
+                      : const Color(0xFFFFF8EF),
+                  padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
+                ),
+                icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                iconAlignment: IconAlignment.end,
+                label: const Text('Ver cuentas y transferencias'),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            data.tieneMovimientos || data.digitalAccounts.isNotEmpty
-                ? _formatMoney(data.dineroDisponible)
-                : '—',
-            key: const ValueKey('home-available-balance'),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontSize: 38,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Nunito',
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Total disponible · no incluye deudas ni planes futuros',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.86),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '¿Dónde está mi dinero?',
-            key: const ValueKey('home-money-location-title'),
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _BalanceMediumLine(
-            label: 'Efectivo',
-            amount: data.balanceBreakdown.cash,
-            icon: Icons.payments_outlined,
-            valueKey: const ValueKey('home-cash-balance'),
-            contrast: true,
-          ),
-          const SizedBox(height: 8),
-          _BalanceMediumLine(
-            label: 'Digital',
-            amount: data.balanceBreakdown.digital,
-            icon: Icons.account_balance_wallet_outlined,
-            valueKey: const ValueKey('home-digital-balance'),
-            contrast: true,
-          ),
-          for (final account in data.digitalAccounts) ...[
-            const SizedBox(height: 8),
-            _DigitalAccountBalanceLine(account: account, contrast: true),
-          ],
-          if (digitalWithoutAccount > 1e-8) ...[
-            const SizedBox(height: 8),
-            _BalanceMediumLine(
-              label: 'Digital sin cuenta',
-              amount: digitalWithoutAccount,
-              icon: Icons.account_balance_wallet_outlined,
-              valueKey: const ValueKey('home-unassigned-digital-balance'),
-              contrast: true,
-            ),
-          ],
-          if (data.balanceBreakdown.unclassified > 1e-8) ...[
-            const SizedBox(height: 8),
-            _BalanceMediumLine(
-              label: 'Sin asignar a un medio',
-              amount: data.balanceBreakdown.unclassified,
-              icon: Icons.help_outline_rounded,
-              valueKey: const ValueKey('home-unclassified-balance'),
-              contrast: true,
-            ),
-          ],
-          const SizedBox(height: 8),
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: TextButton.icon(
-              key: const ValueKey('home-view-accounts'),
-              onPressed: onViewAccounts,
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
-              icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: const Text('Administrar cuentas'),
+          Positioned(
+            right: 0,
+            top: -34,
+            child: SizedBox(
+              width: 96,
+              height: 88,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.isDark
+                      ? const Color(0xFFF6EADB)
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Image.asset(
+                  CatAssets.inicio,
+                  fit: BoxFit.contain,
+                  semanticLabel: 'Gato de MichiFinanzas',
+                ),
+              ),
             ),
           ),
         ],
@@ -1672,101 +1853,124 @@ class _AvailableBalanceCard extends StatelessWidget {
   }
 }
 
-class _BalanceMediumLine extends StatelessWidget {
-  const _BalanceMediumLine({
+class _BalanceSplitButton extends StatelessWidget {
+  const _BalanceSplitButton({
+    super.key,
     required this.label,
     required this.amount,
-    this.icon,
-    this.valueKey,
-    this.contrast = false,
+    required this.dotColor,
+    required this.onTap,
+    this.expanded = false,
   });
 
   final String label;
   final double amount;
-  final IconData? icon;
-  final Key? valueKey;
-  final bool contrast;
+  final Color dotColor;
+  final VoidCallback? onTap;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (icon != null) ...[
-          Icon(
-            icon,
-            size: 18,
-            color: contrast ? AppColors.accent : AppColors.primary,
-          ),
-          const SizedBox(width: 8),
-        ],
-        Expanded(
-          child: Text(
-            label,
-            style: contrast ? const TextStyle(color: Colors.white) : null,
+    return Material(
+      color: Colors.white.withValues(alpha: expanded ? 0.18 : 0.1),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: dotColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.isDark
+                            ? const Color(0xFFFFF4E6)
+                            : const Color(0xFFFFF8EF),
+                      ),
+                    ),
+                  ),
+                  if (label == 'Digital')
+                    Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_down_rounded
+                          : Icons.chevron_right_rounded,
+                      size: 16,
+                      color: AppColors.isDark
+                          ? const Color(0xFFFFF4E6)
+                          : const Color(0xFFFFF8EF),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _formatMoney(amount),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.isDark
+                      ? const Color(0xFFFFF4E6)
+                      : const Color(0xFFFFF8EF),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
-        Text(
-          _formatMoney(amount),
-          key: valueKey,
-          style: contrast ? const TextStyle(color: Colors.white) : null,
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _DigitalAccountBalanceLine extends StatelessWidget {
-  const _DigitalAccountBalanceLine({
-    required this.account,
-    this.contrast = false,
+class _DigitalBalanceRow extends StatelessWidget {
+  const _DigitalBalanceRow({
+    super.key,
+    required this.label,
+    required this.amount,
   });
 
-  final DigitalAccountBalance account;
-  final bool contrast;
+  final String label;
+  final double amount;
 
   @override
   Widget build(BuildContext context) {
-    final name = account.account.nombre;
-    return Container(
-      key: ValueKey('home-account-balance-${account.account.id}'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: contrast
-            ? Colors.white.withValues(alpha: 0.12)
-            : AppColors.surfaceRaised.withValues(alpha: 0.62),
-        borderRadius: BorderRadius.circular(AppRadii.small),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+          Expanded(
             child: Text(
-              name.substring(0, 1).toUpperCase(),
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(
-                color: contrast ? Colors.white : AppColors.accent,
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.isDark
+                    ? const Color(0xFFFFF4E6)
+                    : const Color(0xFFFFF8EF),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: contrast ? const TextStyle(color: Colors.white) : null,
-            ),
-          ),
           Text(
-            _formatMoney(account.balance),
-            key: ValueKey('home-account-balance-value-${account.account.id}'),
-            style: contrast
-                ? Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Colors.white,
-                  )
-                : Theme.of(context).textTheme.titleSmall,
+            _formatMoney(amount),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppColors.isDark
+                  ? const Color(0xFFFFF4E6)
+                  : const Color(0xFFFFF8EF),
+            ),
           ),
         ],
       ),
@@ -1950,170 +2154,279 @@ _ActivityStyle _activityStyle(DashboardActivityKind kind) {
 class _RemindersPanel extends StatelessWidget {
   const _RemindersPanel({
     required this.data,
+    required this.onViewCommitments,
     required this.onViewFutureExpenses,
     required this.onViewSubscriptions,
     required this.onViewDebts,
   });
 
   final DashboardData data;
+  final VoidCallback? onViewCommitments;
   final VoidCallback? onViewFutureExpenses;
   final VoidCallback? onViewSubscriptions;
   final VoidCallback? onViewDebts;
 
   @override
   Widget build(BuildContext context) {
-    final subscriptions = data.subscriptions.take(3).toList();
-    final debts = data.pagosProximos
-        .where((payment) => payment.deuda.fechaProximoPago != null)
-        .take(3)
-        .toList();
-    final plans = data.futureExpenses
-        .where((item) => item.plan.status == FutureExpenseStatus.active)
-        .take(3)
-        .toList();
-    final hasReminders =
-        subscriptions.isNotEmpty || debts.isNotEmpty || plans.isNotEmpty;
+    final upcoming = <_UpcomingPayment>[
+      for (final subscription in data.subscriptions)
+        _UpcomingPayment(
+          title: subscription.nombre,
+          detail: 'Suscripción · ${subscription.frecuencia.toLowerCase()}',
+          date: subscription.proximoPago,
+          amount: subscription.precio,
+          icon: Icons.autorenew_rounded,
+          onTap: onViewSubscriptions,
+        ),
+      for (final payment in data.pagosProximos)
+        if (payment.deuda.fechaProximoPago case final DateTime date)
+          _UpcomingPayment(
+            title: payment.deuda.nombre,
+            detail: 'Próxima cuota de deuda',
+            date: date,
+            amount: payment.montoProximoPago,
+            icon: Icons.account_balance_outlined,
+            onTap: onViewDebts,
+          ),
+      for (final plan in data.futureExpenses)
+        if (plan.plan.status == FutureExpenseStatus.active)
+          _UpcomingPayment(
+            title: plan.plan.name,
+            detail: 'Gasto futuro · reservado ${formatMoney(plan.reservedAmount)}',
+            date: plan.plan.targetDate,
+            amount: plan.plan.targetAmount,
+            icon: Icons.event_note_outlined,
+            reservedAmount: plan.reservedAmount,
+            onTap: onViewFutureExpenses,
+          ),
+    ]..sort((first, second) => first.date.compareTo(second.date));
+    final visible = upcoming.take(4).toList();
 
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeading('Recordatorios'),
-          const SizedBox(height: 12),
-          if (!hasReminders)
-            Row(
-              children: [
-                const AnimatedCat(
-                  asset: CatAssets.vacio,
-                  label: 'Gato descansando',
-                  width: 52,
-                  height: 46,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Próximos pagos',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            if (visible.isNotEmpty)
+              TextButton(
+                key: const ValueKey('home-view-commitments'),
+                onPressed: onViewCommitments,
+                child: const Text('Ver todos'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        _DashboardPanel(
+          child: visible.isEmpty
+              ? Row(
+                  children: [
+                    const AnimatedCat(
+                      asset: CatAssets.vacio,
+                      label: 'Gato descansando',
+                      width: 76,
+                      height: 68,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'No tienes pagos o planes próximos.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    for (var index = 0; index < visible.length; index++) ...[
+                      if (index > 0)
+                        Divider(
+                          height: 1,
+                          color: AppColors.outline.withValues(alpha: 0.25),
+                        ),
+                      _UpcomingPaymentRow(payment: visible[index]),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No tienes pagos o planes próximos.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          if (subscriptions.isNotEmpty) ...[
-            _ReminderGroupTitle(
-              buttonKey: const ValueKey('home-view-subscriptions'),
-              title: 'Suscripciones',
-              onTap: onViewSubscriptions,
-            ),
-            for (final subscription in subscriptions)
-              _ReminderLine(
-                icon: Icons.autorenew_rounded,
-                title: subscription.nombre,
-                detail:
-                    'Próximo cobro · ${_shortDate(subscription.proximoPago)}',
-                amount: subscription.precio,
-              ),
-          ],
-          if (debts.isNotEmpty) ...[
-            _ReminderGroupTitle(
-              buttonKey: const ValueKey('home-view-debts'),
-              title: 'Cuotas',
-              onTap: onViewDebts,
-            ),
-            for (final payment in debts)
-              _ReminderLine(
-                icon: Icons.event_outlined,
-                title: payment.deuda.nombre,
-                detail: _formatDebtDate(payment.deuda.fechaProximoPago!),
-                amount: payment.montoProximoPago,
-              ),
-          ],
-          if (plans.isNotEmpty) ...[
-            _ReminderGroupTitle(
-              buttonKey: const ValueKey('home-future-expenses-see-all'),
-              title: 'Gastos futuros planeados',
-              onTap: onViewFutureExpenses,
-              actionLabel: 'Ver todos',
-            ),
-            for (final plan in plans)
-              _ReminderLine(
-                icon: Icons.event_note_outlined,
-                title: plan.plan.name,
-                detail: 'Planeado · ${_shortDate(plan.plan.targetDate)}',
-                amount: plan.plan.targetAmount,
-              ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _ReminderGroupTitle extends StatelessWidget {
-  const _ReminderGroupTitle({
-    this.buttonKey,
-    required this.title,
-    required this.onTap,
-    this.actionLabel = 'Ver',
-  });
-
-  final Key? buttonKey;
-  final String title;
-  final VoidCallback? onTap;
-  final String actionLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleSmall),
-          ),
-          TextButton(
-            key: buttonKey,
-            onPressed: onTap,
-            child: Text(actionLabel),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReminderLine extends StatelessWidget {
-  const _ReminderLine({
-    required this.icon,
+class _UpcomingPayment {
+  const _UpcomingPayment({
     required this.title,
     required this.detail,
+    required this.date,
     required this.amount,
+    required this.icon,
+    required this.onTap,
+    this.reservedAmount,
   });
 
-  final IconData icon;
   final String title;
   final String detail;
+  final DateTime date;
   final double amount;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final double? reservedAmount;
+}
+
+class _UpcomingPaymentRow extends StatelessWidget {
+  const _UpcomingPaymentRow({required this.payment});
+
+  final _UpcomingPayment payment;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.warning),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(detail, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
+    final today = DateUtils.dateOnly(DateTime.now());
+    final due = DateUtils.dateOnly(payment.date).difference(today).inDays;
+    final month = const [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ][payment.date.month - 1];
+    final dueLabel = due < 0
+        ? 'Venció hace ${-due} ${due == -1 ? 'día' : 'días'}'
+        : due == 0
+        ? 'Hoy'
+        : due == 1
+        ? 'Mañana'
+        : 'En $due días';
+    final urgent = due <= 7;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: payment.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceRaised,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${payment.date.day}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      month.toUpperCase(),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          payment.icon,
+                          size: 15,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            payment.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      payment.detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    if (payment.reservedAmount != null) ...[
+                      const SizedBox(height: 5),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadii.pill),
+                        child: LinearProgressIndicator(
+                          value: (payment.reservedAmount! / payment.amount)
+                              .clamp(0.0, 1.0)
+                              .toDouble(),
+                          minHeight: 6,
+                          backgroundColor: AppColors.surfaceRaised,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatMoney(payment.amount),
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 3),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: urgent
+                          ? AppColors.warning.withValues(alpha: 0.14)
+                          : AppColors.surfaceRaised,
+                      borderRadius: BorderRadius.circular(AppRadii.pill),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        dueLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: urgent ? AppColors.warning : AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(formatMoney(amount)),
-        ],
+        ),
       ),
     );
   }

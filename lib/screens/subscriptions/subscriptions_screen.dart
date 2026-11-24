@@ -341,12 +341,6 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     const AppPageHeader(
                       title: 'Suscripciones',
                       subtitle: 'Ten a la vista tus cobros recurrentes.',
-                      trailing: AnimatedCat(
-                        asset: CatAssets.gastos,
-                        label: 'Gato organizando gastos',
-                        width: 64,
-                        height: 56,
-                      ),
                     ),
                     const SizedBox(height: AppSpacing.section),
                     if (_loadError != null)

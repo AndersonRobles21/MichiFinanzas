@@ -25,13 +25,23 @@ class AppPageHeader extends StatelessWidget {
     final titleBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 6),
         Text(
-          subtitle,
-          key: subtitleKey,
-          style: Theme.of(context).textTheme.bodyLarge,
+          title,
+          style: const TextStyle(
+            fontFamily: 'Nunito',
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            height: 1,
+          ),
         ),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            key: subtitleKey,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
         if (caption != null) ...[
           const SizedBox(height: 4),
           Text(

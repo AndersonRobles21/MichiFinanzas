@@ -12,6 +12,8 @@ class AppColors {
   static _AppPalette get _current =>
       _brightness == Brightness.dark ? _darkPalette : _lightPalette;
 
+  static bool get isDark => _brightness == Brightness.dark;
+
   static Color get background => _current.background;
   static Color get surface => _current.surface;
   static Color get surfaceRaised => _current.surfaceRaised;
@@ -87,12 +89,11 @@ const _lightPalette = _AppPalette(
   chartPalette: [
     Color(0xFF5B2A86),
     Color(0xFFF2994A),
-    Color(0xFF237A50),
-    Color(0xFFF6C744),
-    Color(0xFFC03636),
-    Color(0xFF3F81A8),
-    Color(0xFFB15591),
-    Color(0xFF6A9B4A),
+    Color(0xFFE0B12E),
+    Color(0xFFB48AD8),
+    Color(0xFF8C5A3C),
+    Color(0xFFE8A598),
+    Color(0xFF7A6E86),
   ],
 );
 
@@ -104,7 +105,7 @@ const _darkPalette = _AppPalette(
   primary: Color(0xFFC9A7F0),
   primaryAction: Color(0xFFC9A7F0),
   actionForeground: Color(0xFF1C1625),
-  primaryDeep: Color(0xFF5B2A86),
+  primaryDeep: Color(0xFF3A2B52),
   accent: Color(0xFFF2A766),
   textPrimary: Color(0xFFFFF4E6),
   textSecondary: Color(0xFFC4B6CF),
@@ -125,17 +126,17 @@ const _darkPalette = _AppPalette(
 );
 
 abstract final class AppSpacing {
-  static const pageHorizontal = 20.0;
+  static const pageHorizontal = 16.0;
   static const pageHorizontalWide = 32.0;
-  static const pageTop = 24.0;
-  static const section = 24.0;
+  static const pageTop = 4.0;
+  static const section = 22.0;
   static const card = 16.0;
   static const compact = 12.0;
 }
 
 abstract final class AppRadii {
   static const small = 14.0;
-  static const medium = 16.0;
+  static const medium = 20.0;
   static const large = 24.0;
   static const pill = 999.0;
 }
@@ -147,33 +148,26 @@ abstract final class AppCardDecorations {
     color: AppColors.surface,
     borderRadius: BorderRadius.circular(AppRadii.medium),
     border: Border.all(
-      color: borderColor ?? AppColors.outline.withValues(alpha: 0.62),
+      color:
+          borderColor ??
+          (AppColors.isDark ? AppColors.outline : Colors.transparent),
     ),
-    boxShadow: [
-      BoxShadow(
-        color: const Color(0xFF080610).withValues(alpha: 0.22),
-        blurRadius: 18,
-        offset: const Offset(0, 7),
-      ),
-    ],
+    boxShadow: AppColors.isDark
+        ? const []
+        : [
+            BoxShadow(
+              color: AppColors.brand.withValues(alpha: 0.06),
+              blurRadius: 2,
+            ),
+            BoxShadow(
+              color: AppColors.brand.withValues(alpha: 0.07),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
   );
 
-  static BoxDecoration get featured => BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [AppColors.surfaceRaised, AppColors.surface],
-    ),
-    borderRadius: BorderRadius.circular(AppRadii.large),
-    border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
-    boxShadow: [
-      BoxShadow(
-        color: AppColors.brand.withValues(alpha: 0.12),
-        blurRadius: 22,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  );
+  static BoxDecoration get featured => surfaceWithBorder();
 }
 
 class AppTheme {
@@ -199,6 +193,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'Inter',
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.background,
       canvasColor: AppColors.surface,
@@ -291,7 +286,7 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         indicatorColor: AppColors.primaryAction.withValues(alpha: 0.28),
         elevation: 0,
-        height: 76,
+        height: 84,
         labelTextStyle: const WidgetStatePropertyAll(
           TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
@@ -307,10 +302,10 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.background.withValues(alpha: 0.7),
+        fillColor: AppColors.surfaceRaised,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          horizontal: 14,
+          vertical: 12,
         ),
         hintStyle: TextStyle(color: AppColors.textSecondary),
         labelStyle: TextStyle(color: AppColors.textSecondary),
@@ -344,26 +339,26 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primaryAction,
           foregroundColor: AppColors.actionForeground,
-          minimumSize: const Size(48, 48),
+          minimumSize: const Size(48, 52),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          shape: buttonShape,
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.accent,
-          minimumSize: const Size(48, 48),
+          foregroundColor: AppColors.primary,
+          minimumSize: const Size(48, 52),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           side: BorderSide(color: AppColors.outline),
           shape: buttonShape,
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.accent,
-          minimumSize: const Size(48, 48),
+          minimumSize: const Size(48, 44),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: buttonShape,
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -389,12 +384,13 @@ class AppTheme {
         elevation: 12,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.large),
-          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.7)),
+          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.55)),
         ),
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+          fontSize: 19,
+          fontWeight: FontWeight.w800,
+          fontFamily: 'Nunito',
         ),
         contentTextStyle: TextStyle(
           color: AppColors.textSecondary,
@@ -439,7 +435,9 @@ class AppTheme {
         margin: const EdgeInsets.symmetric(vertical: 6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.medium),
-          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.62)),
+          side: BorderSide(
+            color: AppColors.isDark ? AppColors.outline : Colors.transparent,
+          ),
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
@@ -587,7 +585,7 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         indicatorColor: const Color(0xFFEFE4F7),
         elevation: 0,
-        height: 76,
+        height: 84,
         labelTextStyle: const WidgetStatePropertyAll(
           TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
@@ -605,8 +603,8 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          horizontal: 14,
+          vertical: 12,
         ),
         hintStyle: TextStyle(color: AppColors.textSecondary),
         labelStyle: TextStyle(color: AppColors.textSecondary),
@@ -629,19 +627,19 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primaryAction,
           foregroundColor: Colors.white,
-          minimumSize: const Size(48, 48),
+          minimumSize: const Size(48, 52),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          shape: buttonShape,
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
-          minimumSize: const Size(48, 48),
+          minimumSize: const Size(48, 52),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           side: BorderSide(color: AppColors.outline),
-          shape: buttonShape,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -708,7 +706,9 @@ class AppTheme {
         margin: const EdgeInsets.symmetric(vertical: 6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.medium),
-          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.45)),
+          side: BorderSide(
+            color: AppColors.isDark ? AppColors.outline : Colors.transparent,
+          ),
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(

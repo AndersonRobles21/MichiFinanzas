@@ -43,6 +43,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _incomeRegisterRequestId = 0;
   int? _creditDebtEntityId;
   bool _isTransferring = false;
+  bool _isEditingWelcomeStep = false;
   late Future<AppSettings> _settingsFuture;
   String _userName = '';
 
@@ -66,6 +67,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     HomeScreen(
       databaseService: _databaseService,
       isActive: _selectedIndex == 0,
+      onViewStatistics: () => _selectDestination(8),
+      onViewCommitments: () => _selectDestination(2),
       onViewFutureExpenses: () => _selectDestination(3),
       onViewExpenses: () => _openMovements(0),
       onViewIncomes: () => _openMovements(1),
@@ -83,6 +86,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       incomeRegisterRequestId: _incomeRegisterRequestId,
     ),
     CommitmentsHubScreen(
+      databaseService: _databaseService,
       onSubscriptions: () => _selectDestination(4),
       onFutureExpenses: () => _selectDestination(3),
       onDebts: () => _selectDestination(6),
@@ -117,6 +121,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       }),
     ),
     MoreHubScreen(
+      databaseService: _databaseService,
       onAccounts: () => _selectDestination(11),
       onStatistics: () => _selectDestination(8),
       onSavings: () => _selectDestination(5),
@@ -178,33 +183,42 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '¿Qué quieres registrar?',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            _RegisterActionTile(
-              icon: Icons.south_west_rounded,
-              title: 'Ingreso',
-              onTap: () => Navigator.pop(context, _RegisterAction.income),
-            ),
-            _RegisterActionTile(
-              icon: Icons.receipt_long_outlined,
-              title: 'Gasto',
-              onTap: () => Navigator.pop(context, _RegisterAction.expense),
-            ),
-            _RegisterActionTile(
-              icon: Icons.swap_horiz_rounded,
-              title: 'Transferencia',
-              onTap: () => Navigator.pop(context, _RegisterAction.transfer),
-            ),
-          ],
+      builder: (context) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Qué quieres registrar?',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              _RegisterActionTile(
+                icon: Icons.south_west_rounded,
+                title: 'Ingreso',
+                subtitle: 'Sueldo, dinero extra o préstamo recibido',
+                color: AppColors.positive,
+                onTap: () => Navigator.pop(context, _RegisterAction.income),
+              ),
+              _RegisterActionTile(
+                icon: Icons.receipt_long_outlined,
+                title: 'Gasto',
+                subtitle: 'Compras, servicios y pagos del día',
+                color: AppColors.negative,
+                onTap: () => Navigator.pop(context, _RegisterAction.expense),
+              ),
+              _RegisterActionTile(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Transferencia',
+                subtitle:
+                    'Mover dinero entre efectivo y cuentas; no es ingreso ni gasto',
+                color: AppColors.primary,
+                onTap: () => Navigator.pop(context, _RegisterAction.transfer),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -273,7 +287,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _handleBackNavigation() {
-    if (_selectedIndex != 0) _selectDestination(0);
+    final destination = switch (_selectedIndex) {
+      3 || 4 || 6 || 7 => 2,
+      5 || 8 || 9 || 11 => 10,
+      _ => 0,
+    };
+    if (_selectedIndex != destination) _selectDestination(destination);
   }
 
   @override
@@ -311,10 +330,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           );
         }
         _userName = snapshot.data!.userName;
-        if (_userName.isEmpty) {
+        if (_userName.isEmpty || _isEditingWelcomeStep) {
           return WelcomeScreen(
+            initialName: _userName,
             onContinue: (name) => setState(() {
               _userName = name;
+              _isEditingWelcomeStep = false;
               _settingsFuture = Future.value(
                 snapshot.data!.copyWith(userName: name),
               );
@@ -325,6 +346,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           return DigitalAccountsSetupScreen(
             databaseService: _databaseService,
             onComplete: _completeAccountSetup,
+            onBack: () => setState(() => _isEditingWelcomeStep = true),
           );
         }
         return PopScope(
@@ -369,9 +391,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 }
 
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({super.key, required this.onContinue});
+  const WelcomeScreen({
+    super.key,
+    required this.onContinue,
+    this.initialName = '',
+  });
 
   final ValueChanged<String> onContinue;
+  final String initialName;
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -381,6 +408,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _controller = TextEditingController();
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.initialName;
+  }
 
   @override
   void dispose() {
@@ -414,69 +447,205 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Center(
-                      child: AnimatedCat(
-                        asset: CatAssets.icono,
-                        label: 'Gato de MichiFinanzas',
-                        width: 150,
-                        height: 130,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      '¡Hola! 🐱 Antes de empezar, pon tu nombre para que podamos organizar tu dinero juntos.',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      key: const ValueKey('welcome-user-name'),
-                      controller: _controller,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Tu nombre',
-                        prefixIcon: Icon(Icons.person_outline_rounded),
-                      ),
-                      validator: (value) =>
-                          AppSettingsService.isValidOnboardingUserName(
-                            value ?? '',
-                          )
-                          ? null
-                          : 'Usa solo letras y espacios; no dejes el campo vacío.',
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _continue,
-                        child: _saving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+              constraints: const BoxConstraints(maxWidth: 393),
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      children: [
+                        Form(
+                          key: _formKey,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'MichiFinanzas',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: AppColors.primary,
+                                          ),
+                                    ),
+                                    const Spacer(),
+                                    const _OnboardingStep(
+                                      label: 'Paso 1 de 2',
+                                    ),
+                                  ],
                                 ),
-                              )
-                            : const Text('Continuar'),
-                      ),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  height: 240,
+                                  width: double.infinity,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        width: 210,
+                                        height: 210,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFFBE3C6),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const Positioned(
+                                        left: 16,
+                                        top: 43,
+                                        child: _OnboardingDecoration(
+                                          size: 30,
+                                          color: Color(0xFFF2994A),
+                                        ),
+                                      ),
+                                      const Positioned(
+                                        right: 18,
+                                        top: 34,
+                                        child: _OnboardingDecoration(
+                                          size: 16,
+                                          color: Color(0xFFF6C744),
+                                        ),
+                                      ),
+                                      const Positioned(
+                                        right: 12,
+                                        bottom: 42,
+                                        child: _OnboardingDecoration(
+                                          size: 22,
+                                          color: Color(0xFFB48AD8),
+                                          outlined: true,
+                                        ),
+                                      ),
+                                      Image.asset(
+                                        CatAssets.icono,
+                                        width: 148,
+                                        height: 132,
+                                        fit: BoxFit.contain,
+                                        semanticLabel:
+                                            'Gato de MichiFinanzas',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '¡Hola! Antes de empezar, pon tu nombre para que podamos organizar tu dinero juntos.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(fontSize: 25, height: 1.2),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  key: const ValueKey('welcome-user-name'),
+                                  controller: _controller,
+                                  textCapitalization:
+                                      TextCapitalization.words,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Tu nombre',
+                                  ),
+                                  validator: (value) => AppSettingsService
+                                          .isValidOnboardingUserName(
+                                            value ?? '',
+                                          )
+                                      ? null
+                                      : 'Usa solo letras y espacios; no dejes el campo vacío.',
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Solo letras y espacios. Se guarda únicamente en este celular.',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            border: Border(
+                              top: BorderSide(
+                                color: AppColors.outline.withValues(
+                                  alpha: 0.24,
+                                ),
+                              ),
+                            ),
+                          ),
+                          child: FilledButton(
+                            onPressed: _saving ? null : _continue,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Continuar'),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _OnboardingStep extends StatelessWidget {
+  const _OnboardingStep({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ),
+    );
+  }
+}
+
+class _OnboardingDecoration extends StatelessWidget {
+  const _OnboardingDecoration({
+    required this.size,
+    required this.color,
+    this.outlined = false,
+  });
+
+  final double size;
+  final Color color;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: outlined ? Colors.transparent : color,
+        shape: BoxShape.circle,
+        border: outlined ? Border.all(color: color, width: 4) : null,
       ),
     );
   }
@@ -488,24 +657,61 @@ class _RegisterActionTile extends StatelessWidget {
   const _RegisterActionTile({
     required this.icon,
     required this.title,
+    required this.subtitle,
+    required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
+  final String subtitle;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      minVerticalPadding: 12,
-      leading: CircleAvatar(
-        backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-        child: Icon(icon, color: AppColors.primary),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 76),
+            padding: const EdgeInsets.all(14),
+            decoration: AppCardDecorations.surfaceWithBorder(),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Icon(icon, color: color),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: Theme.of(context).textTheme.titleMedium),
+                      Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+        ),
       ),
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: onTap,
     );
   }
 }
@@ -532,11 +738,18 @@ class _AppBottomNavigationBar extends StatelessWidget {
 
     return Material(
       color: theme.colorScheme.surface,
-      elevation: 8,
+      elevation: 0,
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 66,
+        child: Container(
+          height: 84,
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 18),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(
+              top: BorderSide(color: AppColors.outline.withValues(alpha: 0.28)),
+            ),
+          ),
           child: Row(
             children: [
               for (var index = 0; index < destinations.length; index++)
@@ -590,17 +803,43 @@ class _BottomNavigationItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (isAction)
-                Container(
-                  width: 40,
+                SizedBox(
+                  width: 54,
                   height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryAction,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: AppColors.actionForeground,
-                    size: 23,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        top: -22,
+                        left: 0,
+                        right: 0,
+                        height: 54,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryAction,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.surface,
+                              width: 4,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.28,
+                                ),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            icon,
+                            color: AppColors.actionForeground,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 )
               else
@@ -612,7 +851,7 @@ class _BottomNavigationItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: isAction ? AppColors.primary : color,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: selected || isAction
                       ? FontWeight.w700
                       : FontWeight.w500,

@@ -249,7 +249,7 @@ class DashboardData {
       digitalAccounts: digitalAccounts,
       subscriptions: upcomingSubscriptions,
       totalAhorros: totalAhorros,
-      recentActivities: activities.take(5).toList(),
+      recentActivities: activities.take(4).toList(),
       porcentajeGastado: porcentajeGastado,
       cantidadIngresos: ingresos.length,
       cantidadGastos: gastos.length,

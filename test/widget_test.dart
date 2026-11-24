@@ -3,13 +3,15 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show ValueKey;
 import 'package:flutter/material.dart'
-    show SizedBox, TabBar, Text;
+    show MaterialApp, SizedBox, TabBar, Text;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:finanzas_app/database/app_database.dart';
 import 'package:finanzas_app/main.dart' as app;
 import 'package:finanzas_app/models/money_medium.dart';
+import 'package:finanzas_app/screens/main_navigation_screen.dart'
+    show WelcomeScreen;
 import 'package:finanzas_app/services/app_settings_service.dart';
 import 'package:finanzas_app/services/database_service.dart';
 
@@ -210,6 +212,52 @@ void main() {
     await _pumpUntilFound(tester, find.text('Dinero disponible'));
 
     expect(find.text('Dinero disponible'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _unmountApp(tester);
+  });
+
+  testWidgets('la bienvenida no desborda con poco alto disponible', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 320);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(
+      MaterialApp(home: WelcomeScreen(onContinue: (_) {})),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('welcome-user-name')), findsOneWidget);
+    await tester.ensureVisible(find.text('Continuar'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('el menú de registro se desplaza en ventanas compactas', (
+    tester,
+  ) async {
+    await _prepareTemporaryDatabaseDirectory(tester);
+    tester.view.physicalSize = const Size(360, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final service = DatabaseService(AppDatabase(NativeDatabase.memory()));
+    addTearDown(() => tester.runAsync(() => service.close()));
+    await tester.pumpWidget(app.FinanzasApp(databaseService: service));
+    await _completeWelcome(tester);
+    await tester.tap(
+      find.byKey(const ValueKey('bottom-navigation-Registrar')),
+    );
+    await tester.pumpAndSettle();
+
+    final transferOption = find.text('Transferencia');
+    expect(transferOption, findsOneWidget);
+    await tester.ensureVisible(transferOption);
     expect(tester.takeException(), isNull);
     await _unmountApp(tester);
   });
@@ -423,6 +471,7 @@ Future<void> _completeWelcome(WidgetTester tester) async {
   }
   expect(nameField, findsOneWidget);
   await tester.enterText(nameField, 'Anderson');
+  await tester.ensureVisible(find.text('Continuar'));
   await tester.tap(find.text('Continuar'));
   final continueWithoutAccounts = find.text('Continuar sin cuentas');
   await _pumpUntilFound(tester, continueWithoutAccounts);

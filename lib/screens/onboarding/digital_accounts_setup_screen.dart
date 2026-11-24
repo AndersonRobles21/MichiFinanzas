@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../services/database_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/user_messages.dart';
-import '../../widgets/app_page_header.dart';
 import '../../widgets/cat_illustration.dart';
 
 class DigitalAccountsSetupScreen extends StatefulWidget {
@@ -11,10 +10,12 @@ class DigitalAccountsSetupScreen extends StatefulWidget {
     super.key,
     required this.databaseService,
     required this.onComplete,
+    required this.onBack,
   });
 
   final DatabaseService databaseService;
   final Future<void> Function() onComplete;
+  final VoidCallback onBack;
 
   @override
   State<DigitalAccountsSetupScreen> createState() =>
@@ -206,47 +207,97 @@ class _DigitalAccountsSetupScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Center(
-                            child: AnimatedCat(
-                              asset: CatAssets.icono,
-                              label: 'Gato de MichiFinanzas',
-                              width: 84,
-                              height: 72,
-                            ),
+                          Row(
+                            children: [
+                              IconButton(
+                                tooltip: 'Volver al paso 1',
+                                onPressed: widget.onBack,
+                                icon: const Icon(Icons.arrow_back_rounded),
+                              ),
+                              const Spacer(),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceRaised,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadii.pill,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 11,
+                                    vertical: 5,
+                                  ),
+                                  child: Text(
+                                    'Paso 2 de 2',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.section),
-                          const AppPageHeader(
-                            title: '¿Qué cuentas digitales utilizas?',
-                            subtitle:
-                                'Elige las que usas. No registraremos saldos ni movimientos.',
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '¿Qué cuentas digitales utilizas?',
+                                  style: Theme.of(context).textTheme.headlineSmall
+                                      ?.copyWith(fontSize: 25, height: 1.2),
+                                ),
+                              ),
+                              const AnimatedCat(
+                                asset: CatAssets.icono,
+                                label: 'Gato de MichiFinanzas',
+                                width: 44,
+                                height: 42,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.section),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Elige las que usas. No registraremos saldos ni movimientos.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 16),
                           Text(
                             'Bancos y billeteras',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final name in _suggestedAccounts)
-                                FilterChip(
-                                  key: ValueKey('onboarding-account-$name'),
-                                  avatar: Icon(
-                                    _isSelected(name)
-                                        ? Icons.check_circle_rounded
-                                        : Icons.account_balance_wallet_outlined,
-                                    size: 18,
-                                  ),
-                                  label: Text(name),
-                                  selected: _isSelected(name),
-                                  onSelected: _isExisting(name)
-                                      ? null
-                                      : (selected) =>
-                                            _toggleSuggested(name, selected),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _suggestedAccounts.length,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  mainAxisExtent: 56,
                                 ),
-                            ],
+                            itemBuilder: (context, index) {
+                              final name = _suggestedAccounts[index];
+                              final selected = _isSelected(name);
+                              final bank = const {
+                                'Bancolombia',
+                                'Davivienda',
+                                'BBVA',
+                              }.contains(name);
+                              return _OnboardingAccountTile(
+                                key: ValueKey('onboarding-account-$name'),
+                                name: name,
+                                selected: selected,
+                                icon: bank
+                                    ? Icons.account_balance_outlined
+                                    : Icons.account_balance_wallet_outlined,
+                                onTap: _isExisting(name)
+                                    ? null
+                                    : () => _toggleSuggested(name, !selected),
+                              );
+                            },
                           ),
                           const SizedBox(height: 20),
                           OutlinedButton.icon(
@@ -301,6 +352,78 @@ class _DigitalAccountsSetupScreenState
               },
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingAccountTile extends StatelessWidget {
+  const _OnboardingAccountTile({
+    super.key,
+    required this.name,
+    required this.selected,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool selected;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.outline.withValues(alpha: 0.28),
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? AppColors.primary : AppColors.outline,
+                    width: 1.5,
+                  ),
+                ),
+                child: selected
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: AppColors.actionForeground,
+                      )
+                    : null,
+              ),
+            ],
+          ),
         ),
       ),
     );

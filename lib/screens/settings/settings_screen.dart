@@ -11,7 +11,6 @@ import '../../utils/date_format.dart';
 import '../../utils/money_format.dart';
 import '../../utils/user_messages.dart';
 import '../../widgets/app_page_header.dart';
-import '../../widgets/cat_illustration.dart';
 import '../../widgets/transfer_money_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -612,12 +611,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const AppPageHeader(
                             title: 'Configuración',
                             subtitle: 'Personaliza tus preferencias locales.',
-                            trailing: AnimatedCat(
-                              asset: CatAssets.icono,
-                              label: 'Gato de Finanzas',
-                              width: 60,
-                              height: 48,
-                            ),
                           ),
                           const SizedBox(height: AppSpacing.section),
                           _SettingsSection(

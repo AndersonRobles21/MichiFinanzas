@@ -96,12 +96,6 @@ class _CreditsScreenState extends State<CreditsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addEntity,
-        tooltip: 'Agregar entidad de crédito',
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Agregar entidad'),
-      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -154,15 +148,9 @@ class _CreditsScreenState extends State<CreditsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const AppPageHeader(
-                              title: 'Créditos',
+                              title: 'Créditos de compra',
                               subtitle:
                                   'Organiza tus compras y el cupo de cada entidad.',
-                              trailing: AnimatedCat(
-                                asset: CatAssets.estadisticas,
-                                label: 'Gato organizando créditos',
-                                width: 72,
-                                height: 58,
-                              ),
                             ),
                             if (entities.isNotEmpty) ...[
                               const SizedBox(height: 22),
@@ -184,9 +172,13 @@ class _CreditsScreenState extends State<CreditsScreen> {
                                     ).textTheme.titleLarge,
                                   ),
                                 ),
-                                Text(
-                                  '${entities.length}',
-                                  style: Theme.of(context).textTheme.bodyMedium,
+                                TextButton.icon(
+                                  onPressed: _addEntity,
+                                  icon: const Icon(
+                                    Icons.add_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Agregar entidad'),
                                 ),
                               ],
                             ),

@@ -44,6 +44,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   late final StreamSubscription<void> _financialChanges;
   Future<_StatisticsData>? _statisticsFuture;
   StatisticsPeriod _period = StatisticsPeriod.thisMonth;
+  String _view = 'general';
 
   @override
   void initState() {
@@ -75,13 +76,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         _databaseService.obtenerIngresos(),
         _databaseService.obtenerGastos(),
         _databaseService.obtenerMovimientosAhorro(),
-        _databaseService.obtenerSaldoDisponible(),
+        _databaseService.obtenerSaldosPorMedio(),
         _databaseService.obtenerTodosLosMovimientosReservaGastoFuturo(),
         _databaseService.obtenerTodosLosPagosDeuda(),
         _databaseService.obtenerCuentasDigitales(),
         _databaseService.obtenerGastosCreditoIds(),
       ]);
       final expenses = results[1] as List<Gasto>;
+      final balances = results[3] as AvailableBalanceBreakdown;
       final representedPaymentIds = expenses
           .map((expense) => expense.pagoDeudaId)
           .whereType<int>()
@@ -90,7 +92,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         incomes: results[0] as List<Ingreso>,
         expenses: expenses,
         savingsMovements: results[2] as List<MovimientosAhorroData>,
-        availableBalance: results[3] as double,
+        availableBalance: balances.total,
+        balances: balances,
         futureExpenses: _netFutureExpenseReservations(
           results[4] as List<MovimientosReservaGastoFuturoData>,
         ),
@@ -171,6 +174,32 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   availableBalance: data.availableBalance,
                   creditExpenseIds: data.creditExpenseIds,
                 );
+                bool matchesView(String? medium) => switch (_view) {
+                  'general' => true,
+                  'efectivo' =>
+                    MoneyMedium.fromStorage(medium) == MoneyMedium.cash,
+                  'digital' =>
+                    MoneyMedium.fromStorage(medium) == MoneyMedium.digital,
+                  _ => false,
+                };
+                final selectedExpenses = periodExpenses
+                    .where((expense) => matchesView(expense.medio))
+                    .toList();
+                final selectedDebtPayments = periodDebtPayments
+                    .where((payment) => matchesView(payment.medio))
+                    .toList();
+                final selectedCategories = switch (_view) {
+                  'efectivo' => summary.cashCategories,
+                  'digital' => summary.digitalCategories,
+                  _ => summary.categories,
+                };
+                final selectedExpenseCount =
+                    selectedExpenses.length + selectedDebtPayments.length;
+                final selectedIncomes = _view == 'general'
+                    ? periodIncomes
+                    : periodIncomes
+                          .where((income) => matchesView(income.medio))
+                          .toList();
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
@@ -187,17 +216,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         children: [
                           AppPageHeader(
                             title: 'Estadísticas',
-                            subtitle:
-                                'Ingresos, gastos y ahorros en un vistazo.',
+                            subtitle: '',
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const AnimatedCat(
-                                  asset: CatAssets.estadisticas,
-                                  label: 'Gato revisando estadísticas',
-                                  width: 64,
-                                  height: 52,
-                                ),
                                 IconButton(
                                   tooltip: 'Actualizar estadísticas',
                                   onPressed: _retry,
@@ -213,125 +235,88 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               _period = period;
                             }),
                           ),
-                          const SizedBox(height: AppSpacing.section),
-                          _SummaryGrid(summary: summary),
-                          const SizedBox(height: 28),
-                          Text(
-                            'Estadísticas generales',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Todos los medios · base: ingresos del período.',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          const SizedBox(height: 8),
+                          _StatisticsViewSelector(
+                            selected: _view,
+                            onChanged: (view) => setState(() => _view = view),
                           ),
                           const SizedBox(height: 12),
-                          _CategoryChart(
-                            key: const ValueKey('statistics-general-block'),
-                            categories: summary.categories,
-                            remaining: summary.generalRemaining,
-                            chartKey: const ValueKey('category-pie-chart'),
-                            showSpendingTotalKey: true,
-                            emptyMessage: 'Sin gastos en este período.',
+                          _StatisticsKpis(
+                            summary: summary,
+                            view: _view,
+                            expenseCount: selectedExpenseCount,
+                            balance: switch (_view) {
+                              'efectivo' => data.balances.cash,
+                              'digital' => data.balances.digital,
+                              _ => null,
+                            },
                           ),
-                          if (summary.unclassifiedExpenses > 0) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'Movimientos sin medio: '
-                              '${_formatMoney(summary.unclassifiedExpenses)}. '
-                              'Se incluyen aquí, no en efectivo ni digital.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 18),
                           Text(
-                            'Estadísticas de efectivo',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Solo movimientos clasificados como efectivo.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 12),
-                          _CategoryChart(
-                            key: const ValueKey('statistics-cash-block'),
-                            categories: summary.cashCategories,
-                            remaining: summary.cashRemaining,
-                            chartKey: const ValueKey('cash-category-pie-chart'),
-                            showSpendingTotalKey: false,
-                            emptyMessage:
-                                'Sin movimientos de efectivo clasificados '
-                                'en este período.',
-                          ),
-                          const SizedBox(height: 28),
-                          Text(
-                            'Estadísticas digitales',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Solo movimientos clasificados como digitales.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 12),
-                          _CategoryChart(
-                            key: const ValueKey('statistics-digital-block'),
-                            categories: summary.digitalCategories,
-                            remaining: summary.digitalRemaining,
-                            chartKey: const ValueKey(
-                              'digital-category-pie-chart',
-                            ),
-                            showSpendingTotalKey: false,
-                            emptyMessage:
-                                'Sin movimientos digitales clasificados '
-                                'en este período.',
-                          ),
-                          const SizedBox(height: 16),
-                          _DigitalAccountStatistics(
-                            accounts: data.digitalAccounts
-                                .where((account) => account.balance > 1e-8)
-                                .map(
-                                  (account) => _DigitalAccountPeriodSummary(
-                                    account: account,
-                                    expenses: periodExpenses
-                                        .where(
-                                          (expense) =>
-                                              expense.cuentaDigitalId ==
-                                              account.account.id,
-                                        )
-                                        .toList(),
-                                    range: range,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          const SizedBox(height: 28),
-                          Text(
-                            'Evolución del dinero',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 12),
-                          _TrendChart(
-                            points: _dailyTotals(
-                              range,
-                              periodIncomes,
-                              periodExpenses,
-                              periodDebtPayments,
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-                          Text(
-                            'Movimientos de ahorro',
+                            'Gastos por categoría',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            'Aportes y retiros son transferencias internas; no cuentan como ingresos ni gastos.',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          _CategoryChart(
+                            key: ValueKey('statistics-$_view-block'),
+                            categories: selectedCategories,
+                            remaining: null,
+                            chartKey: ValueKey(
+                              '$_view-category-pie-chart',
+                            ),
+                            showSpendingTotalKey: _view == 'general',
+                            emptyMessage: 'Sin gastos en este período.',
                           ),
-                          const SizedBox(height: 12),
-                          _SavingsMovementSummary(summary: summary),
+                          if (_view == 'general' &&
+                              summary.unclassifiedExpenses > 0) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Movimientos sin medio: ${_formatMoney(summary.unclassifiedExpenses)}. Se incluyen aquí, no en efectivo ni digital.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                          if (_view == 'digital') ...[
+                            const SizedBox(height: 18),
+                            _DigitalAccountStatistics(
+                              accounts: data.digitalAccounts
+                                  .where((account) => account.balance > 1e-8)
+                                  .map(
+                                    (account) => _DigitalAccountPeriodSummary(
+                                      account: account,
+                                      expenses: periodExpenses
+                                          .where(
+                                            (expense) =>
+                                                expense.cuentaDigitalId ==
+                                                account.account.id,
+                                          )
+                                          .toList(),
+                                      range: range,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          Text(
+                            'Tendencia de gastos',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          _TrendChart(
+                            points: _dailyTotals(
+                              range,
+                              selectedIncomes,
+                              selectedExpenses,
+                              selectedDebtPayments,
+                            ),
+                          ),
+                          if (_view == 'general') ...[
+                            const SizedBox(height: 18),
+                            Text(
+                              'Los abonos de deudas se cuentan una sola vez y los préstamos recibidos no cuentan como ingreso. Lo reservado para gastos futuros y los aportes al ahorro no cuentan como gasto.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -387,6 +372,7 @@ class _StatisticsData {
     required this.expenses,
     required this.savingsMovements,
     required this.availableBalance,
+    required this.balances,
     required this.futureExpenses,
     required this.debtPayments,
     required this.digitalAccounts,
@@ -397,6 +383,7 @@ class _StatisticsData {
   final List<Gasto> expenses;
   final List<MovimientosAhorroData> savingsMovements;
   final double availableBalance;
+  final AvailableBalanceBreakdown balances;
   final List<_FutureExpenseReservation> futureExpenses;
   final List<PagosDeudaData> debtPayments;
   final List<DigitalAccountBalance> digitalAccounts;
@@ -947,16 +934,239 @@ class _PeriodSelector extends StatelessWidget {
       runSpacing: 8,
       children: [
         for (final period in StatisticsPeriod.values)
-          ChoiceChip(
+          _StatisticsChip(
             key: ValueKey('period-${period.name}'),
-            label: Text(period.label),
+            label: period.label,
             selected: selected == period,
-            onSelected: (_) => onChanged(period),
-            showCheckmark: false,
+            onTap: () => onChanged(period),
           ),
       ],
     );
   }
+}
+
+class _StatisticsChip extends StatelessWidget {
+  const _StatisticsChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.primary : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadii.pill),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 38),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.outline,
+            ),
+          ),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: selected
+                  ? AppColors.actionForeground
+                  : AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatisticsViewSelector extends StatelessWidget {
+  const _StatisticsViewSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const views = [
+      ('general', 'General'),
+      ('efectivo', 'Efectivo'),
+      ('digital', 'Digital'),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          for (final view in views)
+            Expanded(
+              child: Material(
+                color: selected == view.$1
+                    ? AppColors.surface
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(11),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(11),
+                  onTap: () => onChanged(view.$1),
+                  child: SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: Text(
+                        view.$2,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: selected == view.$1
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatisticsKpis extends StatelessWidget {
+  const _StatisticsKpis({
+    required this.summary,
+    required this.view,
+    required this.expenseCount,
+    required this.balance,
+  });
+
+  final _StatisticsSummary summary;
+  final String view;
+  final int expenseCount;
+  final double? balance;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedCategories = switch (view) {
+      'efectivo' => summary.cashCategories,
+      'digital' => summary.digitalCategories,
+      _ => summary.categories,
+    };
+    final spent = selectedCategories.fold<double>(
+      0,
+      (total, category) => total + category.amount,
+    );
+    final List<_StatisticsMetric> metrics = view == 'general'
+        ? [
+            _StatisticsMetric(
+              label: 'Ingresos',
+              value: summary.incomeTotal,
+              color: AppColors.positive,
+            ),
+            _StatisticsMetric(
+              label: 'Gastos',
+              value: summary.expenseTotal,
+              color: AppColors.negative,
+            ),
+            _StatisticsMetric(
+              label: 'Restante',
+              value: summary.generalRemaining ?? 0,
+              color: AppColors.textPrimary,
+            ),
+          ]
+        : [
+            _StatisticsMetric(
+              label: 'Gastado',
+              value: spent,
+              color: AppColors.negative,
+            ),
+            _StatisticsMetric(
+              label: 'Movimientos',
+              value: expenseCount.toDouble(),
+              color: AppColors.textPrimary,
+              isCount: true,
+            ),
+            _StatisticsMetric(
+              label: 'Saldo actual',
+              value: balance ?? 0,
+              color: AppColors.textPrimary,
+            ),
+          ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gap = 8.0;
+        final width = (constraints.maxWidth - gap * 2) / 3;
+        return Wrap(
+          spacing: gap,
+          children: [
+            for (final metric in metrics)
+              SizedBox(
+                width: width,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: AppCardDecorations.surface,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        metric.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        metric.isCount
+                            ? '${metric.value.round()}'
+                            : _formatMoney(metric.value),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: metric.color,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatisticsMetric {
+  const _StatisticsMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.isCount = false,
+  });
+
+  final String label;
+  final double value;
+  final Color color;
+  final bool isCount;
 }
 
 class _SummaryGrid extends StatelessWidget {

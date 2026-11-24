@@ -38,6 +38,7 @@ class _DebtsScreenState extends State<DebtsScreen> {
   double _unclassifiedBalance = 0;
   late final StreamSubscription<void> _financialChanges;
   bool _isProcessingPayment = false;
+  bool _showPaidDebts = false;
 
   @override
   void initState() {
@@ -288,12 +289,6 @@ class _DebtsScreenState extends State<DebtsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addDebt,
-        tooltip: 'Registrar deuda',
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Nueva deuda'),
-      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -319,6 +314,9 @@ class _DebtsScreenState extends State<DebtsScreen> {
                 final pendingCount = debts
                     .where((entry) => !entry.estaPagada)
                     .length;
+                final visibleDebts = debts
+                    .where((entry) => entry.estaPagada == _showPaidDebts)
+                    .toList();
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
@@ -334,38 +332,41 @@ class _DebtsScreenState extends State<DebtsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const AppPageHeader(
-                            title: 'Deudas',
+                            title: 'Deudas y préstamos',
                             subtitle:
                                 'Controla tus cuotas, abonos y saldos pendientes.',
                           ),
-                          if (debts.isNotEmpty) ...[
-                            const SizedBox(height: 22),
-                            _DebtOverview(
-                              count: debts.length,
-                              pendingCount: pendingCount,
-                              outstandingTotal: outstandingTotal,
-                            ),
-                          ],
-                          const SizedBox(height: 26),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Tus deudas',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ),
-                              Text(
-                                '${debts.length}',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
+                          const SizedBox(height: 18),
+                          _DebtOverview(
+                            count: debts.length,
+                            pendingCount: pendingCount,
+                            outstandingTotal: outstandingTotal,
                           ),
                           const SizedBox(height: 12),
-                          if (debts.isEmpty)
-                            const _DebtEmpty()
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _isProcessingPayment ? null : _addDebt,
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Nueva deuda'),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _DebtStatusSelector(
+                            showPaid: _showPaidDebts,
+                            pendingCount: pendingCount,
+                            paidCount: debts.length - pendingCount,
+                            onChanged: (showPaid) =>
+                                setState(() => _showPaidDebts = showPaid),
+                          ),
+                          const SizedBox(height: 12),
+                          if (visibleDebts.isEmpty)
+                            _DebtEmpty(
+                              isPaid: _showPaidDebts,
+                              onAdd: _addDebt,
+                            )
                           else
-                            ...debts.map(
+                            ...visibleDebts.map(
                               (entry) => Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: _DebtCard(
@@ -1118,6 +1119,65 @@ class _DebtOverview extends StatelessWidget {
   }
 }
 
+class _DebtStatusSelector extends StatelessWidget {
+  const _DebtStatusSelector({
+    required this.showPaid,
+    required this.pendingCount,
+    required this.paidCount,
+    required this.onChanged,
+  });
+
+  final bool showPaid;
+  final int pendingCount;
+  final int paidCount;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      ('Pendientes', pendingCount, false),
+      ('Pagadas', paidCount, true),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          for (final option in options)
+            Expanded(
+              child: Material(
+                color: showPaid == option.$3
+                    ? AppColors.surface
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(11),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(11),
+                  onTap: () => onChanged(option.$3),
+                  child: SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: Text(
+                        '${option.$1} ${option.$2}',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: showPaid == option.$3
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OverviewValue extends StatelessWidget {
   const _OverviewValue({required this.label, required this.value});
 
@@ -1416,7 +1476,10 @@ class _PaymentHistorySheet extends StatelessWidget {
 }
 
 class _DebtEmpty extends StatelessWidget {
-  const _DebtEmpty();
+  const _DebtEmpty({required this.isPaid, required this.onAdd});
+
+  final bool isPaid;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -1434,17 +1497,27 @@ class _DebtEmpty extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Todavía no hay deudas por aquí.',
+              isPaid
+                  ? 'Ninguna deuda pagada aún'
+                  : 'Todavía no hay deudas por aquí.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
-              'Tus compras a crédito y préstamos aparecerán aquí. '
-              'Aquí solo te ayudamos a tenerlas en orden.',
+              isPaid
+                  ? 'Cuando termines de pagar una deuda, quedará guardada aquí.'
+                  : 'Tus compras a crédito y préstamos aparecerán aquí. Aquí solo te ayudamos a tenerlas en orden.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (!isPaid) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: onAdd,
+                child: const Text('Nueva deuda'),
+              ),
+            ],
           ],
         ),
       ),

@@ -31,6 +31,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
   late Future<_SavingsData> _dataFuture;
   bool _isSaving = false;
   int _savingsBounceTrigger = 0;
+  int _selectedTab = 0;
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
       if (mounted) {
         setState(() {
           _dataFuture = _loadData();
+          _savingsBounceTrigger++;
         });
       }
     });
@@ -55,7 +57,6 @@ class _SavingsScreenState extends State<SavingsScreen> {
     if (widget.isActive && !oldWidget.isActive) {
       setState(() {
         _dataFuture = _loadData();
-        _savingsBounceTrigger++;
       });
     }
   }
@@ -303,84 +304,79 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppPageHeader(
-                          title: 'Ahorros',
-                          subtitle: 'Un poquito hoy, un gran paso mañana.',
-                          trailing: AnimatedCat(
-                            asset: CatAssets.ahorros,
-                            label: 'Gato cuidando sus ahorros',
-                            width: 68,
-                            height: 54,
+                          title: 'Ahorros y préstamos',
+                          subtitle: '',
+                        ),
+                        const SizedBox(height: 18),
+                        _SavingsTabSelector(
+                          selected: _selectedTab,
+                          onChanged: (index) =>
+                              setState(() => _selectedTab = index),
+                        ),
+                        const SizedBox(height: 14),
+                        if (_selectedTab == 0) ...[
+                          _SavingsBalancePanel(
+                            total: data.total,
+                            isSaving: _isSaving,
                             bounceTrigger: _savingsBounceTrigger,
+                            onContribute: () =>
+                                _moveMoney(isWithdrawal: false),
+                            onWithdraw: () => _moveMoney(isWithdrawal: true),
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.section),
-                        _SavingsBalancePanel(
-                          total: data.total,
-                          available: data.available,
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            FilledButton.icon(
-                              key: const ValueKey('savings-add'),
-                              onPressed: _isSaving
-                                  ? null
-                                  : () => _moveMoney(isWithdrawal: false),
-                              icon: const Icon(Icons.savings_outlined),
-                              label: const Text('Separar dinero'),
-                            ),
-                            OutlinedButton.icon(
-                              key: const ValueKey('savings-withdraw'),
-                              onPressed: _isSaving || data.total <= 0
-                                  ? null
-                                  : () => _moveMoney(isWithdrawal: true),
-                              icon: const Icon(Icons.output_rounded),
-                              label: const Text('Retirar'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 30),
-                        Text(
-                          'Tu historial',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 12),
-                        if (data.movements.isEmpty)
-                          const _SavingsEmpty()
-                        else
-                          for (final movement in data.movements)
-                            _SavingsMovementTile(movement: movement),
-                        const SizedBox(height: 30),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Préstamos',
-                                style: Theme.of(context).textTheme.titleLarge,
+                          const SizedBox(height: 14),
+                          _SavingsNote(
+                            text:
+                                'Separar y retirar son movimientos internos: no cuentan como ingresos ni gastos. Tu ahorro no se suma al dinero disponible.',
+                          ),
+                          const SizedBox(height: 20),
+                          _SectionHeading(
+                            title: 'Tu historial',
+                            count: data.movements.length,
+                          ),
+                          const SizedBox(height: 8),
+                          if (data.movements.isEmpty)
+                            _SavingsEmpty(
+                              onAdd: () => _moveMoney(isWithdrawal: false),
+                            )
+                          else
+                            _SavingsMovementList(movements: data.movements),
+                        ] else ...[
+                          _ThirdPartyLoanSummary(loans: data.loans),
+                          const SizedBox(height: 14),
+                          _SavingsNote(
+                            text:
+                                'Es dinero que le prestaste a otras personas. No es tu ahorro ni una deuda tuya.',
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _SectionHeading(
+                                  title: 'Préstamos',
+                                  count: data.loans.length,
+                                ),
                               ),
-                            ),
-                            FilledButton.icon(
-                              key: const ValueKey('third-party-loan-add'),
-                              onPressed: _isSaving || data.available <= 0
-                                  ? null
-                                  : _registerLoan,
-                              icon: const Icon(Icons.call_made_rounded),
-                              label: const Text('Prestar dinero'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (data.loans.isEmpty)
-                          const _LoansEmpty()
-                        else
-                          for (final loan in data.loans)
-                            _ThirdPartyLoanCard(
-                              loan: loan,
-                              isBusy: _isSaving,
-                              onReturn: () => _returnLoan(loan),
-                            ),
+                              FilledButton.icon(
+                                key: const ValueKey('third-party-loan-add'),
+                                onPressed: _isSaving || data.available <= 0
+                                    ? null
+                                    : _registerLoan,
+                                icon: const Icon(Icons.call_made_rounded),
+                                label: const Text('Prestar dinero'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (data.loans.isEmpty)
+                            const _LoansEmpty()
+                          else
+                            for (final loan in data.loans)
+                              _ThirdPartyLoanCard(
+                                loan: loan,
+                                isBusy: _isSaving,
+                                onReturn: () => _returnLoan(loan),
+                              ),
+                        ],
                       ],
                     ),
                   ),
@@ -479,54 +475,305 @@ String _newLoanOperationId() {
 }
 
 class _SavingsBalancePanel extends StatelessWidget {
-  const _SavingsBalancePanel({required this.total, required this.available});
+  const _SavingsBalancePanel({
+    required this.total,
+    required this.isSaving,
+    required this.bounceTrigger,
+    required this.onContribute,
+    required this.onWithdraw,
+  });
 
   final double total;
-  final double available;
+  final bool isSaving;
+  final int bounceTrigger;
+  final VoidCallback onContribute;
+  final VoidCallback onWithdraw;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: AppCardDecorations.featured,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.brand,
+        borderRadius: BorderRadius.circular(AppRadii.large),
+      ),
+      child: Stack(
         children: [
-          Text(
-            'Ahorro acumulado',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: Text(
-              formatMoney(total),
-              key: ValueKey(total),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontSize: 32,
-                color: AppColors.primary,
-              ),
+          PositionedDirectional(
+            top: 0,
+            end: 0,
+            child: AnimatedCat(
+              asset: CatAssets.ahorros,
+              label: 'Gato cuidando sus ahorros',
+              width: 76,
+              height: 66,
+              bounceTrigger: bounceTrigger,
             ),
           ),
-          const SizedBox(height: 18),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.account_balance_wallet_outlined, size: 19),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Disponible: ${formatMoney(available)}',
-                  style: Theme.of(context).textTheme.titleMedium,
+              Text(
+                'Ahorro acumulado',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
                 ),
               ),
-              Icon(
-                Icons.pets_rounded,
-                color: AppColors.primary,
-                size: 22,
+              const SizedBox(height: 2),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Text(
+                  formatMoney(total),
+                  key: ValueKey(total),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontSize: 34,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 78),
+                child: Text(
+                  'Un poquito hoy, un gran paso mañana.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('savings-add'),
+                      onPressed: isSaving ? null : onContribute,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.brand,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text('Separar dinero'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('savings-withdraw'),
+                      onPressed: isSaving || total <= 0 ? null : onWithdraw,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text('Retirar'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavingsTabSelector extends StatelessWidget {
+  const _SavingsTabSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final int selected;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Mi ahorro', 'Dinero prestado'];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < labels.length; index++)
+            Expanded(
+              child: Material(
+                color: selected == index
+                    ? AppColors.surface
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(11),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(11),
+                  onTap: () => onChanged(index),
+                  child: SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: Text(
+                        labels[index],
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: selected == index
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavingsNote extends StatelessWidget {
+  const _SavingsNote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadii.small),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 17,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, required this.count});
+
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
+        Text('$count', style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _ThirdPartyLoanSummary extends StatelessWidget {
+  const _ThirdPartyLoanSummary({required this.loans});
+
+  final List<_ThirdPartyLoan> loans;
+
+  @override
+  Widget build(BuildContext context) {
+    final lent = loans.fold<double>(
+      0,
+      (total, loan) => total + loan.loan.montoPrincipal,
+    );
+    final returned = loans.fold<double>(
+      0,
+      (total, loan) => total + loan.totalReturned,
+    );
+    final pending = loans.fold<double>(
+      0,
+      (total, loan) => total + loan.remaining,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppCardDecorations.surface,
+      child: Column(
+        children: [
+          _LoanSummaryValue(label: 'Prestado', amount: lent),
+          const SizedBox(height: 10),
+          _LoanSummaryValue(
+            label: 'Devuelto',
+            amount: returned,
+            color: AppColors.positive,
+          ),
+          const SizedBox(height: 10),
+          _LoanSummaryValue(
+            label: 'Pendiente por cobrar',
+            amount: pending,
+            color: pending > 0 ? AppColors.warning : AppColors.positive,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoanSummaryValue extends StatelessWidget {
+  const _LoanSummaryValue({
+    required this.label,
+    required this.amount,
+    this.color,
+  });
+
+  final String label;
+  final double amount;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        ),
+        Text(
+          formatMoney(amount),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color),
+        ),
+      ],
+    );
+  }
+}
+
+class _SavingsMovementList extends StatelessWidget {
+  const _SavingsMovementList({required this.movements});
+
+  final List<MovimientosAhorroData> movements;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: AppCardDecorations.surface,
+      child: Column(
+        children: [
+          for (var index = 0; index < movements.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                color: AppColors.outline.withValues(alpha: 0.25),
+              ),
+            _SavingsMovementTile(movement: movements[index]),
+          ],
         ],
       ),
     );
@@ -542,19 +789,21 @@ class _SavingsMovementTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isContribution = movement.tipo == DatabaseService.aporteAhorro;
     final color = isContribution ? AppColors.positive : AppColors.negative;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: AppCardDecorations.surface,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: color.withValues(alpha: 0.16),
-            foregroundColor: color,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceRaised,
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: Icon(
-              isContribution
-                  ? Icons.south_west_rounded
-                  : Icons.north_east_rounded,
+              isContribution ? Icons.savings_outlined : Icons.output_rounded,
+              color: color,
+              size: 20,
             ),
           ),
           const SizedBox(width: 12),
@@ -564,22 +813,23 @@ class _SavingsMovementTile extends StatelessWidget {
               children: [
                 Text(
                   isContribution ? 'Aporte a tus ahorros' : 'Retiro de ahorros',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-                const SizedBox(height: 3),
                 Text(
-                  formatSpanishLongDate(movement.fecha),
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  '${isContribution ? 'Desde' : 'Hacia'} ${MoneyMedium.fromStorage(movement.medio)?.label ?? 'Medio sin clasificar'} · ${formatSpanishLongDate(movement.fecha)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
           Text(
-            '${isContribution ? '+' : '-'}${formatMoney(movement.monto)}',
+            '${isContribution ? '+' : '−'}${formatMoney(movement.monto)}',
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(color: color),
+            ).textTheme.titleSmall?.copyWith(color: color),
           ),
         ],
       ),
@@ -588,7 +838,9 @@ class _SavingsMovementTile extends StatelessWidget {
 }
 
 class _SavingsEmpty extends StatelessWidget {
-  const _SavingsEmpty();
+  const _SavingsEmpty({required this.onAdd});
+
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -596,7 +848,8 @@ class _SavingsEmpty extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: AppCardDecorations.surface,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const AnimatedCat(
             asset: CatAssets.vacio,
@@ -604,13 +857,19 @@ class _SavingsEmpty extends StatelessWidget {
             width: 104,
             height: 78,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Tu primer aporte empieza aquí.',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+          const SizedBox(height: 8),
+          Text(
+            'Tu primer aporte empieza aquí',
+            style: Theme.of(context).textTheme.titleSmall,
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Separa un poquito de lo que recibes y míralo crecer.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onAdd, child: const Text('Separar dinero')),
         ],
       ),
     );
